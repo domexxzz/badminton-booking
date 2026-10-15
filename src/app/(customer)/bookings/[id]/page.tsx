@@ -1,6 +1,7 @@
 import QRCode from "qrcode";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { BookingChangePanel, type PendingRequest } from "@/components/BookingChangePanel";
 import { BookingStatusNotice } from "@/components/BookingStatusNotice";
 import { CancelButton } from "@/components/CancelButton";
 import { ChevronLeft } from "@/components/icons";
@@ -24,8 +25,22 @@ type Booking = {
   status: string;
   hold_expires_at: string | null;
   review_note: string | null;
+  court_id: number;
+  channel: string;
   courts: { name: string } | null;
   payments: { created_at: string; verify_status: string; verify_reasons: string[] }[];
+};
+
+type BookingRequestRow = {
+  id: string;
+  kind: "reschedule" | "cancel";
+  status: string;
+  new_court_id: number | null;
+  new_starts_at: string | null;
+  new_ends_at: string | null;
+  admin_note: string | null;
+  refund_slip_path: string | null;
+  resolved_at: string | null;
 };
 
 // What the customer sees while an admin looks at a slip the auto-check could not pass.
@@ -54,11 +69,36 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const { data: booking } = await supabase
     .from("bookings")
     .select(
-      "id, user_id, starts_at, ends_at, amount, status, hold_expires_at, review_note, courts(name), payments(created_at, verify_status, verify_reasons)",
+      "id, user_id, court_id, channel, starts_at, ends_at, amount, status, hold_expires_at, review_note, courts(name), payments(created_at, verify_status, verify_reasons)",
     )
     .eq("id", id)
     .maybeSingle<Booking>();
   if (!booking) notFound();
+
+  const [{ data: requests }, { data: courts }] = await Promise.all([
+    supabase
+      .from("booking_requests")
+      .select("id, kind, status, new_court_id, new_starts_at, new_ends_at, admin_note, refund_slip_path, resolved_at")
+      .eq("booking_id", booking.id)
+      .order("created_at", { ascending: false })
+      .limit(5)
+      .returns<BookingRequestRow[]>(),
+    supabase.from("courts").select("id, name").eq("is_active", true).order("id"),
+  ]);
+  const pendingRow = requests?.find((r) => r.status === "pending") ?? null;
+  const lastResolved = requests?.find((r) => r.status === "approved" || r.status === "rejected") ?? null;
+  const pending: PendingRequest | null = pendingRow && {
+    id: pendingRow.id,
+    kind: pendingRow.kind,
+    new_starts_at: pendingRow.new_starts_at,
+    new_ends_at: pendingRow.new_ends_at,
+    newCourtName: courts?.find((c) => c.id === pendingRow.new_court_id)?.name ?? null,
+  };
+  const refundSlipUrl = lastResolved?.refund_slip_path
+    ? (await supabase.storage.from("refunds").createSignedUrl(lastResolved.refund_slip_path, 600)).data?.signedUrl ?? null
+    : null;
+  const changeable =
+    booking.status === "confirmed" && booking.channel === "online" && Date.parse(booking.starts_at) > Date.now();
 
   // Stop showing the QR once the window closes so nobody pays for a lapsed hold.
   const holdLapsed =
@@ -74,6 +114,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   return (
     <div className="stack">
       <LiveRefresh table="bookings" filter={`id=eq.${booking.id}`} />
+      <LiveRefresh table="booking_requests" filter={`booking_id=eq.${booking.id}`} />
       <BookingStatusNotice
         bookingId={booking.id}
         status={booking.status}
@@ -156,6 +197,34 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           <h2>จองสำเร็จ 🎉</h2>
           <p className="muted">แสดงหน้านี้ที่เคาน์เตอร์เมื่อมาถึงสนาม</p>
         </div>
+      )}
+
+      {lastResolved && (
+        <div className="card stack" style={{ gap: 8 }}>
+          <h2>
+            {lastResolved.kind === "cancel" ? "คำขอยกเลิก" : "คำขอเลื่อน"}
+            {lastResolved.status === "approved" ? " · อนุมัติแล้ว ✅" : " · ไม่อนุมัติ"}
+          </h2>
+          {lastResolved.admin_note && <p className="muted" style={{ margin: 0 }}>แอดมิน: {lastResolved.admin_note}</p>}
+          {refundSlipUrl && (
+            <a href={refundSlipUrl} target="_blank" rel="noreferrer">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="slip" src={refundSlipUrl} alt="สลิปโอนเงินคืน" />
+            </a>
+          )}
+        </div>
+      )}
+
+      {changeable && (
+        <BookingChangePanel
+          bookingId={booking.id}
+          userId={user.id}
+          courtId={booking.court_id}
+          durationHours={(Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) / 3_600_000}
+          amount={Number(booking.amount)}
+          courts={courts ?? []}
+          pending={pending}
+        />
       )}
 
       {holdLapsed && (

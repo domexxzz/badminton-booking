@@ -2,6 +2,7 @@ import "server-only";
 import { getServiceClient } from "@/lib/supabase/service";
 import {
   bookingConfirmedText,
+  sanitizeName,
   slipNeedsReviewText,
   unmatchedTransferText,
   type BookingSummary,
@@ -9,7 +10,7 @@ import {
 } from "./messages";
 import { multicastText } from "./messaging";
 
-const DEFAULT_EVENTS = "confirmed,needs_review,unmatched";
+const DEFAULT_EVENTS = "confirmed,needs_review,unmatched,request";
 
 function enabled(event: ShopEvent): boolean {
   const events = (process.env.LINE_NOTIFY_EVENTS ?? DEFAULT_EVENTS).split(",").map((e) => e.trim());
@@ -95,4 +96,13 @@ export async function notifyAfterTransfer(
   } else if (result.outcome === "unmatched" && enabled("unmatched")) {
     await notifyAdmins(unmatchedTransferText(amount));
   }
+}
+
+/** A customer asked to move or cancel a paid booking. */
+export async function notifyBookingRequest(bookingId: string, kind: "reschedule" | "cancel"): Promise<void> {
+  if (!enabled("request")) return;
+  const summary = await loadBookingSummary(bookingId);
+  if (!summary) return;
+  const title = kind === "cancel" ? "🙋 ขอยกเลิก + คืนเงิน" : "🙋 ขอเลื่อนการจอง";
+  await notifyAdmins(`${title}\n${summary.court} · ${sanitizeName(summary.customer)}\nดูที่หน้าแอดมิน หัวข้อ "คำขอ"`);
 }

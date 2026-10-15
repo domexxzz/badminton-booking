@@ -12,10 +12,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!user) redirect("/login?next=/admin");
   if (!isAdmin) notFound();
 
-  const { count } = await supabase
-    .from("bookings")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "awaiting_review");
+  const [{ count }, { count: requestCount }] = await Promise.all([
+    supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "awaiting_review"),
+    supabase.from("booking_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+  ]);
 
   return (
     <div className="app admin-app">
@@ -34,7 +34,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             </form>
           </div>
         </div>
-        <AdminNav reviewCount={count ?? 0} />
+        <AdminNav reviewCount={count ?? 0} requestCount={requestCount ?? 0} />
       </header>
       <main className="app-main">{children}</main>
     </div>

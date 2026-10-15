@@ -13,6 +13,7 @@ const MIGRATIONS = [
   "0006_line.sql",
   "0007_round_amounts.sql",
   "0008_half_hour_and_rules.sql",
+  "0009_booking_requests.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -332,6 +333,79 @@ await db.exec(`begin;
 check("app_metadata written later in the same transaction is accepted", true);
 await expectError("one LINE account maps to one profile",
   `update profiles set line_user_id = '${LINE_ID}' where id = '${U2}'`, "duplicate key");
+
+// ---- Reschedule / cancel requests (0009) ----
+const U5 = "55555555-5555-5555-5555-555555555555";
+const U6 = "66666666-6666-6666-6666-666666666666";
+await db.exec(`insert into auth.users (id, email) values ('${U5}','e@x.com'),('${U6}','f@x.com')`);
+const day3 = (h) => at(48 + h); // two days after tomorrow's 17:00 base
+async function paidBooking(uid, court, start, hours) {
+  await as(uid);
+  const { rows: [bk] } = await db.query(`select * from create_booking(${court}::smallint, '${start}', ${hours})`);
+  await db.exec(`insert into storage.objects (bucket_id, name) values ('slips', '${uid}/${bk.id}-1.jpg')`);
+  await db.query(`select submit_slip('${bk.id}', '${uid}/${bk.id}-1.jpg')`);
+  await as(ADMIN);
+  await db.query(`select review_payment('${bk.id}', true)`);
+  return bk;
+}
+const rb = await paidBooking(U5, 1, day3(0), 1);
+const other = await paidBooking(U6, 2, day3(0), 1);
+
+await as(U5);
+await expectError("cannot move onto a taken slot",
+  `select request_reschedule('${rb.id}', 2::smallint, '${day3(0.5)}')`, "SLOT_TAKEN");
+await expectError("new start must be on a half hour",
+  `select request_reschedule('${rb.id}', 1::smallint, '${day3(0.25)}')`, "INVALID_START");
+const { rows: [rq] } = await db.query(`select * from request_reschedule('${rb.id}', 1::smallint, '${day3(0.5)}')`);
+check("reschedule request may overlap the booking's own slot", rq.status === "pending" && rq.kind === "reschedule");
+await expectError("one open request per booking",
+  `select request_reschedule('${rb.id}', 3::smallint, '${day3(2)}')`, "REQUEST_PENDING");
+await as(U6);
+await expectError("others cannot ask to move my booking",
+  `select request_reschedule('${rb.id}', 3::smallint, '${day3(2)}')`, "BOOKING_NOT_FOUND");
+await expectError("customers cannot resolve requests", `select resolve_request('${rq.id}', true)`, "FORBIDDEN");
+await as(ADMIN);
+await db.query(`select resolve_request('${rq.id}', true)`);
+const moved = await bookingRow(rb.id);
+check("approved reschedule moves the booking", Date.parse(moved.starts_at) === Date.parse(day3(0.5)) && moved.status === "confirmed");
+const movedOcc = (await db.query(`select starts_at from court_occupancy where booking_id = '${rb.id}'`)).rows[0];
+check("the live board follows the move", Date.parse(movedOcc.starts_at) === Date.parse(day3(0.5)));
+
+// Approval re-checks the slot: someone else may have taken it meanwhile.
+await as(U5);
+const { rows: [rq2] } = await db.query(`select * from request_reschedule('${rb.id}', 3::smallint, '${day3(2)}')`);
+await paidBooking(U6, 3, day3(2), 1);
+await expectError("approving onto a slot taken since the request fails",
+  `select resolve_request('${rq2.id}', true)`, "SLOT_TAKEN");
+await db.query(`select resolve_request('${rq2.id}', false, 'สนามเต็มแล้ว')`);
+check("admin can reject with a note",
+  (await db.query(`select status, admin_note from booking_requests where id = '${rq2.id}'`)).rows[0].admin_note === "สนามเต็มแล้ว");
+
+// Cancel with refund.
+await as(U5);
+await expectError("cancel needs the customer's QR on file",
+  `select request_cancel('${rb.id}', '${U5}/${rb.id}-qr-1.png')`, "INVALID_QR");
+await db.exec(`insert into storage.objects (bucket_id, name) values ('refunds', '${U5}/${rb.id}-qr-1.png')`);
+const { rows: [cq] } = await db.query(`select * from request_cancel('${rb.id}', '${U5}/${rb.id}-qr-1.png', 'ติดธุระ')`);
+check("cancel request recorded", cq.kind === "cancel" && cq.reason === "ติดธุระ");
+await as(ADMIN);
+await expectError("refund needs the slip", `select resolve_request('${cq.id}', true)`, "REFUND_SLIP_REQUIRED");
+await db.exec(`insert into storage.objects (bucket_id, name) values ('refunds', '${U5}/${rb.id}-refund-1.jpg')`);
+await db.query(`select resolve_request('${cq.id}', true, 'โอนคืนแล้ว', '${U5}/${rb.id}-refund-1.jpg')`);
+check("approved cancel frees the court", (await bookingRow(rb.id)).status === "cancelled"
+  && (await db.query(`select 1 from court_occupancy where booking_id = '${rb.id}'`)).rows.length === 0);
+check("refund slip is kept for the customer",
+  (await db.query(`select refund_slip_path from booking_requests where id = '${cq.id}'`)).rows[0].refund_slip_path === `${U5}/${rb.id}-refund-1.jpg`);
+await as(U5);
+await expectError("cancelled bookings cannot be changed again",
+  `select request_reschedule('${rb.id}', 1::smallint, '${day3(3)}')`, "INVALID_STATUS");
+
+// Withdraw.
+await as(U6);
+const { rows: [wq] } = await db.query(`select * from request_reschedule('${other.id}', 4::smallint, '${day3(1)}')`);
+await db.query(`select withdraw_request('${wq.id}')`);
+check("customer can withdraw a pending request",
+  (await db.query(`select status from booking_requests where id = '${wq.id}'`)).rows[0].status === "withdrawn");
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

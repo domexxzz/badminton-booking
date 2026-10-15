@@ -9,7 +9,7 @@ export type BookingSummary = {
   channel: string;
 };
 
-export type ShopEvent = "confirmed" | "needs_review" | "unmatched";
+export type ShopEvent = "confirmed" | "needs_review" | "unmatched" | "request";
 
 const MAX_NAME = 40;
 

@@ -23,6 +23,9 @@ const MESSAGES: Record<string, string> = {
   INVALID_QR: "แนบรูป QR รับเงินของคุณก่อน",
   REQUEST_NOT_FOUND: "ไม่พบคำขอนี้ หรือมีการตัดสินไปแล้ว",
   REFUND_SLIP_REQUIRED: "แนบสลิปโอนเงินคืนก่อนอนุมัติ",
+  CANNOT_REMOVE_SELF: "ถอนสิทธิ์แอดมินของตัวเองไม่ได้ ให้แอดมินคนอื่นทำ",
+  LAST_ADMIN: "ต้องมีแอดมินอย่างน้อย 1 คน",
+  USER_NOT_FOUND: "ไม่พบผู้ใช้นี้",
   TOO_MANY_SLIP_ATTEMPTS: "ส่งสลิปไม่ผ่านครบ 3 ครั้งแล้ว กรุณาติดต่อแอดมินพร้อมหลักฐานการโอน",
 };
 

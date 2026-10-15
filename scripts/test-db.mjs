@@ -14,6 +14,7 @@ const MIGRATIONS = [
   "0007_round_amounts.sql",
   "0008_half_hour_and_rules.sql",
   "0009_booking_requests.sql",
+  "0010_manage_admins.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -406,6 +407,17 @@ const { rows: [wq] } = await db.query(`select * from request_reschedule('${other
 await db.query(`select withdraw_request('${wq.id}')`);
 check("customer can withdraw a pending request",
   (await db.query(`select status from booking_requests where id = '${wq.id}'`)).rows[0].status === "withdrawn");
+
+// ---- Managing admins (0010) ----
+await as(U1);
+await expectError("customers cannot grant admin", `select set_admin('${U1}', true)`, "FORBIDDEN");
+await as(ADMIN);
+await db.query(`select set_admin('${U5}', true)`);
+check("admin can grant admin", (await db.query(`select is_admin from profiles where id = '${U5}'`)).rows[0].is_admin === true);
+await expectError("admins cannot remove themselves", `select set_admin('${ADMIN}', false)`, "CANNOT_REMOVE_SELF");
+await db.query(`select set_admin('${U5}', false)`);
+check("admin can remove another admin", (await db.query(`select is_admin from profiles where id = '${U5}'`)).rows[0].is_admin === false);
+await expectError("unknown users are rejected", `select set_admin(gen_random_uuid(), true)`, "USER_NOT_FOUND");
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

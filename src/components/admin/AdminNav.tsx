@@ -8,6 +8,7 @@ const TABS = [
   { href: "/admin/review", label: "ตรวจสลิป / เงินเข้า" },
   { href: "/admin/requests", label: "คำขอ" },
   { href: "/admin/new", label: "เพิ่มการจอง" },
+  { href: "/admin/team", label: "แอดมิน" },
 ];
 
 export function AdminNav({ reviewCount, requestCount }: { reviewCount: number; requestCount: number }) {

@@ -157,7 +157,7 @@ npx vercel --prod --yes
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | จำเป็น | Anon public key สำหรับ client-side |
 | `SUPABASE_SERVICE_ROLE_KEY` | จำเป็น | Service role key สำหรับ Server Actions / Admin |
 | `SUPABASE_DB_URL` | สำคัญ | Connection string ต่อตรงเข้า Postgres |
-| `PROMPTPAY_ID` | จำเป็น | เบอร์โทรศัพท์ หรือเลขบัตร ปชช. พร้อมเพย์ของสนาม (เช่น `0902107177`) |
+| `PROMPTPAY_ID` | จำเป็น | เบอร์โทรศัพท์ หรือเลขบัตร ปชช. พร้อมเพย์ของสนาม (เช่น `0829457278`) |
 | `NEXT_PUBLIC_SITE_URL` | จำเป็น | URL เว็บ (Local: `http://localhost:3000`, Prod: `https://badminton-booking-steel.vercel.app`) |
 | `LINE_LOGIN_CHANNEL_ID` | ตัวเลือก | LINE Login channel ID |
 | `LINE_LOGIN_CHANNEL_SECRET` | ตัวเลือก | LINE Login secret |

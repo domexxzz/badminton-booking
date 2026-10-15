@@ -1,0 +1,9 @@
+# Never upload local secrets; production values live in Vercel's environment settings.
+.env
+.env.*
+!.env.example
+node_modules
+.next
+supabase/.temp
+supabase/.branches
+coverage

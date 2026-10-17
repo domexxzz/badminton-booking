@@ -125,7 +125,7 @@ export function BookingForm({
                   type="button"
                   className={`chip ${cls}`}
                   disabled={!free && h !== hour && !inRange}
-                  aria-pressed={h === hour}
+                  aria-pressed={h === hour || inRange}
                   aria-label={`${formatHour(h)} ${free ? "ว่าง" : "ไม่ว่าง"}`}
                   onClick={() => {
                     setError(null);

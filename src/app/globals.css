@@ -216,6 +216,92 @@ input[type="file"] { font-size: 14px; }
 .chip.past { opacity: 0.4; cursor: default; }
 .chip.unavailable { color: #b4bfcb; text-decoration: line-through; cursor: not-allowed; }
 .chip.selected, .chip.in-range { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
+.chip.time-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 4px 2px;
+  line-height: 1.15;
+}
+.chip-time-start {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+.chip-time-end {
+  font-size: 11px;
+  opacity: 0.75;
+  font-weight: 500;
+}
+.chip.selected .chip-time-end,
+.chip.in-range .chip-time-end,
+.chip.booked .chip-time-end {
+  opacity: 0.95;
+  color: #fff;
+}
+
+/* Selected Time Banner */
+.selected-time-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--primary-soft);
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--primary-strong);
+  font-size: 13.5px;
+  animation: fade-in 0.18s ease-out;
+}
+.selected-time-banner strong {
+  font-size: 15px;
+  color: var(--primary-strong);
+}
+.selected-time-banner .time-end-highlight {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  white-space: nowrap;
+}
+
+/* Duration Grid */
+.hours-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.duration-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 4px 2px;
+  line-height: 1.15;
+}
+.duration-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.duration-sub {
+  font-size: 11px;
+  opacity: 0.75;
+  font-weight: 500;
+}
+.duration-chip.selected .duration-sub {
+  color: #fff;
+  opacity: 0.95;
+}
+
 .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); }
 .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 5px; vertical-align: -1px; border: 1px solid var(--border); }
 .live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }

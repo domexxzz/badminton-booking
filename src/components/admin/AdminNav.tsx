@@ -9,6 +9,7 @@ const TABS = [
   { href: "/admin/requests", label: "คำขอ" },
   { href: "/admin/new", label: "เพิ่มการจอง" },
   { href: "/admin/team", label: "แอดมิน" },
+  { href: "/admin/settings", label: "เวลาเปิด-ปิด" },
 ];
 
 export function AdminNav({ reviewCount, requestCount }: { reviewCount: number; requestCount: number }) {

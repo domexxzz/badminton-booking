@@ -16,7 +16,7 @@ type Row = {
 };
 
 export default async function MyBookingsPage() {
-  const { supabase, user, displayName } = await getSessionUser();
+  const { supabase, user, isAdmin, displayName } = await getSessionUser();
   if (!user) redirect("/login?next=/me");
 
   const { data, error } = await supabase
@@ -35,15 +35,28 @@ export default async function MyBookingsPage() {
 
   return (
     <>
-      <section className="card profile-card">
-        <span className="avatar">{(displayName ?? "ผ").trim().charAt(0)}</span>
-        <div style={{ display: "grid", flex: 1 }}>
-          <strong>{displayName ?? "ผู้เล่น"}</strong>
-          <span className="muted">สมาชิก</span>
+      <section className="card stack" style={{ gap: 12 }}>
+        <div className="profile-card">
+          <span className="avatar">{(displayName ?? "ผ").trim().charAt(0)}</span>
+          <div style={{ display: "grid", flex: 1, gap: 2 }}>
+            <strong>{displayName ?? "ผู้เล่น"}</strong>
+            <div>
+              {isAdmin ? (
+                <span className="badge confirmed">แอดมิน</span>
+              ) : (
+                <span className="muted">สมาชิก</span>
+              )}
+            </div>
+          </div>
+          <form action={signOut}>
+            <button className="btn btn-sm btn-ghost" type="submit">ออกจากระบบ</button>
+          </form>
         </div>
-        <form action={signOut}>
-          <button className="btn btn-sm btn-ghost" type="submit">ออกจากระบบ</button>
-        </form>
+        {isAdmin && (
+          <Link href="/admin" className="btn btn-block" style={{ textAlign: "center" }}>
+            ⚙️ เข้าสู่ระบบหลังร้าน (Admin) ↗
+          </Link>
+        )}
       </section>
 
       <section className="stack" style={{ gap: 10 }}>

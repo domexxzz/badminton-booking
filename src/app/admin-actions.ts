@@ -15,3 +15,28 @@ export async function setAdmin(userId: string, isAdmin: boolean): Promise<Action
   revalidatePath("/admin/team");
   return { ok: true, data: null };
 }
+
+export async function updateVenueHoursAction(openHour: number, closeHour: number): Promise<ActionResult> {
+  if (
+    typeof openHour !== "number" ||
+    typeof closeHour !== "number" ||
+    openHour < 0 ||
+    closeHour > 24 ||
+    openHour >= closeHour
+  ) {
+    return { ok: false, error: "เวลาเปิดและเวลาปิดไม่ถูกต้อง" };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("update_venue_hours", {
+    p_open_hour: openHour,
+    p_close_hour: closeHour,
+  });
+  if (error) return { ok: false, error: friendlyError(error) };
+  revalidatePath("/");
+  revalidatePath("/book");
+  revalidatePath("/schedule");
+  revalidatePath("/admin");
+  revalidatePath("/admin/settings");
+  return { ok: true, data: null };
+}
+

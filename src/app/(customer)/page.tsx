@@ -2,17 +2,20 @@ import Link from "next/link";
 import { CourtArt } from "@/components/CourtArt";
 import { CourtRules } from "@/components/CourtRules";
 import { CalendarIcon, CourtIcon, ReceiptIcon, ShuttleIcon } from "@/components/icons";
-import { BOOKING_RULES } from "@/lib/config";
 import { formatBaht, formatTime } from "@/lib/format";
 import { bangkokDate, formatHour, isActive, slotStart, type Occupancy } from "@/lib/slots";
 import { getSessionUser } from "@/lib/supabase/server";
+import { getVenueHours } from "@/lib/venue-settings";
 
 export const dynamic = "force-dynamic";
 
 const TODAY_ROWS = 6;
 
 export default async function HomePage() {
-  const { supabase } = await getSessionUser();
+  const [{ supabase }, { openHour, closeHour }] = await Promise.all([
+    getSessionUser(),
+    getVenueHours(),
+  ]);
   const now = new Date();
   const today = bangkokDate(now);
 
@@ -41,8 +44,8 @@ export default async function HomePage() {
       <section className="banner">
         <h2>จองสนามแบดได้ใน 1 นาที</h2>
         <p>
-          {courts.data.length} สนาม · {formatBaht(minPrice)}/ชม. · เปิดทุกวัน {formatHour(BOOKING_RULES.openHour)}–
-          {formatHour(BOOKING_RULES.closeHour)}
+          {courts.data.length} สนาม · {formatBaht(minPrice)}/ชม. · เปิดทุกวัน {formatHour(openHour)}–
+          {formatHour(closeHour)}
         </p>
         <Link href="/book" className="btn btn-sm" style={{ marginTop: 12, background: "#fff", color: "#3f9d70" }}>
           จองเลย

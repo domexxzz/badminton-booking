@@ -27,6 +27,7 @@ const MESSAGES: Record<string, string> = {
   LAST_ADMIN: "ต้องมีแอดมินอย่างน้อย 1 คน",
   USER_NOT_FOUND: "ไม่พบผู้ใช้นี้",
   TOO_MANY_SLIP_ATTEMPTS: "ส่งสลิปไม่ผ่านครบ 3 ครั้งแล้ว กรุณาติดต่อแอดมินพร้อมหลักฐานการโอน",
+  INVALID_HOURS: "เวลาเปิดและเวลาปิดสนามไม่ถูกต้อง",
 };
 
 export function friendlyError(error: { message?: string } | null | undefined): string {

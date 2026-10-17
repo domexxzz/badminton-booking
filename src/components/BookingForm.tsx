@@ -5,7 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { createBooking } from "@/app/actions";
 import { BOOKING_RULES } from "@/lib/config";
 import { formatBaht, formatDayLong } from "@/lib/format";
-import { cellState, formatHour, maxBookableHours, openingSlots, slotStart, upcomingDates } from "@/lib/slots";
+import { cellState, formatHour, getVenueStatus, maxBookableHours, openingSlots, slotStart, upcomingDates } from "@/lib/slots";
 import { DatePills } from "./DatePills";
 import { ChevronDown } from "./icons";
 import { useOccupancy } from "./useOccupancy";
@@ -33,7 +33,14 @@ export function BookingForm({
   const router = useRouter();
   const [now, setNow] = useState(() => new Date());
   const dates = upcomingDates(now, BOOKING_RULES.maxDaysAhead);
-  const [date, setDate] = useState(initial.date && dates.includes(initial.date) ? initial.date : dates[0]);
+  const venueStatus = getVenueStatus(now, openHour, closeHour);
+  const defaultDate =
+    initial.date && dates.includes(initial.date)
+      ? initial.date
+      : venueStatus.isTodayClosed && dates[1]
+      ? dates[1]
+      : dates[0];
+  const [date, setDate] = useState(defaultDate);
   const [selectedCourts, setSelectedCourts] = useState<number[]>(() => {
     if (initial.court && courts.some((c) => c.id === initial.court)) return [initial.court];
     return courts[0] ? [courts[0].id] : [1];
@@ -179,6 +186,28 @@ export function BookingForm({
               <span className="time-end-highlight">
                 เลิก {formatHour(hour + hours)} น.
               </span>
+            </div>
+          )}
+
+          {date === dates[0] && venueStatus.isTodayClosed && (
+            <div className="card closed-notice-card" style={{ marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 18 }}>🌙</span>
+                <strong>วันนี้สนามปิดบริการแล้ว (รอบสุดท้าย {formatHour(closeHour)}:00 น.)</strong>
+              </div>
+              <span className="muted" style={{ fontSize: 13 }}>
+                กรุณาเลือกวันถัดไปเพื่อเลือกช่วงเวลาที่ต้องการจอง
+              </span>
+              {dates[1] && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-book-tomorrow"
+                  style={{ marginTop: 4, width: "fit-content" }}
+                  onClick={() => changeDate(dates[1])}
+                >
+                  📅 ไปที่วันพรุ่งนี้
+                </button>
+              )}
             </div>
           )}
 

@@ -90,3 +90,10 @@ export const ShuttleIcon = (p: IconProps) => (
     <path d="m9.2 14.8 8.3-8.3M9 13l6.5-9 4.5 4.5-9 6.5M12 10l2 2M14.5 7.5l2 2" />
   </Svg>
 );
+
+export const MoonIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+  </Svg>
+);
+

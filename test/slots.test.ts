@@ -7,6 +7,7 @@ import {
   openingHours,
   slotStart,
   upcomingDates,
+  getVenueStatus,
   type Occupancy,
 } from "../src/lib/slots";
 
@@ -109,3 +110,52 @@ describe("applyOccupancyChange", () => {
     expect(deleted.map((o) => o.booking_id)).toEqual(["b2"]);
   });
 });
+
+describe("getVenueStatus", () => {
+  test("detects closed after closeHour (e.g. 23:28 Bangkok time) and counts down to tomorrow 09:00", () => {
+    // 2026-10-17 16:28:00 UTC = 2026-10-17 23:28:00 Bangkok
+    const timeAtNight = new Date("2026-10-17T16:28:00Z");
+    const status = getVenueStatus(timeAtNight, 9, 23);
+    expect(status.isOpen).toBe(false);
+    expect(status.isTodayClosed).toBe(true);
+    expect(status.isBeforeOpen).toBe(false);
+    expect(status.targetType).toBe("open");
+    expect(status.targetDateStr).toBe("2026-10-18");
+    expect(status.targetHour).toBe(9);
+    // From 23:28 to tomorrow 09:00 is 9h 32m
+    expect(status.remainingHours).toBe(9);
+    expect(status.remainingMinutes).toBe(32);
+    expect(status.remainingSeconds).toBe(0);
+  });
+
+  test("detects closed before openHour (e.g. 08:30 Bangkok time) and counts down to today 09:00", () => {
+    // 2026-10-18 01:30:00 UTC = 2026-10-18 08:30:00 Bangkok
+    const timeInMorning = new Date("2026-10-18T01:30:00Z");
+    const status = getVenueStatus(timeInMorning, 9, 23);
+    expect(status.isOpen).toBe(false);
+    expect(status.isTodayClosed).toBe(false);
+    expect(status.isBeforeOpen).toBe(true);
+    expect(status.targetType).toBe("open");
+    expect(status.targetDateStr).toBe("2026-10-18");
+    expect(status.targetHour).toBe(9);
+    expect(status.remainingHours).toBe(0);
+    expect(status.remainingMinutes).toBe(30);
+    expect(status.remainingSeconds).toBe(0);
+  });
+
+  test("detects open during business hours (e.g. 15:00 Bangkok time) and counts down to today 23:00", () => {
+    // 2026-10-18 08:00:00 UTC = 2026-10-18 15:00:00 Bangkok
+    const timeOpen = new Date("2026-10-18T08:00:00Z");
+    const status = getVenueStatus(timeOpen, 9, 23);
+    expect(status.isOpen).toBe(true);
+    expect(status.isTodayClosed).toBe(false);
+    expect(status.isBeforeOpen).toBe(false);
+    expect(status.targetType).toBe("close");
+    expect(status.targetDateStr).toBe("2026-10-18");
+    expect(status.targetHour).toBe(23);
+    expect(status.remainingHours).toBe(8);
+    expect(status.remainingMinutes).toBe(0);
+    expect(status.remainingSeconds).toBe(0);
+  });
+});
+

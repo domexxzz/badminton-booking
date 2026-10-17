@@ -13,7 +13,17 @@ type Court = { id: number; name: string; price_per_hour: number };
 const CLOCK_TICK_MS = 30_000;
 const STATE_LABEL = { free: "ว่าง", held: "รอชำระ", booked: "จองแล้ว", past: "เลยเวลา" } as const;
 
-export function ScheduleBoard({ courts, initialDate }: { courts: Court[]; initialDate?: string }) {
+export function ScheduleBoard({
+  courts,
+  initialDate,
+  openHour = BOOKING_RULES.openHour,
+  closeHour = BOOKING_RULES.closeHour,
+}: {
+  courts: Court[];
+  initialDate?: string;
+  openHour?: number;
+  closeHour?: number;
+}) {
   const router = useRouter();
   const [now, setNow] = useState(() => new Date());
   const dates = upcomingDates(now, BOOKING_RULES.maxDaysAhead);
@@ -51,7 +61,7 @@ export function ScheduleBoard({ courts, initialDate }: { courts: Court[]; initia
             {court.name} <span>{formatBaht(court.price_per_hour)}/ชม. ({formatBaht(court.price_per_hour / 2)}/30 นาที)</span>
           </h2>
           <div className="chip-grid">
-            {openingSlots().map((hour) => {
+            {openingSlots(0.5, openHour, closeHour).map((hour) => {
               const state = cellState(court.id, date, hour, occupancy, now);
               return (
                 <button

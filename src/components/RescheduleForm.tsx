@@ -19,12 +19,16 @@ export function RescheduleForm({
   durationHours,
   courts,
   onCancel,
+  openHour = BOOKING_RULES.openHour,
+  closeHour = BOOKING_RULES.closeHour,
 }: {
   bookingId: string;
   currentCourtId: number;
   durationHours: number;
   courts: Court[];
   onCancel: () => void;
+  openHour?: number;
+  closeHour?: number;
 }) {
   const router = useRouter();
   const now = useMemo(() => new Date(), []);
@@ -38,7 +42,7 @@ export function RescheduleForm({
   // The booking itself is about to move, so its current slot counts as free.
   const others = useMemo(() => occupancy.filter((o) => o.booking_id !== bookingId), [occupancy, bookingId]);
 
-  const fits = (h: number) => maxBookableHours(courtId, date, h, others, now) >= durationHours - 1e-6;
+  const fits = (h: number) => maxBookableHours(courtId, date, h, others, now, 0.5, closeHour) >= durationHours - 1e-6;
 
   function submit() {
     if (hour === null) return;
@@ -67,7 +71,7 @@ export function RescheduleForm({
       <div className="field">
         <span>เวลาเริ่มใหม่ (เล่น {durationHours} ชม. เท่าเดิม)</span>
         <div className="chip-grid">
-          {openingSlots().map((h) => {
+          {openingSlots(0.5, openHour, closeHour).map((h) => {
             const ok = fits(h);
             return (
               <button

@@ -20,11 +20,15 @@ export function BookingForm({
   isLoggedIn,
   bookerName,
   initial,
+  openHour = BOOKING_RULES.openHour,
+  closeHour = BOOKING_RULES.closeHour,
 }: {
   courts: Court[];
   isLoggedIn: boolean;
   bookerName: string | null;
   initial: Initial;
+  openHour?: number;
+  closeHour?: number;
 }) {
   const router = useRouter();
   const [now, setNow] = useState(() => new Date());
@@ -42,7 +46,7 @@ export function BookingForm({
     return () => clearInterval(id);
   }, []);
 
-  const maxHours = hour === null ? 0 : maxBookableHours(courtId, date, hour, occupancy, now);
+  const maxHours = hour === null ? 0 : maxBookableHours(courtId, date, hour, occupancy, now, 0.5, closeHour);
 
   // Someone else took the chosen time (ignore our own booking arriving over realtime).
   useEffect(() => {
@@ -111,7 +115,7 @@ export function BookingForm({
         <div className="field">
           <span>เวลาเริ่ม</span>
           <div className="chip-grid">
-            {openingSlots().map((h) => {
+            {openingSlots(0.5, openHour, closeHour).map((h) => {
               const free = cellState(courtId, date, h, occupancy, now) === "free";
               const inRange = hour !== null && h > hour && h < hour + hours;
               const cls = h === hour ? "selected" : inRange ? "in-range" : free ? "free" : "unavailable";
@@ -126,7 +130,7 @@ export function BookingForm({
                   onClick={() => {
                     setError(null);
                     setHour(h);
-                    const maxH = maxBookableHours(courtId, date, h, occupancy, now);
+                    const maxH = maxBookableHours(courtId, date, h, occupancy, now, 0.5, closeHour);
                     setHours(maxH >= 1 ? 1 : maxH >= 0.5 ? 0.5 : 0.5);
                   }}
                 >

@@ -20,13 +20,23 @@ const emptyForm = (date: string, courtId: number): AdminBookingInput => ({
   note: "",
 });
 
-export function AdminBookingForm({ courts, dates }: { courts: Court[]; dates: string[] }) {
+export function AdminBookingForm({
+  courts,
+  dates,
+  openHour = BOOKING_RULES.openHour,
+  closeHour = BOOKING_RULES.closeHour,
+}: {
+  courts: Court[];
+  dates: string[];
+  openHour?: number;
+  closeHour?: number;
+}) {
   const router = useRouter();
   const [form, setForm] = useState(() => emptyForm(dates[0], courts[0]?.id ?? 1));
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const maxHours = Math.max(0.5, BOOKING_RULES.closeHour - form.hour);
+  const maxHours = Math.max(0.5, closeHour - form.hour);
   const price = courts.find((c) => c.id === form.courtId)?.price_per_hour ?? 0;
   const update = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -77,7 +87,7 @@ export function AdminBookingForm({ courts, dates }: { courts: Court[]; dates: st
         <label>
           เริ่ม
           <select value={form.hour} onChange={(e) => update({ hour: Number(e.target.value) })}>
-            {openingSlots().map((h) => (
+            {openingSlots(0.5, openHour, closeHour).map((h) => (
               <option key={h} value={h}>
                 {formatHour(h)}
               </option>

@@ -36,15 +36,13 @@ export function upcomingDates(now: Date, count: number): string[] {
   return Array.from({ length: count }, (_, i) => new Date(first + i * DAY_MS).toISOString().slice(0, 10));
 }
 
-export function openingHours(): number[] {
-  const { openHour, closeHour } = BOOKING_RULES;
-  return Array.from({ length: closeHour - openHour }, (_, i) => openHour + i);
+export function openingHours(open: number = BOOKING_RULES.openHour, close: number = BOOKING_RULES.closeHour): number[] {
+  return Array.from({ length: close - open }, (_, i) => open + i);
 }
 
-export function openingSlots(step = 0.5): number[] {
-  const { openHour, closeHour } = BOOKING_RULES;
-  const count = Math.round((closeHour - openHour) / step);
-  return Array.from({ length: count }, (_, i) => Number((openHour + i * step).toFixed(2)));
+export function openingSlots(step = 0.5, open: number = BOOKING_RULES.openHour, close: number = BOOKING_RULES.closeHour): number[] {
+  const count = Math.round((close - open) / step);
+  return Array.from({ length: count }, (_, i) => Number((open + i * step).toFixed(2)));
 }
 
 /** Holds whose payment window has lapsed no longer block the slot. */
@@ -83,11 +81,12 @@ export function maxBookableHours(
   occupancy: readonly Occupancy[],
   now: Date,
   step = 0.5,
+  closeHour: number = BOOKING_RULES.closeHour,
 ): number {
   let hours = 0;
   while (
     hours + step <= BOOKING_RULES.maxHours + 1e-6 &&
-    hour + hours + step <= BOOKING_RULES.closeHour + 1e-6 &&
+    hour + hours + step <= closeHour + 1e-6 &&
     cellState(courtId, date, hour + hours, occupancy, now, step) === "free"
   ) {
     hours = Number((hours + step).toFixed(2));

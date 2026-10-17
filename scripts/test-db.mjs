@@ -15,6 +15,7 @@ const MIGRATIONS = [
   "0008_half_hour_and_rules.sql",
   "0009_booking_requests.sql",
   "0010_manage_admins.sql",
+  "0011_venue_settings.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -418,6 +419,18 @@ await expectError("admins cannot remove themselves", `select set_admin('${ADMIN}
 await db.query(`select set_admin('${U5}', false)`);
 check("admin can remove another admin", (await db.query(`select is_admin from profiles where id = '${U5}'`)).rows[0].is_admin === false);
 await expectError("unknown users are rejected", `select set_admin(gen_random_uuid(), true)`, "USER_NOT_FOUND");
+
+
+// ---- Venue settings (0011) ----
+await as(U1);
+await expectError("customers cannot update venue hours", "select update_venue_hours(8, 23)", "FORBIDDEN");
+await as(ADMIN);
+await expectError("invalid hours: open >= close", "select update_venue_hours(23, 23)", "INVALID_HOURS");
+await expectError("invalid hours: close beyond 24", "select update_venue_hours(9, 25)", "INVALID_HOURS");
+await db.query("select update_venue_hours(8.0, 24.0)");
+const venueRow = (await db.query("select open_hour, close_hour from venue_settings where id = 1")).rows[0];
+check("admin can update venue hours to 8:00 - 24:00", Number(venueRow.open_hour) === 8 && Number(venueRow.close_hour) === 24);
+await db.query("select update_venue_hours(9.0, 23.0)");
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

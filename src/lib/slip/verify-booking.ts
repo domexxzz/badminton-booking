@@ -6,6 +6,7 @@ import type { ProviderResult, VerifyStatus } from "./types";
 
 type PendingPayment = {
   id: string;
+  amount?: number;
   slip_path: string;
   bookings: { amount: number; created_at: string; status: string } | null;
 };
@@ -28,7 +29,7 @@ function toRecord(result: ProviderResult, payment: PendingPayment): CheckRecord 
     return { status: result.kind, reasons: [result.message] };
   }
   const evaluation = evaluateSlip(result.slip, {
-    amountBaht: Number(payment.bookings!.amount),
+    amountBaht: Number(payment.amount ?? payment.bookings!.amount),
     bookingCreatedAt: payment.bookings!.created_at,
     now: new Date(),
     promptPayId: process.env.PROMPTPAY_ID || null,
@@ -63,7 +64,7 @@ export async function verifyLatestSlip(bookingId: string): Promise<string | null
   try {
     const { data: payment, error } = await supabase
       .from("payments")
-      .select("id, slip_path, bookings(amount, created_at, status)")
+      .select("id, amount, slip_path, bookings(amount, created_at, status)")
       .eq("booking_id", bookingId)
       .eq("status", "submitted")
       .order("created_at", { ascending: false })

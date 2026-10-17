@@ -34,7 +34,10 @@ export function BookingForm({
   const [now, setNow] = useState(() => new Date());
   const dates = upcomingDates(now, BOOKING_RULES.maxDaysAhead);
   const [date, setDate] = useState(initial.date && dates.includes(initial.date) ? initial.date : dates[0]);
-  const [courtId, setCourtId] = useState(courts.some((c) => c.id === initial.court) ? initial.court! : courts[0]?.id);
+  const [selectedCourts, setSelectedCourts] = useState<number[]>(() => {
+    if (initial.court && courts.some((c) => c.id === initial.court)) return [initial.court];
+    return courts[0] ? [courts[0].id] : [1];
+  });
   const [hour, setHour] = useState<number | null>(initial.hour ?? null);
   const [hours, setHours] = useState(1);
   const [error, setError] = useState<string | null>(null);
@@ -46,21 +49,33 @@ export function BookingForm({
     return () => clearInterval(id);
   }, []);
 
-  const maxHours = hour === null ? 0 : maxBookableHours(courtId, date, hour, occupancy, now, 0.5, closeHour);
+  const maxHours =
+    hour === null
+      ? 0
+      : Math.min(
+          ...selectedCourts.map((cid) =>
+            maxBookableHours(cid, date, hour, occupancy, now, 0.5, closeHour),
+          ),
+        );
 
   // Someone else took the chosen time (ignore our own booking arriving over realtime).
   useEffect(() => {
     if (hour === null || pending) return;
     if (maxHours === 0) {
       setHour(null);
-      setError("เวลาที่เลือกเพิ่งถูกจองไป กรุณาเลือกใหม่");
+      setError("เวลาที่เลือกมีสนามที่ไม่ว่างแล้ว กรุณาเลือกใหม่");
     } else if (hours > maxHours) {
       setHours(maxHours);
     }
   }, [hour, hours, maxHours, pending]);
 
-  const court = courts.find((c) => c.id === courtId);
-  const total = court && hour !== null ? Math.round(court.price_per_hour * hours) : 0;
+  const total =
+    hour !== null
+      ? selectedCourts.reduce((sum, cid) => {
+          const c = courts.find((item) => item.id === cid);
+          return sum + (c ? Math.round(c.price_per_hour * hours) : 0);
+        }, 0)
+      : 0;
 
   function changeDate(next: string) {
     setDate(next);
@@ -68,21 +83,19 @@ export function BookingForm({
     setError(null);
   }
 
-  function changeCourt(next: number) {
-    setCourtId(next);
-    setHour(null);
-    setError(null);
-  }
-
   function book() {
-    if (hour === null || !court) return;
+    if (hour === null || selectedCourts.length === 0) return;
     if (!isLoggedIn) {
-      router.push(`/login?next=${encodeURIComponent(`/book?date=${date}&court=${court.id}&hour=${hour}`)}`);
+      router.push(`/login?next=${encodeURIComponent(`/book?date=${date}&court=${selectedCourts[0]}&hour=${hour}`)}`);
       return;
     }
     setError(null);
     startTransition(async () => {
-      const result = await createBooking({ courtId: court.id, startsAt: slotStart(date, hour), hours });
+      const result = await createBooking({
+        courtIds: selectedCourts,
+        startsAt: slotStart(date, hour),
+        hours,
+      });
       if (result.ok) router.push(`/bookings/${result.data.id}`);
       else setError(result.error);
     });
@@ -98,19 +111,52 @@ export function BookingForm({
           <DatePills dates={dates} value={date} onChange={changeDate} />
         </div>
 
-        <label className="field">
-          <span>สนาม</span>
-          <div className="select-wrap">
-            <select value={courtId} onChange={(e) => changeCourt(Number(e.target.value))}>
-              {courts.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} · {formatBaht(c.price_per_hour)}/ชม. ({formatBaht(c.price_per_hour / 2)}/30 นาที)
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={18} />
+        <div className="field">
+          <div className="row" style={{ marginBottom: 4 }}>
+            <span>สนาม (เลือกได้หลายสนาม รวมบิลเดียว)</span>
+            <button
+              type="button"
+              className="link-btn"
+              style={{ fontSize: 13, color: "var(--primary-strong)", fontWeight: 500 }}
+              onClick={() => {
+                setError(null);
+                if (selectedCourts.length === courts.length) {
+                  setSelectedCourts([courts[0]?.id ?? 1]);
+                } else {
+                  setSelectedCourts(courts.map((c) => c.id));
+                }
+              }}
+            >
+              {selectedCourts.length === courts.length ? "เลือกสนามเดียว" : "⚡ จองเหมา 4 สนาม"}
+            </button>
           </div>
-        </label>
+          <div className="court-chip-grid">
+            {courts.map((c) => {
+              const isSelected = selectedCourts.includes(c.id);
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`chip court-select-pill ${isSelected ? "selected" : "free"}`}
+                  onClick={() => {
+                    setError(null);
+                    if (isSelected) {
+                      if (selectedCourts.length > 1) {
+                        setSelectedCourts(selectedCourts.filter((id) => id !== c.id));
+                      }
+                    } else {
+                      setSelectedCourts([...selectedCourts, c.id].sort((a, b) => a - b));
+                    }
+                  }}
+                  aria-pressed={isSelected}
+                >
+                  <span className="court-pill-title">{c.name}</span>
+                  <span className="court-pill-sub">{formatBaht(c.price_per_hour)}/ชม.</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <div className="field">
           <div className="row" style={{ marginBottom: 2 }}>
@@ -138,7 +184,9 @@ export function BookingForm({
 
           <div className="chip-grid">
             {openingSlots(0.5, openHour, closeHour).map((h) => {
-              const free = cellState(courtId, date, h, occupancy, now) === "free";
+              const free = selectedCourts.every(
+                (cid) => cellState(cid, date, h, occupancy, now) === "free",
+              );
               const inRange = hour !== null && h > hour && h < hour + hours;
               const isSelected = h === hour;
               const cls = isSelected ? "selected" : inRange ? "in-range" : free ? "free" : "unavailable";
@@ -155,7 +203,11 @@ export function BookingForm({
                   onClick={() => {
                     setError(null);
                     setHour(h);
-                    const maxH = maxBookableHours(courtId, date, h, occupancy, now, 0.5, closeHour);
+                    const maxH = Math.min(
+                      ...selectedCourts.map((cid) =>
+                        maxBookableHours(cid, date, h, occupancy, now, 0.5, closeHour),
+                      ),
+                    );
                     setHours(maxH >= 1 ? 1 : maxH >= 0.5 ? 0.5 : 0.5);
                   }}
                 >
@@ -204,20 +256,32 @@ export function BookingForm({
           <span>{isLoggedIn ? (bookerName ?? "บัญชีของคุณ") : "ยังไม่ได้เข้าสู่ระบบ"}</span>
         </div>
         <div className="summary-line">
+          <span className="muted">สนาม</span>
+          <span style={{ fontWeight: 600 }}>
+            {selectedCourts.length === 1
+              ? (courts.find((c) => c.id === selectedCourts[0])?.name ?? "สนาม")
+              : `${selectedCourts.length} สนาม (${selectedCourts.map((cid) => courts.find((c) => c.id === cid)?.name ?? `สนาม ${cid}`).join(", ")})`}
+          </span>
+        </div>
+        <div className="summary-line">
           <span className="muted">วันเวลา</span>
           <span>
             {hour === null
               ? "เลือกเวลาเริ่ม"
-              : `${formatDayLong(date)} ${formatHour(hour)}–${formatHour(hour + hours)}`}
+              : `${formatDayLong(date)} ${formatHour(hour)}–${formatHour(hour + hours)} (${hours === 0.5 ? "30 นาที" : `${hours} ชม.`})`}
           </span>
         </div>
         <div className="summary-total">
-          <span>รวม</span>
+          <span>รวมทั้งหมด</span>
           <span>{hour === null ? "–" : formatBaht(total)}</span>
         </div>
         {error && <p className="error">{error}</p>}
         <button className="btn btn-block" type="button" onClick={book} disabled={hour === null || pending}>
-          {pending ? "กำลังจอง…" : isLoggedIn ? "จองและชำระเงิน" : "เข้าสู่ระบบเพื่อจอง"}
+          {pending
+            ? "กำลังจอง…"
+            : isLoggedIn
+              ? `จอง ${selectedCourts.length} สนามและชำระเงิน (${formatBaht(total)})`
+              : "เข้าสู่ระบบเพื่อจอง"}
         </button>
       </section>
     </div>

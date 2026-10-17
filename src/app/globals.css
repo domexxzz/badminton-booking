@@ -216,6 +216,36 @@ input[type="file"] { font-size: 14px; }
 .chip.past { opacity: 0.4; cursor: default; }
 .chip.unavailable { color: #b4bfcb; text-decoration: line-through; cursor: not-allowed; }
 .chip.selected, .chip.in-range { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
+
+/* Court Multi-select Grid */
+.court-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.court-select-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 4px 2px;
+  line-height: 1.2;
+}
+.court-pill-title {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.court-pill-sub {
+  font-size: 11px;
+  opacity: 0.75;
+  font-weight: 500;
+}
+.court-select-pill.selected .court-pill-sub {
+  color: #fff;
+  opacity: 0.95;
+}
+
 .chip.time-slot {
   display: flex;
   flex-direction: column;

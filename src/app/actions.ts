@@ -15,23 +15,35 @@ export type ActionResult<T = null> = { ok: true; data: T } | { ok: false; error:
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function createBooking(input: {
-  courtId: number;
+  courtId?: number;
+  courtIds?: number[];
   startsAt: string;
   hours: number;
 }): Promise<ActionResult<{ id: string }>> {
-  const { courtId, startsAt, hours } = input;
+  const { courtId, courtIds, startsAt, hours } = input;
+  const ids = Array.isArray(courtIds) && courtIds.length > 0
+    ? courtIds
+    : Number.isInteger(courtId)
+      ? [courtId!]
+      : [];
+
   const validHours =
     typeof hours === "number" &&
     hours >= 0.5 &&
     hours <= BOOKING_RULES.maxHours &&
     Math.round(hours * 2) === hours * 2;
-  if (!Number.isInteger(courtId) || !validHours || Number.isNaN(Date.parse(startsAt))) {
+  if (
+    ids.length === 0 ||
+    ids.some((id) => !Number.isInteger(id)) ||
+    !validHours ||
+    Number.isNaN(Date.parse(startsAt))
+  ) {
     return { ok: false, error: "ข้อมูลการจองไม่ถูกต้อง" };
   }
 
   const supabase = await createClient();
   const { data, error } = await supabase
-    .rpc("create_booking", { p_court_id: courtId, p_starts_at: startsAt, p_hours: hours })
+    .rpc("create_multi_booking", { p_court_ids: ids, p_starts_at: startsAt, p_hours: hours })
     .single<{ id: string }>();
 
   if (error || !data) return { ok: false, error: friendlyError(error) };

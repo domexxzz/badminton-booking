@@ -43,24 +43,39 @@ async function loadBookingSummary(bookingId: string): Promise<BookingSummary | n
   if (!supabase) return null;
   const { data: b } = await supabase
     .from("bookings")
-    .select("starts_at, ends_at, amount, channel, customer_name, user_id, courts(name)")
+    .select("starts_at, ends_at, amount, group_id, channel, customer_name, user_id, courts(name)")
     .eq("id", bookingId)
     .maybeSingle<{
       starts_at: string;
       ends_at: string;
       amount: number;
+      group_id?: string;
       channel: string;
       customer_name: string | null;
       user_id: string;
       courts: { name: string } | null;
     }>();
   if (!b) return null;
+
+  let courtName = b.courts?.name ?? "สนาม";
+  let totalAmount = Number(b.amount);
+  if (b.group_id) {
+    const { data: groupList } = await supabase
+      .from("bookings")
+      .select("amount, courts(name)")
+      .eq("group_id", b.group_id);
+    if (groupList && groupList.length > 1) {
+      courtName = groupList.map((item) => (item.courts as { name?: string } | null)?.name ?? "สนาม").join(", ");
+      totalAmount = groupList.reduce((sum, item) => sum + Number(item.amount), 0);
+    }
+  }
+
   const { data: profile } = await supabase.from("profiles").select("display_name").eq("id", b.user_id).maybeSingle();
   return {
-    court: b.courts?.name ?? "สนาม",
+    court: courtName,
     startsAt: b.starts_at,
     endsAt: b.ends_at,
-    amount: Number(b.amount),
+    amount: totalAmount,
     customer: b.customer_name ?? profile?.display_name ?? "ลูกค้า",
     channel: b.channel,
   };

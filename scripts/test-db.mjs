@@ -16,6 +16,7 @@ const MIGRATIONS = [
   "0009_booking_requests.sql",
   "0010_manage_admins.sql",
   "0011_venue_settings.sql",
+  "0012_multi_court_bookings.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -437,5 +438,64 @@ const venueRow = (await db.query("select open_hour, close_hour from venue_settin
 check("admin can update venue hours to 8:00 - 24:00", Number(venueRow.open_hour) === 8 && Number(venueRow.close_hour) === 24);
 await db.query("select update_venue_hours(9.0, 23.0)");
 
+// ---- Multi-court booking in single bill (0012) ----
+const U7 = "77777777-7777-7777-7777-777777777777";
+await db.exec(`insert into auth.users (id, email) values ('${U7}','u7@x.com')`);
+await as(U7);
+const day4 = (h) => at(72 + h);
+
+// Reject duplicate court IDs
+await expectError("cannot specify duplicate court ids in multi-court booking",
+  `select create_multi_booking(array[1::smallint, 1::smallint], '${day4(0)}', 1.0)`, "INVALID_COURTS");
+
+// Book Court 2 and Court 3 together for 1 hour at day4(0)
+const { rows: [mbLead] } = await db.query(
+  `select * from create_multi_booking(array[2::smallint, 3::smallint], '${day4(0)}', 1.0)`
+);
+check("multi-court booking returns lead row", mbLead && mbLead.court_id === 2);
+
+const { rows: groupRows } = await db.query(
+  `select * from bookings where group_id = '${mbLead.group_id}' order by court_id`
+);
+check("creates 2 booking rows sharing the same group_id",
+  groupRows.length === 2 && groupRows[0].court_id === 2 && groupRows[1].court_id === 3);
+
+// Both courts must be held in court_occupancy
+const { rows: occRows } = await db.query(
+  `select * from court_occupancy where booking_id in ('${groupRows[0].id}', '${groupRows[1].id}')`
+);
+check("occupancy mirrors both held courts", occRows.length === 2 && occRows.every(r => r.state === "held"));
+
+// Submit slip for the combined amount (150 + 150 = 300)
+await db.exec(`insert into storage.objects (bucket_id, name) values ('slips', '${U7}/${mbLead.id}-1.jpg')`);
+await db.query(`select submit_slip('${mbLead.id}', '${U7}/${mbLead.id}-1.jpg')`);
+
+const { rows: afterSlipRows } = await db.query(
+  `select status from bookings where group_id = '${mbLead.group_id}'`
+);
+check("submitting slip updates all bookings in group to awaiting_review",
+  afterSlipRows.length === 2 && afterSlipRows.every(r => r.status === "awaiting_review"));
+
+const { rows: [payRow] } = await db.query(
+  `select * from payments where booking_id = '${mbLead.id}'`
+);
+check("payment record captures the total group amount (300)", Number(payRow.amount) === 300);
+
+// Auto-check with matching total amount (300) confirms BOTH bookings in the group
+await db.query(`select record_slip_check('${payRow.id}', 'verified', '{}'::text[], 'TRX-MULTI-1', 300.0)`);
+const { rows: afterVerifyRows } = await db.query(
+  `select status from bookings where group_id = '${mbLead.group_id}'`
+);
+check("verified slip confirms all bookings in the group",
+  afterVerifyRows.length === 2 && afterVerifyRows.every(r => r.status === "confirmed"));
+
+// Single-court booking through create_booking still works and has a group_id
+const { rows: [singleB] } = await db.query(
+  `select * from create_booking(4::smallint, '${day4(0)}', 1.0)`
+);
+check("single-court create_booking generates a group_id",
+  singleB && singleB.group_id !== null && singleB.court_id === 4);
+
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);
+

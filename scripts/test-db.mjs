@@ -69,7 +69,10 @@ const { rows: [b3] } = await db.query(`select * from create_booking(1::smallint,
 check("adjacent slot ok", b3.status === "pending_payment");
 check("open bookings can share a price", Number(b2.amount) === 150 && Number(b3.amount) === 150, `${b2.amount} vs ${b3.amount}`);
 await db.query(`select create_booking(3::smallint, '${at(0)}', 1)`);
-await expectError("open booking limit", `select create_booking(4::smallint, '${at(0)}', 1)`, "TOO_MANY_HOLDS");
+const { rows: [b4hold] } = await db.query(`select * from create_booking(4::smallint, '${at(0)}', 1)`);
+check("can hold 4 courts concurrently", b4hold.status === "pending_payment");
+await expectError("open booking limit at 4", `select create_booking(1::smallint, '${at(4)}', 1)`, "TOO_MANY_HOLDS");
+await db.query(`select cancel_booking('${b4hold.id}')`);
 await expectError("outside hours", `select create_booking(4::smallint, '${at(5)}', 2)`, "OUTSIDE_OPENING_HOURS");
 await expectError("invalid start minute", `select create_booking(4::smallint, '${at(0.25)}', 1)`, "INVALID_START");
 await expectError("invalid duration step", `select create_booking(4::smallint, '${at(0.5)}', 0.25)`, "INVALID_DURATION");
@@ -207,7 +210,9 @@ await submitFresh(U2, b6.id, 1);
 await as(U2);
 const openNow = (await db.query(`select count(*)::int as n from bookings where user_id = '${U2}' and status in ('pending_payment','awaiting_review')`)).rows[0].n;
 check("setup: U2 has 3 open bookings, one under review", openNow === 3, `open=${openNow}`);
-await expectError("slips under review count toward the limit", `select create_booking(2::smallint, '${at(4)}', 1)`, "TOO_MANY_HOLDS");
+const { rows: [b7] } = await db.query(`select * from create_booking(2::smallint, '${at(4)}', 1)`);
+check("U2 can book 4th open booking", b7.status === "pending_payment");
+await expectError("slips under review count toward the limit (5th fails)", `select create_booking(2::smallint, '${at(5)}', 1)`, "TOO_MANY_HOLDS");
 
 // ---- Incoming-transfer notifications (0004) ----
 const RBN = "public.record_bank_notification(text,text,text,text,text,numeric,timestamptz,text)";

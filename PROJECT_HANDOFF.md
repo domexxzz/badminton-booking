@@ -10,7 +10,7 @@
 - **Production URL:** [https://badminton-booking-steel.vercel.app](https://badminton-booking-steel.vercel.app)
 - **สถานะปัจจุบัน:** 
   - ✅ Production Deployment สำเร็จ (Live บน Vercel)
-  - ✅ Vitest Unit Tests: 10/10 files (119/119 tests passed)
+  - ✅ Vitest Unit Tests: 10/10 files (126/126 tests passed)
   - ✅ Database E2E Tests (PGlite): ALL PASSED
   - ✅ Production Build (`next build`): Compiled สำเร็จ 0 error
   - ✅ รัน Database Migration `0012_multi_court_bookings.sql` บน Supabase Production เรียบร้อยแล้ว
@@ -18,7 +18,17 @@
 ---
 
 ## 2. อัปเดตล่าสุดที่เพิ่งทำเสร็จ (Recent Key Changes)
-1. **ระบบตัวจับเวลาร้านปิด 23:00 และการ์ดกลางคืนแจ้งปิดร้าน (Closing Countdown Timer & Hybrid Night View)**:
+1. **ระบบแจ้งเตือนการจองคิวแบบเรียลไทม์ (In-App Realtime Toast & เสียงเตือน + LINE Messaging Push)**:
+   - **In-App Realtime Toast Banner (`RealtimeNotificationBanner.tsx`)**:
+     - ทำงานแบบเรียลไทม์ผ่าน Supabase Realtime (Websocket channel) ดักฟัง `INSERT` และ `UPDATE` ในตาราง `bookings` และ `booking_requests`
+     - แยกมุมมองและระดับสิทธิ์ระหว่าง **แอดมิน** (เห็นยอดจองใหม่, สลิปแนบใหม่, คำขอยกเลิก/เลื่อนเวลา) และ **ลูกค้า** (เห็นเฉพาะการจองของตนเองตาม RLS: ชำระเงินสำเร็จ, อนุมัติสลิป, ผลการอนุมัติคำขอ)
+     - ระบบเสียงเตือน (Chime sound) สร้างคลื่นเสียงด้วย Web Audio API โดยตรง ไม่ต้องโหลดไฟล์ MP3 ให้เปลืองแบนด์วิดท์
+     - รองรับปุ่มเปิด/ปิดเสียง (🔔 / 🔕) พร้อมบันทึกการตั้งค่าลง `localStorage`
+     - Toast แสดงสวยงามด้านมุมขวาบน มีแอนิเมชัน Fade-in/out และปุ่มทางลัดกดไปยังหน้าตรวจสอบหรือหน้ารายละเอียดการจองได้ทันที
+   - **ระบบแจ้งเตือนผ่าน LINE OA (Messaging API)**:
+     - **ฝั่งแอดมิน**: แจ้งเตือนเมื่อมีลูกค้าเริ่มจองคิวใหม่ (`new_booking`), แนบสลิปใหม่รอตรวจ (`notifyAfterSlip`), แจ้งเตือนเมื่อมีคำขอเลื่อนหรือยกเลิกคิว
+     - **ฝั่งลูกค้า**: แจ้งเตือนตรงเข้า LINE ส่วนตัวของลูกค้า (สำหรับผู้ใช้ที่เชื่อมต่อ LINE Login) เมื่อยืนยันการจองสำเร็จ (`customerBookingConfirmedText`), เมื่อสลิปผ่านการอนุมัติ/ปฏิเสธ, และเมื่อแอดมินตอบรับคำขอเลื่อนหรือยกเลิกคิว
+2. **ระบบตัวจับเวลาร้านปิด 23:00 และการ์ดกลางคืนแจ้งปิดร้าน (Closing Countdown Timer & Hybrid Night View)**:
    - ตรวจจับเวลาเปิด-ปิดสนามแบบเรียลไทม์ (09:00 - 23:00 น.) ตามเวลาประเทศไทย (UTC+7)
    - เมื่อถึงเวลา 23:00 น. หน้าแรกจะเปลี่ยนการ์ดเป็นดีไซน์กลางคืน (Night Mode) อัตโนมัติ โดยไม่ต้องรีเฟรช
    - แสดงตัวเลขนับถอยหลัง (Countdown) สู่เวลาเปิด 09:00 น. วันถัดไปแบบวินาทีต่อวินาที (ชั่วโมง : นาที : วินาที)
@@ -106,6 +116,7 @@ badminton-booking/
 │   │   ├── actions.ts             # Server Actions (createBooking, submitSlip, adminCreateBooking ฯลฯ)
 │   │   └── globals.css            # ดีไซน์ระบบทั้งหมด
 │   ├── components/
+│   │   ├── RealtimeNotificationBanner.tsx # แบนเนอร์แจ้งเตือนเรียลไทม์ (Toast + Web Audio chime)
 │   │   ├── BookingForm.tsx        # แบบฟอร์มจองสนาม (รองรับสล็อต 30 นาที)
 │   │   ├── ScheduleBoard.tsx      # ตารางบอร์ดเรียลไทม์ (ช่องละ 30 นาที)
 │   │   ├── CourtRules.tsx         # ข้อปฏิบัติ 9 ข้อของ แบดมินตัน@สินธานี
@@ -116,6 +127,7 @@ badminton-booking/
 │       ├── slots.ts               # การคำนวณเวลาสล็อต 30 นาที และสถานะคิว
 │       ├── format.ts              # ฟอร์แมตเงินบาท (formatBaht) และฟอร์แมตเวลา
 │       ├── promptpay.ts           # สร้าง PromptPay QR payload
+│       ├── line/                  # LINE Messaging API แจ้งเตือนแอดมินและลูกค้า (notify-shop.ts, messages.ts)
 │       └── supabase/              # Supabase client helpers (SSR + Server)
 ├── supabase/
 │   └── migrations/

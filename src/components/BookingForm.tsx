@@ -113,20 +113,45 @@ export function BookingForm({
         </label>
 
         <div className="field">
-          <span>เวลาเริ่ม</span>
+          <div className="row" style={{ marginBottom: 2 }}>
+            <span>เวลาเริ่ม</span>
+            {hour !== null && (
+              <span className="badge confirmed" style={{ fontSize: 13, fontWeight: 600 }}>
+                {formatHour(hour)} – {formatHour(hour + hours)} น. ({hours === 0.5 ? "30 นาที" : `${hours} ชม.`})
+              </span>
+            )}
+          </div>
+
+          {hour !== null && (
+            <div className="selected-time-banner">
+              <div>
+                จองรอบ: <strong>{formatHour(hour)} &ndash; {formatHour(hour + hours)} น.</strong>
+                <div style={{ fontSize: 12, opacity: 0.85, marginTop: 1 }}>
+                  เริ่ม {formatHour(hour)} น. &bull; เล่นเสร็จ {formatHour(hour + hours)} น.
+                </div>
+              </div>
+              <span className="time-end-highlight">
+                เลิก {formatHour(hour + hours)} น.
+              </span>
+            </div>
+          )}
+
           <div className="chip-grid">
             {openingSlots(0.5, openHour, closeHour).map((h) => {
               const free = cellState(courtId, date, h, occupancy, now) === "free";
               const inRange = hour !== null && h > hour && h < hour + hours;
-              const cls = h === hour ? "selected" : inRange ? "in-range" : free ? "free" : "unavailable";
+              const isSelected = h === hour;
+              const cls = isSelected ? "selected" : inRange ? "in-range" : free ? "free" : "unavailable";
+              const startStr = formatHour(h).replace(":", ".");
+              const endStr = formatHour(h + 0.5).replace(":", ".");
               return (
                 <button
                   key={h}
                   type="button"
-                  className={`chip ${cls}`}
-                  disabled={!free && h !== hour && !inRange}
-                  aria-pressed={h === hour || inRange}
-                  aria-label={`${formatHour(h)} ${free ? "ว่าง" : "ไม่ว่าง"}`}
+                  className={`chip time-slot ${cls}`}
+                  disabled={!free && !isSelected && !inRange}
+                  aria-pressed={isSelected || inRange}
+                  aria-label={`รอบ ${formatHour(h)} ถึง ${formatHour(h + 0.5)} ${free ? "ว่าง" : "ไม่ว่าง"}`}
                   onClick={() => {
                     setError(null);
                     setHour(h);
@@ -134,7 +159,8 @@ export function BookingForm({
                     setHours(maxH >= 1 ? 1 : maxH >= 0.5 ? 0.5 : 0.5);
                   }}
                 >
-                  {formatHour(h).replace(":", ".")}
+                  <span className="chip-time-start">{startStr}</span>
+                  <span className="chip-time-end">– {endStr}</span>
                 </button>
               );
             })}
@@ -142,19 +168,32 @@ export function BookingForm({
         </div>
 
         <div className="field">
-          <span>ระยะเวลา</span>
-          <div className="hours" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4].map((h) => (
-              <button
-                key={h}
-                type="button"
-                className={`chip ${h === hours ? "selected" : h <= maxHours ? "free" : "unavailable"}`}
-                disabled={hour === null || h > maxHours}
-                onClick={() => setHours(h)}
-              >
-                {h === 0.5 ? "30 นาที" : `${h} ชม.`}
-              </button>
-            ))}
+          <div className="row" style={{ marginBottom: 2 }}>
+            <span>ระยะเวลา</span>
+            {hour !== null && (
+              <span className="muted" style={{ fontSize: 12 }}>
+                เล่นถึง {formatHour(hour + hours)} น.
+              </span>
+            )}
+          </div>
+          <div className="hours-grid">
+            {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4].map((h) => {
+              const isSelected = h === hours;
+              const isAvailable = h <= maxHours;
+              const endHourStr = hour !== null ? formatHour(hour + h).replace(":", ".") : null;
+              return (
+                <button
+                  key={h}
+                  type="button"
+                  className={`chip duration-chip ${isSelected ? "selected" : isAvailable ? "free" : "unavailable"}`}
+                  disabled={hour === null || !isAvailable}
+                  onClick={() => setHours(h)}
+                >
+                  <span className="duration-title">{h === 0.5 ? "30 นาที" : `${h} ชม.`}</span>
+                  {endHourStr && <span className="duration-sub">เลิก {endHourStr}</span>}
+                </button>
+              );
+            })}
           </div>
         </div>
       </section>

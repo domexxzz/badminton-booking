@@ -9,28 +9,38 @@
 - **ชื่อโครงการ:** ระบบจองสนามแบดมินตัน แบดมินตัน@สินธานี
 - **Production URL:** [https://badminton-booking-steel.vercel.app](https://badminton-booking-steel.vercel.app)
 - **สถานะปัจจุบัน:** 
-  - ✅ Production Deployment สำเร็จ (Live)
+  - ✅ Production Deployment สำเร็จ (Live บน Vercel)
   - ✅ Vitest Unit Tests: 10/10 files (119/119 tests passed)
   - ✅ Database E2E Tests (PGlite): ALL PASSED
   - ✅ Production Build (`next build`): Compiled สำเร็จ 0 error
-  - ✅ รัน Database Migration `0008_half_hour_and_rules.sql` บน Supabase Production เรียบร้อยแล้ว
+  - ✅ รัน Database Migration `0012_multi_court_bookings.sql` บน Supabase Production เรียบร้อยแล้ว
 
 ---
 
 ## 2. อัปเดตล่าสุดที่เพิ่งทำเสร็จ (Recent Key Changes)
-1. **ตัดเศษสตางค์ออกจากระบบทั้งหมด (No Satang)**:
+1. **ระบบจองหลายสนามพร้อมกันในรอบเดียว รวมเป็นบิลเดียว (Multi-Court Single Bill)**:
+   - เพิ่ม `group_id` ในตาราง `bookings` และสร้าง Stored Procedure `create_multi_booking(p_court_ids, p_starts_at, p_hours)`
+   - ให้ลูกค้ากดเลือกสนามพร้อมกันได้หลายสนาม (เช่น สนาม 1 + สนาม 2 หรือเหมาหมด 4 สนาม) ในหน้า [Book](file:///e:/d-rescue/badminton-booking/src/app/(customer)/book/page.tsx)
+   - รวมยอดเงินเป็นยอดเดียว แสดง PromptPay QR โค้ดเดียว แนบสลิปครั้งเดียว และยืนยันการจองพร้อมกันทุกสนามในกลุ่ม
+   - ระบบตรวจสลิปอัตโนมัติ (EasySlip / ธนาคาร) และแจ้งเตือน LINE ทางร้านจะแจ้งยอดรวมและสนามทั้งหมดในบิลเดียว
+   - หน้า "ประวัติการจองของฉัน" รวมรายการตาม `group_id` เป็นการ์ดเดียวให้ดูง่าย
+2. **ปรับปรุงการแสดงเวลาของสล็อตให้ชัดเจน ไม่สับสนเวลาเลิกเล่น**:
+   - ชิปสล็อตเวลาแสดงช่วงเวลาแบบละเอียด (เช่น `11.00 – 11.30` จนถึงชิปสุดท้าย `13.30 – 14.00`)
+   - ปุ่มเลือกระยะเวลาระบุเวลาเลิกเล่นให้ทันที (เช่น `3 ชม. เลิก 14.00`)
+   - มีป้ายสรุปเวลาที่จองชัดเจน (เช่น `จองรอบ: 11:00 – 14:00 น. เริ่ม 11:00 น. • เล่นเสร็จ 14:00 น.`)
+3. **ตัดเศษสตางค์ออกจากระบบทั้งหมด (No Satang)**:
    - ปรับยอดเงิน PromptPay QR, การแสดงผลในหน้าเว็บ และหน้าสลิปให้เป็นจำนวนเต็มบาท (`formatBaht` ใช้ `Math.round(...)`)
-2. **ระบบสล็อตเวลาแบบ 30 นาที (ครึ่งชั่วโมง)**:
+4. **ระบบสล็อตเวลาแบบ 30 นาที (ครึ่งชั่วโมง)**:
    - รองรับการจองทีละ 0.5 ชั่วโมง (เช่น 0.5, 1.0, 1.5, 2.0 ชม.)
    - รอบเริ่มต้นของสนามเริ่มได้ทุกๆ 30 นาที (เช่น 09:00, 09:30, 10:00, 10:30, ...)
-3. **โครงสร้างราคาใหม่**:
+5. **โครงสร้างราคาใหม่**:
    - **฿150 ต่อชั่วโมง** (หรือรอบละ **฿75 ต่อ 30 นาที**) สำหรับสนาม 1 – 4
-4. **ระยะเวลาล็อกคิวรอชำระเงิน (Hold Timeout)**:
+6. **ระยะเวลาล็อกคิวรอชำระเงิน (Hold Timeout)**:
    - ปรับลดเหลือ **5 นาที** (จากเดิม 15 นาที) เพื่อป้องกันการจองดองคิว
-5. **กติกาและข้อปฏิบัติของสนาม 9 ข้อ**:
+7. **กติกาและข้อปฏิบัติของสนาม 9 ข้อ**:
    - สร้าง Component `src/components/CourtRules.tsx` และนำไปแสดงผลที่หน้าแรกของลูกค้าแล้ว
-6. **Database Migration 0008**:
-   - สร้างไฟล์ `supabase/migrations/0008_half_hour_and_rules.sql` อัปเดต Stored Procedures `opening_hours_ok`, `create_booking`, และ `admin_create_booking` ให้รับ `numeric hours` และรันบน Supabase เรียบร้อย
+8. **Database Migration 0012**:
+   - ไฟล์ `supabase/migrations/0012_multi_court_bookings.sql` อัปเดตรองรับ `create_multi_booking`, อัปเดต `submit_slip`, `review_payment`, `cancel_booking`, และ `record_slip_check` ให้ซิงค์สถานะตามกลุ่มสนามและคำนวณยอดเงินรวมกลุ่ม
 
 ---
 

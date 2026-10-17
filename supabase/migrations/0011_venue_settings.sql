@@ -18,6 +18,7 @@ on conflict (id) do nothing;
 alter table public.venue_settings enable row level security;
 
 -- Anyone can read opening hours (customers and guests need to see slot buttons)
+drop policy if exists "venue_settings are public" on public.venue_settings;
 create policy "venue_settings are public" on public.venue_settings
   for select to anon, authenticated using (true);
 

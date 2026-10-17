@@ -16,6 +16,15 @@ import { getSessionUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+type GroupBooking = {
+  id: string;
+  court_id: number;
+  starts_at: string;
+  ends_at: string;
+  amount: number;
+  courts: { name: string } | null;
+};
+
 type Booking = {
   id: string;
   user_id: string;
@@ -26,6 +35,7 @@ type Booking = {
   hold_expires_at: string | null;
   review_note: string | null;
   court_id: number;
+  group_id?: string;
   channel: string;
   courts: { name: string } | null;
   payments: { created_at: string; verify_status: string; verify_reasons: string[] }[];
@@ -69,11 +79,24 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const { data: booking } = await supabase
     .from("bookings")
     .select(
-      "id, user_id, court_id, channel, starts_at, ends_at, amount, status, hold_expires_at, review_note, courts(name), payments(created_at, verify_status, verify_reasons)",
+      "id, user_id, court_id, group_id, channel, starts_at, ends_at, amount, status, hold_expires_at, review_note, courts(name), payments(created_at, verify_status, verify_reasons)",
     )
     .eq("id", id)
     .maybeSingle<Booking>();
   if (!booking) notFound();
+
+  // Load all bookings in this bill group if multi-court
+  const { data: groupBookings } = await supabase
+    .from("bookings")
+    .select("id, court_id, starts_at, ends_at, amount, courts(name)")
+    .eq("group_id", booking.group_id ?? booking.id)
+    .order("court_id")
+    .returns<GroupBooking[]>();
+
+  const allBookings = groupBookings && groupBookings.length > 0 ? groupBookings : [booking];
+  const isMultiCourt = allBookings.length > 1;
+  const courtNames = allBookings.map((b) => b.courts?.name ?? "สนาม").join(", ");
+  const totalAmount = allBookings.reduce((sum, b) => sum + Number(b.amount), 0);
 
   const [{ data: requests }, { data: courts }] = await Promise.all([
     supabase
@@ -106,7 +129,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
     booking.hold_expires_at !== null &&
     Date.parse(booking.hold_expires_at) <= Date.now();
   const awaitingPayment = booking.status === "pending_payment" && !holdLapsed;
-  const amountBaht = Math.round(Number(booking.amount));
+  const amountBaht = Math.round(totalAmount);
   const qr = awaitingPayment ? await promptPayQr(amountBaht) : null;
   const latestPayment = [...booking.payments].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
   const autoCheckProblem = latestPayment && VERIFY_FOR_CUSTOMER[latestPayment.verify_status];
@@ -120,9 +143,9 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         status={booking.status}
         reviewNote={booking.review_note}
         summary={{
-          court: booking.courts?.name ?? "สนาม",
+          court: isMultiCourt ? `${allBookings.length} สนาม (${courtNames})` : (booking.courts?.name ?? "สนาม"),
           slot: formatSlot(booking.starts_at, booking.ends_at),
-          amount: formatBaht(booking.amount),
+          amount: formatBaht(totalAmount),
         }}
       />
       <div className="page-head">
@@ -133,11 +156,31 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
       </div>
       <section className="card list-item">
         <div className="meta">
-          <strong>{booking.courts?.name ?? "สนาม"}</strong>
+          <strong>
+            {isMultiCourt
+              ? `จอง ${allBookings.length} สนาม (${courtNames})`
+              : (booking.courts?.name ?? "สนาม")}
+          </strong>
           <span className="muted">{formatSlot(booking.starts_at, booking.ends_at)}</span>
         </div>
         <span className={`badge ${booking.status}`}>{STATUS_LABEL[booking.status]}</span>
       </section>
+
+      {isMultiCourt && (
+        <section className="card stack" style={{ gap: 8 }}>
+          <span className="muted" style={{ fontSize: 13, fontWeight: 600 }}>รายการสนามในบิลนี้:</span>
+          {allBookings.map((b) => (
+            <div key={b.id} className="row" style={{ fontSize: 14, borderBottom: "1px dashed var(--border)", paddingBottom: 6 }}>
+              <span>🏸 {b.courts?.name} ({formatSlot(b.starts_at, b.ends_at)})</span>
+              <strong>{formatBaht(b.amount)}</strong>
+            </div>
+          ))}
+          <div className="summary-total" style={{ paddingTop: 4 }}>
+            <span>ยอดรวมทั้งสิ้น</span>
+            <span>{formatBaht(totalAmount)}</span>
+          </div>
+        </section>
+      )}
 
       {awaitingPayment && (
         <div className="card pay">
@@ -154,8 +197,8 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           </div>
           <div className="stack">
             <div style={{ textAlign: "center" }}>
-              <div className="muted">ยอดที่ต้องโอน</div>
-              <div className="amount">{formatBaht(booking.amount)}</div>
+              <div className="muted">ยอดที่ต้องโอน {isMultiCourt ? `(รวม ${allBookings.length} สนาม)` : ""}</div>
+              <div className="amount">{formatBaht(totalAmount)}</div>
               <div className="muted">สแกน QR แล้วยอดจะขึ้นเอง</div>
             </div>
             {booking.hold_expires_at && (

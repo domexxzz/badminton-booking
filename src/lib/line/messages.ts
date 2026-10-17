@@ -7,6 +7,7 @@ export type BookingSummary = {
   amount: number;
   customer: string;
   channel: string;
+  userId?: string;
 };
 
 export type ShopEvent = "confirmed" | "needs_review" | "unmatched" | "request";
@@ -31,8 +32,37 @@ const describe = (b: BookingSummary) =>
 
 export const bookingConfirmedText = (b: BookingSummary) => `✅ ยืนยันการจองอัตโนมัติ\n${describe(b)}`;
 
+export const newBookingAlertText = (b: BookingSummary) =>
+  `⚡ มีการจองคิวใหม่ (รอชำระเงิน)\n${describe(b)}\n⏳ ล็อกคิวรอชำระเงิน 5 นาที`;
+
+export const customerBookingConfirmedText = (b: BookingSummary, bookingId: string) =>
+  `🎉 การจองสนามแบดมินตันของคุณได้รับการยืนยันแล้ว!\n${b.court} · ${formatSlot(b.startsAt, b.endsAt)}\nยอดชำระ: ${formatBaht(b.amount)} (เรียบร้อย)\nดูรายละเอียดคิว: https://badminton-booking-steel.vercel.app/bookings/${bookingId}`;
+
+export const customerSlipSubmittedText = (b: BookingSummary) =>
+  `🧾 ได้รับสลิปของคุณแล้ว\n${b.court} · ${formatSlot(b.startsAt, b.endsAt)}\nระบบกำลังส่งให้แอดมินตรวจสอบคิว ขอบคุณครับ`;
+
+export const customerSlipRejectedText = (b: BookingSummary, note: string) =>
+  `⚠️ สลิปของคุณไม่ผ่านการตรวจสอบ\n${b.court} · ${formatSlot(b.startsAt, b.endsAt)}\nเหตุผล: ${note || "ยอดเงินหรือข้อมูลไม่ตรง"}\nกรุณาแนบสลิปใหม่อีกครั้งครับ`;
+
+export const customerRequestResolvedText = (
+  b: BookingSummary,
+  kind: "reschedule" | "cancel",
+  approve: boolean,
+  note: string,
+) => {
+  if (kind === "cancel") {
+    return approve
+      ? `✅ คำขอยกเลิกและคืนเงินของคุณได้รับการอนุมัติแล้ว\n${b.court}\nหมายเหตุ: ${note || "โอนเงินคืนเรียบร้อย"}`
+      : `❌ คำขอยกเลิกของคุณไม่ได้รับการอนุมัติ\nเหตุผล: ${note || "-"}`;
+  }
+  return approve
+    ? `✅ คำขอเลื่อนเวลาการจองของคุณได้รับการอนุมัติแล้ว\n${b.court} · เวลาใหม่: ${formatSlot(b.startsAt, b.endsAt)}`
+    : `❌ คำขอเลื่อนเวลาของคุณไม่ได้รับการอนุมัติ\nเหตุผล: ${note || "-"}`;
+};
+
 export const slipNeedsReviewText = (b: BookingSummary, reasons: string[]) =>
   [`🧾 มีสลิปรอตรวจ`, describe(b), ...reasons.map((r) => `• ${r}`), `ตรวจที่หน้าแอดมิน`].join("\n");
 
 export const unmatchedTransferText = (amount: number | null) =>
   `⚠️ มีเงินเข้า ${amount === null ? "(อ่านยอดไม่ได้)" : formatBaht(amount)}\nเทียบกับสลิปที่หน้าแอดมิน หัวข้อ "เงินเข้า"`;
+

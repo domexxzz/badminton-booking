@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BottomNav } from "@/components/BottomNav";
+import { RealtimeNotificationBanner } from "@/components/RealtimeNotificationBanner";
 import { getSessionUser } from "@/lib/supabase/server";
 
 // Customer-facing shell. Nothing here points at the shop's admin area.
@@ -8,6 +9,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
 
   return (
     <div className="app">
+      <RealtimeNotificationBanner userId={user?.id} isAdmin={false} />
       <header className="app-header">
         {user ? (
           <div className="greeting">

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { BOOKING_RULES } from "@/lib/config";
 import { slotStart } from "@/lib/slots";
 import { friendlyError } from "@/lib/errors";
-import { notifyAfterSlip } from "@/lib/line/notify-shop";
+import { notifyAfterSlip, notifyNewBooking, notifyPaymentReviewed } from "@/lib/line/notify-shop";
 import { safeNext } from "@/lib/safe-next";
 import { isSlipVerificationEnabled, verifyLatestSlip } from "@/lib/slip/verify-booking";
 import { createClient, getSessionUser } from "@/lib/supabase/server";
@@ -48,6 +48,7 @@ export async function createBooking(input: {
 
   if (error || !data) return { ok: false, error: friendlyError(error) };
   revalidatePath("/me");
+  await notifyNewBooking(data.id);
   return { ok: true, data: { id: data.id } };
 }
 
@@ -110,6 +111,7 @@ export async function reviewPayment(
   });
   if (error) return { ok: false, error: friendlyError(error) };
 
+  await notifyPaymentReviewed(bookingId, approve, note);
   revalidatePath("/admin");
   return { ok: true, data: null };
 }

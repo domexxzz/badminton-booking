@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { signOut } from "@/app/actions";
 import { AdminNav } from "@/components/admin/AdminNav";
+import { RealtimeNotificationBanner } from "@/components/RealtimeNotificationBanner";
 import { getSessionUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="app admin-app">
+      <RealtimeNotificationBanner userId={user.id} isAdmin={true} />
       <header className="admin-header">
         <div className="row" style={{ flexWrap: "nowrap" }}>
           <div className="greeting">

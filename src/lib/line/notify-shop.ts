@@ -2,6 +2,11 @@ import "server-only";
 import { getServiceClient } from "@/lib/supabase/service";
 import {
   bookingConfirmedText,
+  customerBookingConfirmedText,
+  customerRequestResolvedText,
+  customerSlipRejectedText,
+  customerSlipSubmittedText,
+  newBookingAlertText,
   sanitizeName,
   slipNeedsReviewText,
   unmatchedTransferText,
@@ -10,9 +15,9 @@ import {
 } from "./messages";
 import { multicastText } from "./messaging";
 
-const DEFAULT_EVENTS = "confirmed,needs_review,unmatched,request";
+const DEFAULT_EVENTS = "confirmed,needs_review,unmatched,request,new_booking";
 
-function enabled(event: ShopEvent): boolean {
+function enabled(event: ShopEvent | "new_booking"): boolean {
   const events = (process.env.LINE_NOTIFY_EVENTS ?? DEFAULT_EVENTS).split(",").map((e) => e.trim());
   return Boolean(process.env.LINE_MESSAGING_TOKEN) && events.includes(event);
 }
@@ -35,6 +40,24 @@ async function notifyAdmins(text: string): Promise<void> {
     );
   } catch (error) {
     console.error("Shop LINE notification failed:", error);
+  }
+}
+
+/** Pushes a direct message to a specific customer if they connected LINE. Never throws. */
+export async function notifyCustomer(userId: string | undefined, text: string): Promise<void> {
+  if (!userId) return;
+  try {
+    const supabase = getServiceClient();
+    if (!supabase) return;
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("line_user_id")
+      .eq("id", userId)
+      .maybeSingle();
+    if (!profile?.line_user_id) return;
+    await multicastText(process.env.LINE_MESSAGING_TOKEN!, [profile.line_user_id], text);
+  } catch (error) {
+    console.error("Customer LINE notification failed:", error);
   }
 }
 
@@ -78,10 +101,19 @@ async function loadBookingSummary(bookingId: string): Promise<BookingSummary | n
     amount: totalAmount,
     customer: b.customer_name ?? profile?.display_name ?? "ลูกค้า",
     channel: b.channel,
+    userId: b.user_id,
   };
 }
 
-/** After a customer submits a slip: tell the shop it was confirmed, or that it needs a look. */
+/** When a customer makes a new booking (pending payment hold). */
+export async function notifyNewBooking(bookingId: string): Promise<void> {
+  if (!enabled("new_booking")) return;
+  const summary = await loadBookingSummary(bookingId);
+  if (!summary) return;
+  await notifyAdmins(newBookingAlertText(summary));
+}
+
+/** After a customer submits a slip: tell the shop it was confirmed, or that it needs a look, and update customer. */
 export async function notifyAfterSlip(bookingId: string, verifyStatus: string | null): Promise<void> {
   if (verifyStatus === "skipped") return;
   const event: ShopEvent = verifyStatus === "verified" ? "confirmed" : "needs_review";
@@ -89,7 +121,12 @@ export async function notifyAfterSlip(bookingId: string, verifyStatus: string | 
   const summary = await loadBookingSummary(bookingId);
   if (!summary) return;
 
-  if (event === "confirmed") return notifyAdmins(bookingConfirmedText(summary));
+  if (event === "confirmed") {
+    await notifyAdmins(bookingConfirmedText(summary));
+    await notifyCustomer(summary.userId, customerBookingConfirmedText(summary, bookingId));
+    return;
+  }
+
   const { data } = await getServiceClient()!
     .from("payments")
     .select("verify_reasons")
@@ -97,7 +134,22 @@ export async function notifyAfterSlip(bookingId: string, verifyStatus: string | 
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  return notifyAdmins(slipNeedsReviewText(summary, (data?.verify_reasons as string[] | undefined) ?? []));
+
+  await notifyAdmins(slipNeedsReviewText(summary, (data?.verify_reasons as string[] | undefined) ?? []));
+  await notifyCustomer(summary.userId, customerSlipSubmittedText(summary));
+}
+
+/** After an admin reviews a payment slip. */
+export async function notifyPaymentReviewed(bookingId: string, approve: boolean, note: string): Promise<void> {
+  const summary = await loadBookingSummary(bookingId);
+  if (!summary) return;
+
+  if (approve) {
+    if (enabled("confirmed")) await notifyAdmins(bookingConfirmedText(summary));
+    await notifyCustomer(summary.userId, customerBookingConfirmedText(summary, bookingId));
+  } else {
+    await notifyCustomer(summary.userId, customerSlipRejectedText(summary, note));
+  }
 }
 
 /** After the shop phone reports money in. */
@@ -107,7 +159,10 @@ export async function notifyAfterTransfer(
 ): Promise<void> {
   if (result.outcome === "matched" && result.booking_id && !result.reconciled && enabled("confirmed")) {
     const summary = await loadBookingSummary(result.booking_id);
-    if (summary) await notifyAdmins(bookingConfirmedText(summary));
+    if (summary) {
+      await notifyAdmins(bookingConfirmedText(summary));
+      await notifyCustomer(summary.userId, customerBookingConfirmedText(summary, result.booking_id));
+    }
   } else if (result.outcome === "unmatched" && enabled("unmatched")) {
     await notifyAdmins(unmatchedTransferText(amount));
   }
@@ -121,3 +176,16 @@ export async function notifyBookingRequest(bookingId: string, kind: "reschedule"
   const title = kind === "cancel" ? "🙋 ขอยกเลิก + คืนเงิน" : "🙋 ขอเลื่อนการจอง";
   await notifyAdmins(`${title}\n${summary.court} · ${sanitizeName(summary.customer)}\nดูที่หน้าแอดมิน หัวข้อ "คำขอ"`);
 }
+
+/** After an admin resolves a reschedule or cancel request. */
+export async function notifyRequestResolvedToCustomer(
+  bookingId: string,
+  kind: "reschedule" | "cancel",
+  approve: boolean,
+  note: string,
+): Promise<void> {
+  const summary = await loadBookingSummary(bookingId);
+  if (!summary) return;
+  await notifyCustomer(summary.userId, customerRequestResolvedText(summary, kind, approve, note));
+}
+

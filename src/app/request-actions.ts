@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { friendlyError } from "@/lib/errors";
-import { notifyBookingRequest } from "@/lib/line/notify-shop";
+import { notifyBookingRequest, notifyRequestResolvedToCustomer } from "@/lib/line/notify-shop";
 import { slotStart } from "@/lib/slots";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "./actions";
@@ -81,6 +81,12 @@ export async function resolveRequest(input: {
     return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
   }
   const supabase = await createClient();
+  const { data: req } = await supabase
+    .from("booking_requests")
+    .select("kind")
+    .eq("id", requestId)
+    .maybeSingle<{ kind: "reschedule" | "cancel" }>();
+
   const { error } = await supabase.rpc("resolve_request", {
     p_request_id: requestId,
     p_approve: approve,
@@ -88,6 +94,9 @@ export async function resolveRequest(input: {
     p_refund_slip_path: refundSlipPath,
   });
   if (error) return { ok: false, error: friendlyError(error) };
+  if (req?.kind) {
+    await notifyRequestResolvedToCustomer(bookingId, req.kind, approve, note);
+  }
   refresh(bookingId);
   return { ok: true, data: null };
 }

@@ -2,6 +2,11 @@ import { describe, expect, test, vi } from "vitest";
 import { buildAuthorizeUrl, exchangeCode, verifyIdToken, type LineLoginConfig } from "../src/lib/line/login";
 import {
   bookingConfirmedText,
+  customerBookingConfirmedText,
+  customerRequestResolvedText,
+  customerSlipRejectedText,
+  customerSlipSubmittedText,
+  newBookingAlertText,
   sanitizeName,
   slipNeedsReviewText,
   unmatchedTransferText,
@@ -142,4 +147,32 @@ describe("shop messages", () => {
     expect(unmatchedTransferText(null)).toContain("อ่านยอดไม่ได้");
     expect(unmatchedTransferText(260)).toContain("฿260");
   });
+
+  test("generates alert for new booking", () => {
+    const text = newBookingAlertText(booking);
+    expect(text).toContain("⚡ มีการจองคิวใหม่");
+    expect(text).toContain("ล็อกคิวรอชำระเงิน 5 นาที");
+    expect(text).toContain("฿260");
+  });
+
+  test("generates customer booking confirmed text with URL", () => {
+    const text = customerBookingConfirmedText(booking, "b-123");
+    expect(text).toContain("🎉 การจองสนามแบดมินตันของคุณได้รับการยืนยันแล้ว!");
+    expect(text).toContain("b-123");
+    expect(text).toContain("฿260");
+  });
+
+  test("generates customer slip submitted and rejected text", () => {
+    expect(customerSlipSubmittedText(booking)).toContain("🧾 ได้รับสลิปของคุณแล้ว");
+    expect(customerSlipRejectedText(booking, "ยอดไม่ครบ")).toContain("⚠️ สลิปของคุณไม่ผ่านการตรวจสอบ");
+    expect(customerSlipRejectedText(booking, "ยอดไม่ครบ")).toContain("ยอดไม่ครบ");
+  });
+
+  test("generates customer request resolved text", () => {
+    expect(customerRequestResolvedText(booking, "reschedule", true, "")).toContain("✅ คำขอเลื่อนเวลาการจองของคุณได้รับการอนุมัติแล้ว");
+    expect(customerRequestResolvedText(booking, "reschedule", false, "คิวเต็ม")).toContain("❌ คำขอเลื่อนเวลาของคุณไม่ได้รับการอนุมัติ");
+    expect(customerRequestResolvedText(booking, "cancel", true, "โอนคืนแล้ว")).toContain("✅ คำขอยกเลิกและคืนเงินของคุณได้รับการอนุมัติแล้ว");
+    expect(customerRequestResolvedText(booking, "cancel", false, "เลยเวลา")).toContain("❌ คำขอยกเลิกของคุณไม่ได้รับการอนุมัติ");
+  });
 });
+

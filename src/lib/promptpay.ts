@@ -34,12 +34,71 @@ export function parseTarget(raw: string): Target {
   throw new Error("PromptPay ID must be a 10-digit mobile, 13-digit ID or 15-digit e-wallet");
 }
 
+/** Default Bangkok Bank Merchant Pro QR payload for แบดมินตัน@สินธานี (อัครเนย์ ลาน้ำเที่ยง, ร้านค้า 1077272). */
+export const BBL_MERCHANT_PRO_QR =
+  "00020101021130820016A000000677010112011501075360003740602150060000010772720320261018I700000000000053037645802TH5907akkanay62240720BED4256284C54781AC086304C8A7";
+
+export const BBL_MERCHANT_INFO = {
+  bank: "ธนาคารกรุงเทพ (Bangkok Bank)",
+  accountName: "นาย อัครเนย์ ลาน้ำเที่ยง",
+  shortName: "อัครเนย์",
+  merchantId: "1077272",
+  type: "Bangkok Bank Merchant Pro",
+} as const;
+
+function parseEmvCoTags(payload: string): { id: string; val: string }[] {
+  const tags: { id: string; val: string }[] = [];
+  let i = 0;
+  while (i < payload.length - 4) {
+    const id = payload.slice(i, i + 2);
+    const len = parseInt(payload.slice(i + 2, i + 4), 10);
+    if (Number.isNaN(len) || i + 4 + len > payload.length) break;
+    if (id === "63") break;
+    const val = payload.slice(i + 4, i + 4 + len);
+    tags.push({ id, val });
+    i += 4 + len;
+  }
+  return tags;
+}
+
+function updateEmvCoAmount(rawPayload: string, amount?: number): string {
+  const tags = parseEmvCoTags(rawPayload);
+  let res = "";
+  let addedAmount = false;
+
+  for (const t of tags) {
+    if (t.id === "01") {
+      res += field("01", amount !== undefined ? "12" : "11");
+    } else if (t.id === "54") {
+      // Replaced by new amount below
+    } else {
+      res += field(t.id, t.val);
+      if (t.id === "53" && amount !== undefined) {
+        res += field("54", amount.toFixed(2));
+        addedAmount = true;
+      }
+    }
+  }
+
+  if (!addedAmount && amount !== undefined) {
+    res += field("54", amount.toFixed(2));
+  }
+
+  const body = res + "6304";
+  return body + crc16(body);
+}
+
 export function promptPayPayload(rawTarget: string, amount?: number): string {
-  const target = parseTarget(rawTarget);
   if (amount !== undefined && (!Number.isFinite(amount) || amount <= 0)) {
     throw new Error("Amount must be a positive number");
   }
 
+  // If the target is already a complete EMVCo payload (e.g. Bangkok Bank Merchant Pro)
+  if (rawTarget.startsWith("000201")) {
+    return updateEmvCoAmount(rawTarget, amount);
+  }
+
+  const target = parseTarget(rawTarget);
   const merchant = field("00", PROMPTPAY_AID) + field(target.tag, target.value);
   const body =
     field("00", "01") +
@@ -52,3 +111,4 @@ export function promptPayPayload(rawTarget: string, amount?: number): string {
 
   return body + crc16(body);
 }
+

@@ -136,6 +136,29 @@ export function AdminBookingForm({
           />
         </label>
       </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "var(--surface-2)", borderRadius: 8, border: "1px dashed var(--border)" }}>
+        <input
+          type="checkbox"
+          id="is-recurring-checkbox"
+          style={{ width: 18, height: 18, cursor: "pointer" }}
+          checked={form.note.includes("[จองประจำ]")}
+          onChange={(e) => {
+            if (e.target.checked) {
+              update({ note: form.note.includes("[จองประจำ]") ? form.note : `[จองประจำ] ${form.note}`.trim() });
+            } else {
+              update({ note: form.note.replace("[จองประจำ]", "").trim() });
+            }
+          }}
+        />
+        <label htmlFor="is-recurring-checkbox" style={{ cursor: "pointer", fontSize: 13, userSelect: "none" }}>
+          <strong>🔒 ก๊วนประจำ / จองประจำ (Non-active)</strong>
+          <span className="muted" style={{ display: "block", fontSize: 12 }}>
+            ล็อกสล็อตนี้ไว้ในตารางคิว ลูกค้าทั่วไปจะไม่สามารถจองทับได้
+          </span>
+        </label>
+      </div>
+
       <div className="row">
         <span className="muted">ราคา {formatBaht(price * Math.min(form.hours, maxHours))} · ยืนยันทันทีและขึ้นบนตารางเรียลไทม์</span>
         <button className="btn" type="submit" disabled={pending}>

@@ -10,7 +10,6 @@ import { LiveRefresh } from "@/components/LiveRefresh";
 import { SaveQrButton } from "@/components/SaveQrButton";
 import { SlipUploader } from "@/components/SlipUploader";
 import { STATUS_LABEL, formatBaht, formatSlot } from "@/lib/format";
-import { promptPayPayload } from "@/lib/promptpay";
 import { isSlipVerificationEnabled } from "@/lib/slip/verify-booking";
 import { getSessionUser } from "@/lib/supabase/server";
 
@@ -60,16 +59,22 @@ const VERIFY_FOR_CUSTOMER: Record<string, string> = {
   unreadable: "ระบบอ่านสลิปไม่ได้",
 };
 
+import { BBL_MERCHANT_INFO, BBL_MERCHANT_PRO_QR, promptPayPayload } from "@/lib/promptpay";
+
 async function promptPayQr(amount: number): Promise<string | null> {
-  const target = process.env.PROMPTPAY_ID;
-  if (!target) return null;
+  const target =
+    process.env.BBL_MERCHANT_PRO_QR ||
+    (process.env.PROMPTPAY_ID?.startsWith("000201") ? process.env.PROMPTPAY_ID : null) ||
+    BBL_MERCHANT_PRO_QR;
+
   try {
     return await QRCode.toDataURL(promptPayPayload(target, amount), { margin: 2, width: 560 });
   } catch (error) {
-    console.error("Failed to build PromptPay QR:", error);
+    console.error("Failed to build Payment QR:", error);
     return null;
   }
 }
+
 
 export default async function BookingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -188,19 +193,43 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
             {qr ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="qr" src={qr} alt="PromptPay QR สำหรับชำระเงิน" />
-                <SaveQrButton dataUrl={qr} fileName={`promptpay-${amountBaht}-baht.png`} />
+                <img className="qr" src={qr} alt="Bangkok Bank Thai QR Payment สำหรับชำระเงิน" />
+                <SaveQrButton dataUrl={qr} fileName={`bbl-qr-${amountBaht}-baht.png`} />
               </>
             ) : (
-              <p className="error">ยังไม่ได้ตั้งค่า PROMPTPAY_ID กรุณาติดต่อแอดมิน</p>
+              <p className="error">ไม่สามารถสร้าง QR ชำระเงินได้ กรุณาติดต่อแอดมิน</p>
             )}
           </div>
-          <div className="stack">
+          <div className="stack" style={{ gap: 12 }}>
+            <div className="bbl-payment-info card" style={{ background: "var(--surface-2)", border: "1px solid var(--border)", padding: "12px 14px", borderRadius: "10px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontWeight: 700, color: "var(--foreground)", fontSize: "0.95rem" }}>
+                  🏦 ธนาคารกรุงเทพ (Bangkok Bank)
+                </span>
+                <span className="badge" style={{ fontSize: "0.75rem", background: "var(--primary)", color: "#fff" }}>
+                  Merchant Pro
+                </span>
+              </div>
+              <div style={{ fontSize: "0.88rem", display: "flex", flexDirection: "column", gap: 3 }}>
+                <div>
+                  <span className="muted">ชื่อบัญชี: </span>
+                  <strong>{BBL_MERCHANT_INFO.accountName}</strong>
+                </div>
+                <div>
+                  <span className="muted">รหัสร้านค้า: </span>
+                  <span style={{ fontFamily: "monospace", fontWeight: 600 }}>{BBL_MERCHANT_INFO.merchantId}</span>
+                </div>
+              </div>
+            </div>
+
             <div style={{ textAlign: "center" }}>
               <div className="muted">ยอดที่ต้องโอน {isMultiCourt ? `(รวม ${allBookings.length} สนาม)` : ""}</div>
               <div className="amount">{formatBaht(totalAmount)}</div>
-              <div className="muted">สแกน QR แล้วยอดจะขึ้นเอง</div>
+              <div className="muted" style={{ fontSize: "0.85rem", marginTop: 2 }}>
+                สแกน QR ด้วยแอปธนาคารแล้วยอดจะขึ้นให้อัตโนมัติ
+              </div>
             </div>
+
             {booking.hold_expires_at && (
               <p>
                 กรุณาโอนภายใน <Countdown until={booking.hold_expires_at} /> ไม่เช่นนั้นระบบจะปล่อยคิวให้คนอื่น

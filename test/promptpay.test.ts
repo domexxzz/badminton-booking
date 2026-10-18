@@ -50,4 +50,19 @@ describe("promptPayPayload", () => {
     expect(() => promptPayPayload("0812345678", 0)).toThrow();
     expect(() => promptPayPayload("0812345678", Number.NaN)).toThrow();
   });
+
+  test("accepts Bangkok Bank Merchant Pro EMVCo payload and injects dynamic amount", () => {
+    const bblPayload =
+      "00020101021130820016A000000677010112011501075360003740602150060000010772720320261018I700000000000053037645802TH5907akkanay62240720BED4256284C54781AC086304C8A7";
+
+    const withAmount = promptPayPayload(bblPayload, 150);
+    expect(withAmount).toContain("010212"); // Dynamic QR
+    expect(withAmount).toContain("5406150.00"); // Amount tag 54
+    expect(withAmount).toContain("5907akkanay");
+    expect(withAmount.endsWith(crc16(withAmount.slice(0, -4)))).toBe(true);
+
+    const withoutAmount = promptPayPayload(bblPayload);
+    expect(withoutAmount).toBe(bblPayload);
+  });
 });
+

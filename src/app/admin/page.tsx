@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CancelButton } from "@/components/CancelButton";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { AdminDatePicker } from "@/components/admin/AdminDatePicker";
@@ -95,6 +96,32 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
           <span className="value">{summary.utilization}%</span>
           <span className="sub">{summary.bookedHours} ชม. จาก {courts.data.length} สนาม</span>
         </div>
+      </section>
+
+      <section
+        className="card"
+        style={{
+          background: "linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(59, 130, 246, 0.08))",
+          border: "1px solid var(--border)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 12,
+          padding: "14px 16px",
+        }}
+      >
+        <div>
+          <strong style={{ fontSize: "1rem", display: "flex", alignItems: "center", gap: 6 }}>
+            <span>📊</span> ดูรายงานสถิติและกราฟรายรับอย่างละเอียด
+          </strong>
+          <span className="muted" style={{ fontSize: "0.85rem", display: "block", marginTop: 2 }}>
+            กราฟแท่งรายรับ ยอดจองรายชั่วโมง/วัน/เดือน/ปี และส่งออกข้อมูลเป็น Excel/CSV
+          </span>
+        </div>
+        <Link href="/admin/analytics" className="btn btn-sm btn-primary">
+          เปิดแดชบอร์ดรายงาน →
+        </Link>
       </section>
 
       {courts.data.map((court) => {

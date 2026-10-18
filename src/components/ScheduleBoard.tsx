@@ -49,7 +49,7 @@ export function ScheduleBoard({
 
       <div className="legend">
         <span><i style={{ background: "var(--surface-2)" }} />ว่าง (แตะเพื่อจอง)</span>
-        <span><i style={{ background: "var(--primary)", borderColor: "var(--primary)" }} />จองแล้ว</span>
+        <span><i className="legend-booked" />🔒 จองแล้ว / ก๊วนประจำ (Non-active)</span>
         <span><i style={{ background: "var(--held)" }} />รอชำระ</span>
       </div>
 
@@ -69,10 +69,11 @@ export function ScheduleBoard({
                   type="button"
                   className={`chip ${state}`}
                   disabled={state !== "free"}
-                  aria-label={`${court.name} ${formatHour(hour)} ${STATE_LABEL[state]}`}
+                  aria-label={`${court.name} ${formatHour(hour)} ${state === "booked" ? "จองแล้ว/ล็อกไว้ (Non-active)" : STATE_LABEL[state]}`}
                   onClick={() => router.push(`/book?date=${date}&court=${court.id}&hour=${hour}`)}
                 >
                   {formatHour(hour).replace(":", ".")}
+                  {state === "booked" && <span className="chip-lock-icon">🔒</span>}
                 </button>
               );
             })}

@@ -241,7 +241,7 @@ export function BookingForm({
                   }}
                 >
                   <span className="chip-time-start">{startStr}</span>
-                  <span className="chip-time-end">– {endStr}</span>
+                  <span className="chip-time-end">{free ? `– ${endStr}` : "🔒 ล็อกแล้ว"}</span>
                 </button>
               );
             })}

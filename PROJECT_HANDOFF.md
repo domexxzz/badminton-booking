@@ -10,7 +10,7 @@
 - **Production URL:** [https://badminton-booking-steel.vercel.app](https://badminton-booking-steel.vercel.app)
 - **สถานะปัจจุบัน:** 
   - ✅ Production Deployment สำเร็จ (Live บน Vercel)
-  - ✅ Vitest Unit Tests: 10/10 files (126/126 tests passed)
+  - ✅ Vitest Unit Tests: 10/10 files (127/127 tests passed)
   - ✅ Database E2E Tests (PGlite): ALL PASSED
   - ✅ Production Build (`next build`): Compiled สำเร็จ 0 error
   - ✅ รัน Database Migration `0012_multi_court_bookings.sql` บน Supabase Production เรียบร้อยแล้ว

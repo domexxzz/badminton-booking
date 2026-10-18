@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { AnalyticsBookingTable, type BookingRowItem } from "@/components/admin/AnalyticsBookingTable";
 import { AnalyticsCharts, type ChannelStat, type CourtStat, type TimeDataPoint } from "@/components/admin/AnalyticsCharts";
@@ -60,7 +60,7 @@ export default async function AnalyticsPage({
 }) {
   const { supabase, user, isAdmin } = await getSessionUser();
   if (!user) redirect("/login?next=/admin/analytics");
-  if (!isAdmin) notFound();
+  if (!isAdmin) return null; // the admin layout shows the no-access screen
 
   const params = await searchParams;
   const now = new Date();

@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions";
 import { AdminNav } from "@/components/admin/AdminNav";
+import { NoAdminAccess } from "@/components/admin/NoAdminAccess";
 import { RealtimeNotificationBanner } from "@/components/RealtimeNotificationBanner";
 import { getSessionUser } from "@/lib/supabase/server";
 
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const { supabase, user, isAdmin, displayName } = await getSessionUser();
   if (!user) redirect("/login?next=/admin");
-  if (!isAdmin) notFound();
+  if (!isAdmin) return <NoAdminAccess displayName={displayName} />;
 
   const [{ count }, { count: requestCount }] = await Promise.all([
     supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "awaiting_review"),

@@ -24,6 +24,8 @@ export function BookingChangePanel({
   amount,
   courts,
   pending,
+  canCancel,
+  cancelDeadlineText,
 }: {
   bookingId: string;
   userId: string;
@@ -32,6 +34,8 @@ export function BookingChangePanel({
   amount: number;
   courts: { id: number; name: string }[];
   pending: PendingRequest | null;
+  canCancel: boolean;
+  cancelDeadlineText: string;
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<"menu" | "reschedule" | "cancel">("menu");
@@ -70,10 +74,19 @@ export function BookingChangePanel({
           <button type="button" className="btn btn-ghost btn-block" onClick={() => setMode("reschedule")}>
             ขอเลื่อนเวลา
           </button>
-          <button type="button" className="btn btn-ghost btn-block" onClick={() => setMode("cancel")}>
-            ขอยกเลิก / คืนเงิน
-          </button>
+          {canCancel && (
+            <button type="button" className="btn btn-ghost btn-block" onClick={() => setMode("cancel")}>
+              ยกเลิกการจอง
+            </button>
+          )}
         </div>
+      )}
+      {mode === "menu" && (
+        <p className="muted" style={{ margin: 0, fontSize: 14 }}>
+          {canCancel
+            ? `ยกเลิกเองและรับเงินคืนได้ถึง ${cancelDeadlineText} (12:00 น. ของวันที่เล่น)`
+            : `เลยเวลายกเลิกเองแล้ว (ยกเลิกได้ถึง 12:00 น. ของวันที่เล่น) ถ้าจำเป็นต้องยกเลิก กรุณาติดต่อร้าน`}
+        </p>
       )}
       {mode === "reschedule" && (
         <RescheduleForm
@@ -85,7 +98,13 @@ export function BookingChangePanel({
         />
       )}
       {mode === "cancel" && (
-        <CancelRequestForm bookingId={bookingId} userId={userId} amount={amount} onCancel={() => setMode("menu")} />
+        <CancelRequestForm
+          bookingId={bookingId}
+          userId={userId}
+          amount={amount}
+          deadlineText={cancelDeadlineText}
+          onCancel={() => setMode("menu")}
+        />
       )}
     </div>
   );

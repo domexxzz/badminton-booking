@@ -17,6 +17,7 @@ const MIGRATIONS = [
   "0010_manage_admins.sql",
   "0011_venue_settings.sql",
   "0012_multi_court_bookings.sql",
+  "0013_self_cancel_deadline.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -495,6 +496,32 @@ const { rows: [singleB] } = await db.query(
 );
 check("single-court create_booking generates a group_id",
   singleB && singleB.group_id !== null && singleB.court_id === 4);
+
+// ---- Self-cancel deadline (0013) ----
+const deadline = async (start) =>
+  new Date((await db.query(`select self_cancel_deadline($1::timestamptz) as d`, [start])).rows[0].d).toISOString();
+check("evening booking: cancel until 12:00 that day",
+  (await deadline("2026-10-20T18:00:00+07:00")) === new Date("2026-10-20T12:00:00+07:00").toISOString());
+check("morning booking: cancel until it starts",
+  (await deadline("2026-10-20T09:30:00+07:00")) === new Date("2026-10-20T09:30:00+07:00").toISOString());
+check("cancelled booking waits for the refund",
+  (await db.query(`select status, refund_amount from booking_requests where id = '${cq.id}'`)).rows[0].status === "approved"
+  && Number(cq.refund_amount) === Number(rb.amount) && cq.status === "refund_pending");
+await as(ADMIN);
+await expectError("a refund cannot be rejected once the booking is cancelled",
+  `select resolve_request('${cq.id}', false)`, "REQUEST_NOT_FOUND");
+
+// Cancelling one court of a multi-court bill cancels the whole bill.
+const U9 = "99999999-9999-9999-9999-999999999999";
+await db.exec(`insert into auth.users (id, email) values ('${U9}','i@x.com')`);
+const pairA = await paidBooking(U9, 1, day3(4), 1);
+const pairB = await paidBooking(U9, 2, day3(4), 1);
+await db.exec(`update bookings set group_id = '${pairA.id}' where id in ('${pairA.id}', '${pairB.id}')`);
+await as(U9);
+await db.exec(`insert into storage.objects (bucket_id, name) values ('refunds', '${U9}/${pairA.id}-qr-1.png')`);
+const { rows: [gq] } = await db.query(`select * from request_cancel('${pairA.id}', '${U9}/${pairA.id}-qr-1.png')`);
+check("whole bill is cancelled and refunded together",
+  (await bookingRow(pairB.id)).status === "cancelled" && Number(gq.refund_amount) === Number(pairA.amount) + Number(pairB.amount));
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

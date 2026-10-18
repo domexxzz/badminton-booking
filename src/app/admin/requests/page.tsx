@@ -12,6 +12,8 @@ type Row = {
   booking_id: string;
   user_id: string;
   kind: "reschedule" | "cancel";
+  status: "pending" | "refund_pending";
+  refund_amount: number | null;
   new_court_id: number | null;
   new_starts_at: string | null;
   new_ends_at: string | null;
@@ -26,9 +28,9 @@ export default async function RequestsPage() {
   const requests = await supabase
     .from("booking_requests")
     .select(
-      "id, booking_id, user_id, kind, new_court_id, new_starts_at, new_ends_at, reason, refund_qr_path, created_at, bookings(court_id, starts_at, ends_at, amount, courts(name))",
+      "id, booking_id, user_id, kind, status, refund_amount, new_court_id, new_starts_at, new_ends_at, reason, refund_qr_path, created_at, bookings(court_id, starts_at, ends_at, amount, courts(name))",
     )
-    .eq("status", "pending")
+    .in("status", ["pending", "refund_pending"])
     .order("created_at", { ascending: true })
     .returns<Row[]>();
 
@@ -56,7 +58,7 @@ export default async function RequestsPage() {
     <>
       <LiveRefresh table="booking_requests" />
       <section className="stack" style={{ gap: 10 }}>
-        <h2>คำขอเลื่อน / ยกเลิก ({requests.data.length})</h2>
+        <h2>คำขอเลื่อน / ยกเลิก / รอโอนคืน ({requests.data.length})</h2>
         {requests.data.length === 0 && <div className="card muted">ไม่มีคำขอค้าง</div>}
         {requests.data.map((r) => {
           const customer = who.get(r.user_id);
@@ -65,7 +67,13 @@ export default async function RequestsPage() {
           return (
             <div key={r.id} className="card stack" style={{ gap: 8 }}>
               <div className="row">
-                <strong>{r.kind === "cancel" ? "🧾 ขอยกเลิก + คืนเงิน" : "🔁 ขอเลื่อน"}</strong>
+                <strong>
+                  {r.status === "refund_pending"
+                    ? "💸 ลูกค้ายกเลิกแล้ว · รอโอนคืน"
+                    : r.kind === "cancel"
+                      ? "🧾 ขอยกเลิก + คืนเงิน"
+                      : "🔁 ขอเลื่อน"}
+                </strong>
                 <span className="muted">{formatDate(r.created_at)} {formatTime(r.created_at)}</span>
               </div>
               <div>
@@ -88,7 +96,9 @@ export default async function RequestsPage() {
               {r.kind === "cancel" && (
                 <div className="stack" style={{ gap: 4 }}>
                   <span>
-                    QR รับเงินของลูกค้า · โอนคืน <strong>{b ? formatBaht(b.amount) : "-"}</strong>
+                    QR รับเงินของลูกค้า · โอนคืน{" "}
+                    <strong>{formatBaht(Number(r.refund_amount ?? b?.amount ?? 0))}</strong>
+                    {r.status === "refund_pending" && <span className="muted"> (สนามถูกปล่อยแล้ว)</span>}
                   </span>
                   {qr ? (
                     <a href={qr} target="_blank" rel="noreferrer" download>
@@ -101,7 +111,13 @@ export default async function RequestsPage() {
                   <span className="muted">แตะรูปเพื่อเปิดเต็มจอ / บันทึก แล้วสแกนจากแอปธนาคารเพื่อโอนคืน</span>
                 </div>
               )}
-              <RequestActions requestId={r.id} bookingId={r.booking_id} customerId={r.user_id} kind={r.kind} />
+              <RequestActions
+                requestId={r.id}
+                bookingId={r.booking_id}
+                customerId={r.user_id}
+                kind={r.kind}
+                refundOnly={r.status === "refund_pending"}
+              />
             </div>
           );
         })}

@@ -16,7 +16,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const [{ count }, { count: requestCount }] = await Promise.all([
     supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "awaiting_review"),
-    supabase.from("booking_requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    supabase
+      .from("booking_requests")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["pending", "refund_pending"]),
   ]);
 
   return (

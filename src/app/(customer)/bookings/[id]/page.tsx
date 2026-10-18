@@ -9,7 +9,8 @@ import { Countdown } from "@/components/Countdown";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { SaveQrButton } from "@/components/SaveQrButton";
 import { SlipUploader } from "@/components/SlipUploader";
-import { STATUS_LABEL, formatBaht, formatSlot } from "@/lib/format";
+import { canSelfCancel, selfCancelDeadline } from "@/lib/cancel-policy";
+import { STATUS_LABEL, formatBaht, formatDate, formatSlot, formatTime } from "@/lib/format";
 import { isSlipVerificationEnabled } from "@/lib/slip/verify-booking";
 import { getSessionUser } from "@/lib/supabase/server";
 
@@ -49,6 +50,7 @@ type BookingRequestRow = {
   new_ends_at: string | null;
   admin_note: string | null;
   refund_slip_path: string | null;
+  refund_amount: number | null;
   resolved_at: string | null;
 };
 
@@ -106,8 +108,9 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const [{ data: requests }, { data: courts }] = await Promise.all([
     supabase
       .from("booking_requests")
-      .select("id, kind, status, new_court_id, new_starts_at, new_ends_at, admin_note, refund_slip_path, resolved_at")
-      .eq("booking_id", booking.id)
+      .select("id, kind, status, new_court_id, new_starts_at, new_ends_at, admin_note, refund_slip_path, refund_amount, resolved_at")
+      // A whole-bill cancel is recorded on whichever court the customer opened.
+      .in("booking_id", allBookings.map((b) => b.id))
       .order("created_at", { ascending: false })
       .limit(5)
       .returns<BookingRequestRow[]>(),
@@ -115,6 +118,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   ]);
   const pendingRow = requests?.find((r) => r.status === "pending") ?? null;
   const lastResolved = requests?.find((r) => r.status === "approved" || r.status === "rejected") ?? null;
+  const refundPending = requests?.find((r) => r.status === "refund_pending") ?? null;
   const pending: PendingRequest | null = pendingRow && {
     id: pendingRow.id,
     kind: pendingRow.kind,
@@ -127,6 +131,8 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
     : null;
   const changeable =
     booking.status === "confirmed" && booking.channel === "online" && Date.parse(booking.starts_at) > Date.now();
+  const cancelDeadline = selfCancelDeadline(booking.starts_at);
+  const cancelDeadlineText = `${formatDate(cancelDeadline.toISOString())} ${formatTime(cancelDeadline.toISOString())} น.`;
 
   // Stop showing the QR once the window closes so nobody pays for a lapsed hold.
   const holdLapsed =
@@ -271,7 +277,17 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
-      {lastResolved && (
+      {refundPending && (
+        <div className="card stack" style={{ gap: 8 }}>
+          <h2>ยกเลิกแล้ว · รอร้านโอนคืน</h2>
+          <p className="muted" style={{ margin: 0 }}>
+            ร้านจะโอนคืน {formatBaht(Number(refundPending.refund_amount ?? totalAmount))} เข้า QR ที่คุณแนบไว้
+            เมื่อโอนแล้วสลิปคืนเงินจะขึ้นที่หน้านี้
+          </p>
+        </div>
+      )}
+
+      {!refundPending && lastResolved && (
         <div className="card stack" style={{ gap: 8 }}>
           <h2>
             {lastResolved.kind === "cancel" ? "คำขอยกเลิก" : "คำขอเลื่อน"}
@@ -293,9 +309,11 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           userId={user.id}
           courtId={booking.court_id}
           durationHours={(Date.parse(booking.ends_at) - Date.parse(booking.starts_at)) / 3_600_000}
-          amount={Number(booking.amount)}
+          amount={totalAmount}
           courts={courts ?? []}
           pending={pending}
+          canCancel={canSelfCancel(booking.starts_at)}
+          cancelDeadlineText={cancelDeadlineText}
         />
       )}
 

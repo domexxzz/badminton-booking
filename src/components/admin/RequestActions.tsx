@@ -5,17 +5,22 @@ import { useState } from "react";
 import { resolveRequest } from "@/app/request-actions";
 import { ImagePicker, uploadImage } from "../ImagePicker";
 
-/** Approve/reject a customer's request. Approving a cancel needs the refund slip. */
+/**
+ * Approve/reject a customer's request. Approving a cancel needs the refund slip.
+ * `refundOnly`: the customer already cancelled; all that is left is the refund.
+ */
 export function RequestActions({
   requestId,
   bookingId,
   customerId,
   kind,
+  refundOnly = false,
 }: {
   requestId: string;
   bookingId: string;
   customerId: string;
   kind: "reschedule" | "cancel";
+  refundOnly?: boolean;
 }) {
   const router = useRouter();
   const [slip, setSlip] = useState<File | null>(null);
@@ -64,16 +69,24 @@ export function RequestActions({
       />
       {error && <p className="error">{error}</p>}
       <div style={{ display: "flex", gap: 8 }}>
-        <button type="button" className="btn btn-ghost" onClick={() => decide(false)} disabled={busy}>
-          ไม่อนุมัติ
-        </button>
+        {!refundOnly && (
+          <button type="button" className="btn btn-ghost" onClick={() => decide(false)} disabled={busy}>
+            ไม่อนุมัติ
+          </button>
+        )}
         <button
           type="button"
           className="btn btn-block"
           onClick={() => decide(true)}
           disabled={busy || (kind === "cancel" && !slip)}
         >
-          {busy ? "กำลังบันทึก…" : kind === "cancel" ? "โอนคืนแล้ว · ยกเลิกการจอง" : "อนุมัติการเลื่อน"}
+          {busy
+            ? "กำลังบันทึก…"
+            : refundOnly
+              ? "โอนคืนแล้ว · ส่งสลิปให้ลูกค้า"
+              : kind === "cancel"
+                ? "โอนคืนแล้ว · ยกเลิกการจอง"
+                : "อนุมัติการเลื่อน"}
         </button>
       </div>
     </div>

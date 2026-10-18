@@ -173,7 +173,7 @@ export async function notifyBookingRequest(bookingId: string, kind: "reschedule"
   if (!enabled("request")) return;
   const summary = await loadBookingSummary(bookingId);
   if (!summary) return;
-  const title = kind === "cancel" ? "🙋 ขอยกเลิก + คืนเงิน" : "🙋 ขอเลื่อนการจอง";
+  const title = kind === "cancel" ? "❌ ลูกค้ายกเลิกการจองแล้ว · รอโอนคืน" : "🙋 ขอเลื่อนการจอง";
   await notifyAdmins(`${title}\n${summary.court} · ${sanitizeName(summary.customer)}\nดูที่หน้าแอดมิน หัวข้อ "คำขอ"`);
 }
 

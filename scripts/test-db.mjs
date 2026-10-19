@@ -19,6 +19,7 @@ const MIGRATIONS = [
   "0012_multi_court_bookings.sql",
   "0013_self_cancel_deadline.sql",
   "0014_coach_terms.sql",
+  "0015_shop_contact.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -563,6 +564,19 @@ check("pay-now coach booking waits for payment at the agreed price",
 const { rows: [later2] } = await db.query(`select * from create_coach_booking(array[4]::smallint[], '${coachDay(0)}', 1, true, null)`);
 await db.query(`select cancel_booking('${later2.id}')`);
 check("coach cancels an unpaid pay-later booking without a refund", (await bookingRow(later2.id)).status === "cancelled");
+
+// ---- Shop contact (0015) ----
+await as(U1);
+await expectError("customers cannot change the shop contact",
+  `select update_shop_contact('x', '0812345678', 'abc')`, "FORBIDDEN");
+await as(ADMIN);
+await expectError("phone must be a Thai number", `select update_shop_contact('Akkanay', '12345', null)`, "INVALID_PHONE");
+await expectError("LINE must be an ID or a LINE link",
+  `select update_shop_contact('Akkanay', null, 'https://evil.example/x')`, "INVALID_LINE");
+await db.query(`select update_shop_contact(' Akkanay ', '082-945-7278', '@sinthani')`);
+const contact = (await db.query(`select contact_name, contact_phone, contact_line from venue_settings where id = 1`)).rows[0];
+check("admin saves the shop contact (phone digits only)",
+  contact.contact_name === "Akkanay" && contact.contact_phone === "0829457278" && contact.contact_line === "@sinthani");
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

@@ -8,6 +8,7 @@ import { ChevronLeft } from "@/components/icons";
 import { Countdown } from "@/components/Countdown";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { SaveQrButton } from "@/components/SaveQrButton";
+import { ShopContactCard } from "@/components/ShopContactCard";
 import { SlipUploader } from "@/components/SlipUploader";
 import { canSelfCancel, selfCancelDeadline } from "@/lib/cancel-policy";
 import { STATUS_LABEL, formatBaht, formatDate, formatSlot, formatTime } from "@/lib/format";
@@ -368,6 +369,8 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           <Link className="btn btn-block" href="/book">จองใหม่</Link>
         </div>
       )}
+
+      <ShopContactCard title="มีคำถามเรื่องการจองนี้?" />
     </div>
   );
 }

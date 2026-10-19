@@ -1244,3 +1244,7 @@ details summary { cursor: pointer; }
 .board-legend { display: flex; flex-wrap: wrap; gap: 6px; }
 .board-key { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; }
 .coach-terms { border-top: 1px dashed var(--border); padding-top: 10px; }
+
+/* ---------- Contact the shop ---------- */
+.contact-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.contact-actions .btn { flex: 1 1 160px; text-align: center; }

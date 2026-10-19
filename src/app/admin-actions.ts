@@ -59,3 +59,18 @@ export async function markBookingPaid(bookingId: string): Promise<ActionResult> 
   revalidatePath(`/bookings/${bookingId}`);
   return { ok: true, data: null };
 }
+
+export async function updateShopContactAction(name: string, phone: string, line: string): Promise<ActionResult> {
+  if (typeof name !== "string" || typeof phone !== "string" || typeof line !== "string") {
+    return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("update_shop_contact", {
+    p_name: name.slice(0, 60),
+    p_phone: phone.slice(0, 20),
+    p_line: line.slice(0, 200),
+  });
+  if (error) return { ok: false, error: friendlyError(error) };
+  revalidatePath("/", "layout");
+  return { ok: true, data: null };
+}

@@ -1,4 +1,5 @@
 import { HomeClientView } from "@/components/HomeClientView";
+import { ShopContactCard } from "@/components/ShopContactCard";
 import { bangkokDate, slotStart, type Occupancy } from "@/lib/slots";
 import { getSessionUser } from "@/lib/supabase/server";
 import { getVenueHours } from "@/lib/venue-settings";
@@ -30,12 +31,15 @@ export default async function HomePage() {
   }
 
   return (
-    <HomeClientView
-      courts={courts.data}
-      occupancy={occupancy.data ?? []}
-      openHour={openHour}
-      closeHour={closeHour}
-    />
+    <>
+      <HomeClientView
+        courts={courts.data}
+        occupancy={occupancy.data ?? []}
+        openHour={openHour}
+        closeHour={closeHour}
+      />
+      <ShopContactCard />
+    </>
   );
 }
 

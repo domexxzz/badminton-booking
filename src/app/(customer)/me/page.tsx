@@ -1,3 +1,4 @@
+import { ShopContactCard } from "@/components/ShopContactCard";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions";
@@ -99,6 +100,7 @@ export default async function MyBookingsPage() {
           ))}
         </div>
       </section>
+      <ShopContactCard />
     </>
   );
 }

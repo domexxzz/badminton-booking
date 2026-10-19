@@ -1,10 +1,12 @@
 import { AdminHoursSettings } from "@/components/admin/AdminHoursSettings";
+import { ShopContactSettings } from "@/components/admin/ShopContactSettings";
+import { getShopContact } from "@/lib/shop-contact";
 import { getVenueHours } from "@/lib/venue-settings";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const { openHour, closeHour } = await getVenueHours();
+  const [{ openHour, closeHour }, contact] = await Promise.all([getVenueHours(), getShopContact()]);
 
   return (
     <section className="stack" style={{ gap: 16 }}>
@@ -16,6 +18,7 @@ export default async function SettingsPage() {
       </div>
 
       <AdminHoursSettings currentOpenHour={openHour} currentCloseHour={closeHour} />
+      <ShopContactSettings current={contact} />
     </section>
   );
 }

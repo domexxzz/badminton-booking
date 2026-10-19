@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { cancelBooking } from "@/app/actions";
 import { withdrawRequest } from "@/app/request-actions";
 import { formatSlot } from "@/lib/format";
 import { CancelRequestForm } from "./CancelRequestForm";
@@ -26,6 +27,7 @@ export function BookingChangePanel({
   pending,
   canCancel,
   cancelDeadlineText,
+  unpaidPayLater = false,
 }: {
   bookingId: string;
   userId: string;
@@ -36,11 +38,22 @@ export function BookingChangePanel({
   pending: PendingRequest | null;
   canCancel: boolean;
   cancelDeadlineText: string;
+  /** Nothing was paid yet, so cancelling needs no refund QR. */
+  unpaidPayLater?: boolean;
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<"menu" | "reschedule" | "cancel">("menu");
   const [error, setError] = useState<string | null>(null);
   const [busy, startTransition] = useTransition();
+
+  const cancelUnpaid = () => {
+    if (!confirm("ยืนยันยกเลิกการจอง? สนามจะถูกปล่อยให้คนอื่นจองทันที")) return;
+    startTransition(async () => {
+      const result = await cancelBooking(bookingId);
+      if (!result.ok) return setError(result.error);
+      router.refresh();
+    });
+  };
 
   if (pending) {
     const withdraw = () =>
@@ -75,7 +88,12 @@ export function BookingChangePanel({
             ขอเลื่อนเวลา
           </button>
           {canCancel && (
-            <button type="button" className="btn btn-ghost btn-block" onClick={() => setMode("cancel")}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-block"
+              disabled={busy}
+              onClick={() => (unpaidPayLater ? cancelUnpaid() : setMode("cancel"))}
+            >
               ยกเลิกการจอง
             </button>
           )}
@@ -84,10 +102,11 @@ export function BookingChangePanel({
       {mode === "menu" && (
         <p className="muted" style={{ margin: 0, fontSize: 14 }}>
           {canCancel
-            ? `ยกเลิกเองและรับเงินคืนได้ถึง ${cancelDeadlineText} (12:00 น. ของวันที่เล่น)`
+            ? `${unpaidPayLater ? "ยกเลิกเองได้ถึง" : "ยกเลิกเองและรับเงินคืนได้ถึง"} ${cancelDeadlineText} (12:00 น. ของวันที่เล่น)`
             : `เลยเวลายกเลิกเองแล้ว (ยกเลิกได้ถึง 12:00 น. ของวันที่เล่น) ถ้าจำเป็นต้องยกเลิก กรุณาติดต่อร้าน`}
         </p>
       )}
+      {mode === "menu" && error && <p className="error">{error}</p>}
       {mode === "reschedule" && (
         <RescheduleForm
           bookingId={bookingId}

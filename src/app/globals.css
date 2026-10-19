@@ -1226,4 +1226,21 @@ details summary { cursor: pointer; }
   }
 }
 
-
+/* ---------- Admin court board (courts across, half hours down) ---------- */
+.board-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.board { border-collapse: collapse; width: 100%; min-width: 420px; font-size: 12.5px; table-layout: fixed; }
+.board th, .board td { border-bottom: 1px solid var(--border); border-left: 1px solid var(--border); padding: 0; vertical-align: top; }
+.board thead th { padding: 8px 4px; background: var(--surface-2); font-weight: 600; position: sticky; top: 0; }
+.board tbody th { width: 52px; padding: 4px; color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.board-free { height: 26px; }
+.board-cell { border-radius: 6px; }
+.board-link { display: grid; gap: 1px; padding: 4px 6px; height: 100%; color: inherit; text-decoration: none; overflow-wrap: anywhere; line-height: 1.3; }
+.board-link strong { font-size: 12.5px; }
+.board-link span { font-size: 11px; opacity: .8; }
+.board-cell.confirmed, .board-key.confirmed { background: var(--primary-soft); color: var(--primary-strong); }
+.board-cell.held, .board-key.held { background: var(--held); color: var(--held-ink); }
+.board-cell.unpaid, .board-key.unpaid { background: var(--danger-soft); color: var(--danger); }
+.board-cell.regular, .board-key.regular { background: var(--surface-2); color: var(--muted); }
+.board-legend { display: flex; flex-wrap: wrap; gap: 6px; }
+.board-key { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; }
+.coach-terms { border-top: 1px dashed var(--border); padding-top: 10px; }

@@ -19,6 +19,7 @@ export function BookingForm({
   courts,
   isLoggedIn,
   bookerName,
+  isCoach = false,
   initial,
   openHour = BOOKING_RULES.openHour,
   closeHour = BOOKING_RULES.closeHour,
@@ -26,6 +27,7 @@ export function BookingForm({
   courts: Court[];
   isLoggedIn: boolean;
   bookerName: string | null;
+  isCoach?: boolean;
   initial: Initial;
   openHour?: number;
   closeHour?: number;
@@ -76,6 +78,8 @@ export function BookingForm({
     }
   }, [hour, hours, maxHours, pending]);
 
+  const [payLater, setPayLater] = useState(false);
+  const [agreedTotal, setAgreedTotal] = useState("");
   const total =
     hour !== null
       ? selectedCourts.reduce((sum, cid) => {
@@ -83,6 +87,8 @@ export function BookingForm({
           return sum + (c ? Math.round(c.price_per_hour * hours) : 0);
         }, 0)
       : 0;
+
+  const agreedValue = isCoach && agreedTotal.trim() !== "" ? Number(agreedTotal) : null;
 
   function changeDate(next: string) {
     setDate(next);
@@ -98,10 +104,16 @@ export function BookingForm({
     }
     setError(null);
     startTransition(async () => {
+      const agreed = agreedTotal.trim() === "" ? null : Number(agreedTotal);
+      if (agreed !== null && (!Number.isInteger(agreed) || agreed <= 0 || agreed > total)) {
+        setError(`ใส่ยอดเป็นจำนวนเต็มบาท ไม่เกินราคาปกติ ${formatBaht(total)}`);
+        return;
+      }
       const result = await createBooking({
         courtIds: selectedCourts,
         startsAt: slotStart(date, hour),
         hours,
+        coach: isCoach ? { payLater, total: agreed } : undefined,
       });
       if (result.ok) router.push(`/bookings/${result.data.id}`);
       else setError(result.error);
@@ -302,14 +314,40 @@ export function BookingForm({
         </div>
         <div className="summary-total">
           <span>รวมทั้งหมด</span>
-          <span>{hour === null ? "–" : formatBaht(total)}</span>
+          <span>{hour === null ? "–" : formatBaht(agreedValue ?? total)}</span>
         </div>
+        {isCoach && hour !== null && (
+          <div className="coach-terms stack" style={{ gap: 8 }}>
+            <span className="muted" style={{ fontSize: 13, fontWeight: 600 }}>🏅 ตัวเลือกสำหรับโค้ช</span>
+            <div className="hours" role="radiogroup" aria-label="วิธีชำระเงิน" style={{ display: "flex", gap: 6 }}>
+              <button type="button" className={`chip ${!payLater ? "selected" : "free"}`} aria-pressed={!payLater} onClick={() => setPayLater(false)}>
+                ชำระทันที
+              </button>
+              <button type="button" className={`chip ${payLater ? "selected" : "free"}`} aria-pressed={payLater} onClick={() => setPayLater(true)}>
+                ชำระภายหลัง
+              </button>
+            </div>
+            <label className="field">
+              <span>ยอดตามที่ตกลงกับร้าน (เว้นว่าง = ราคาปกติ {formatBaht(total)})</span>
+              <input
+                id="coach-agreed-total"
+                type="text"
+                inputMode="numeric"
+                placeholder={String(total)}
+                value={agreedTotal}
+                onChange={(e) => setAgreedTotal(e.target.value.replace(/[^0-9]/g, ""))}
+              />
+            </label>
+          </div>
+        )}
         {error && <p className="error">{error}</p>}
         <button className="btn btn-block" type="button" onClick={book} disabled={hour === null || pending}>
           {pending
             ? "กำลังจอง…"
             : isLoggedIn
-              ? `จอง ${selectedCourts.length} สนามและชำระเงิน (${formatBaht(total)})`
+              ? isCoach && payLater
+                ? `จอง ${selectedCourts.length} สนาม · ชำระภายหลัง (${formatBaht(agreedValue ?? total)})`
+                : `จอง ${selectedCourts.length} สนามและชำระเงิน (${formatBaht(agreedValue ?? total)})`
               : "เข้าสู่ระบบเพื่อจอง"}
         </button>
       </section>

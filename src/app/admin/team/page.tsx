@@ -1,4 +1,5 @@
 import { AdminToggle } from "@/components/admin/AdminToggle";
+import { CoachToggle } from "@/components/admin/CoachToggle";
 import { formatDate } from "@/lib/format";
 import { getSessionUser } from "@/lib/supabase/server";
 
@@ -12,6 +13,7 @@ type Person = {
   phone: string | null;
   line_user_id: string | null;
   is_admin: boolean;
+  is_coach?: boolean;
   created_at: string;
 };
 
@@ -22,7 +24,8 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
 
   let query = supabase
     .from("profiles")
-    .select("id, display_name, phone, line_user_id, is_admin, created_at")
+    // "*" so the list still loads before the is_coach column is migrated.
+    .select("*")
     .order("is_admin", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(LIST_LIMIT);
@@ -51,17 +54,20 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
           {p.phone && ` · ${p.phone}`}
         </span>
       </div>
-      {p.id === user?.id ? (
-        <span className="badge confirmed">แอดมิน</span>
-      ) : (
-        <AdminToggle userId={p.id} name={p.display_name ?? "ผู้ใช้นี้"} isAdmin={p.is_admin} />
-      )}
+      <div style={{ display: "grid", justifyItems: "end", gap: 6 }}>
+        {p.id === user?.id ? (
+          <span className="badge confirmed">แอดมิน</span>
+        ) : (
+          <AdminToggle userId={p.id} name={p.display_name ?? "ผู้ใช้นี้"} isAdmin={p.is_admin} />
+        )}
+        {!p.is_admin && <CoachToggle userId={p.id} name={p.display_name ?? "ผู้ใช้นี้"} isCoach={p.is_coach === true} />}
+      </div>
     </div>
   );
 
   return (
     <section className="stack" style={{ gap: 10 }}>
-      <h2>จัดการแอดมิน</h2>
+      <h2>จัดการแอดมิน / โค้ช</h2>
       <p className="muted" style={{ margin: 0 }}>
         คนที่จะเป็นแอดมินต้องเข้าเว็บแล้วกด “เข้าสู่ระบบด้วย LINE” 1 ครั้งก่อน ชื่อถึงจะขึ้นในรายการนี้
       </p>

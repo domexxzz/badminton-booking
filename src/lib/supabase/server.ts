@@ -25,11 +25,12 @@ export async function createClient() {
 export const getSessionUser = cache(async () => {
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
-  if (!data.user) return { supabase, user: null, isAdmin: false, displayName: null } as const;
+  if (!data.user) return { supabase, user: null, isAdmin: false, isCoach: false, displayName: null } as const;
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_admin, display_name")
+    // "*" keeps working while a newly added column (e.g. is_coach) is not migrated yet.
+    .select("*")
     .eq("id", data.user.id)
     .maybeSingle();
 
@@ -37,6 +38,7 @@ export const getSessionUser = cache(async () => {
     supabase,
     user: data.user,
     isAdmin: profile?.is_admin === true,
+    isCoach: profile?.is_coach === true,
     displayName: (profile?.display_name as string | null | undefined) ?? null,
   } as const;
 });

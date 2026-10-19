@@ -31,6 +31,9 @@ type Booking = {
   starts_at: string;
   ends_at: string;
   amount: number;
+  pay_later?: boolean;
+  paid_at?: string | null;
+  list_amount?: number | null;
   status: string;
   hold_expires_at: string | null;
   review_note: string | null;
@@ -86,7 +89,8 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const { data: booking } = await supabase
     .from("bookings")
     .select(
-      "id, user_id, court_id, group_id, channel, starts_at, ends_at, amount, status, hold_expires_at, review_note, courts(name), payments(created_at, verify_status, verify_reasons)",
+      // "*" keeps the page working before newer columns (pay_later, ...) are migrated.
+      "*, courts(name), payments(created_at, verify_status, verify_reasons)",
     )
     .eq("id", id)
     .maybeSingle<Booking>();
@@ -141,7 +145,8 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
     Date.parse(booking.hold_expires_at) <= Date.now();
   const awaitingPayment = booking.status === "pending_payment" && !holdLapsed;
   const amountBaht = Math.round(totalAmount);
-  const qr = awaitingPayment ? await promptPayQr(amountBaht) : null;
+  const unpaidPayLater = booking.status === "confirmed" && booking.pay_later === true && !booking.paid_at;
+  const qr = awaitingPayment || unpaidPayLater ? await promptPayQr(amountBaht) : null;
   const latestPayment = [...booking.payments].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
   const autoCheckProblem = latestPayment && VERIFY_FOR_CUSTOMER[latestPayment.verify_status];
 
@@ -270,6 +275,34 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
+      {booking.status === "confirmed" && booking.pay_later && (
+        <div className="card stack" style={{ gap: 8 }}>
+          {unpaidPayLater ? (
+            <>
+              <h2>🕒 ชำระภายหลัง · ค้างชำระ {formatBaht(totalAmount)}</h2>
+              <p className="muted" style={{ margin: 0 }}>
+                สนามยืนยันแล้ว ชำระเมื่อสะดวกด้วย QR นี้ หรือที่เคาน์เตอร์ ร้านจะกดยืนยันเมื่อได้รับเงิน
+              </p>
+              {qr && (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img className="qr" src={qr} alt="QR ชำระเงินภายหลัง" />
+                  <SaveQrButton dataUrl={qr} fileName={`bbl-qr-${amountBaht}-baht.png`} />
+                </>
+              )}
+            </>
+          ) : (
+            <h2>✅ ชำระเงินแล้ว {formatBaht(totalAmount)}</h2>
+          )}
+        </div>
+      )}
+
+      {booking.list_amount != null && Number(booking.list_amount) !== Number(booking.amount) && (
+        <p className="muted" style={{ margin: 0, textAlign: "center" }}>
+          ราคาตกลงพิเศษ {formatBaht(totalAmount)}
+        </p>
+      )}
+
       {booking.status === "confirmed" && (
         <div className="card">
           <h2>จองสำเร็จ 🎉</h2>
@@ -313,6 +346,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           courts={courts ?? []}
           pending={pending}
           canCancel={canSelfCancel(booking.starts_at)}
+          unpaidPayLater={unpaidPayLater}
           cancelDeadlineText={cancelDeadlineText}
         />
       )}

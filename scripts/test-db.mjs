@@ -18,6 +18,7 @@ const MIGRATIONS = [
   "0011_venue_settings.sql",
   "0012_multi_court_bookings.sql",
   "0013_self_cancel_deadline.sql",
+  "0014_coach_terms.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -522,6 +523,46 @@ await db.exec(`insert into storage.objects (bucket_id, name) values ('refunds', 
 const { rows: [gq] } = await db.query(`select * from request_cancel('${pairA.id}', '${U9}/${pairA.id}-qr-1.png')`);
 check("whole bill is cancelled and refunded together",
   (await bookingRow(pairB.id)).status === "cancelled" && Number(gq.refund_amount) === Number(pairA.amount) + Number(pairB.amount));
+
+// ---- Coach terms (0014) ----
+const COACH = "88888888-8888-8888-8888-000000000001";
+await db.exec(`insert into auth.users (id, email) values ('${COACH}','coach@x.com')`);
+const coachDay = (h) => at(96 + h);
+await as(COACH);
+await expectError("only coaches get special terms",
+  `select create_coach_booking(array[1,2]::smallint[], '${coachDay(0)}', 2, true, 500)`, "NOT_COACH");
+const coachPriv = await db.query(`select has_column_privilege('authenticated', 'public.profiles', 'is_coach', 'UPDATE') as p`);
+check("customers cannot make themselves coaches", coachPriv.rows[0].p === false);
+await as(U1);
+await expectError("customers cannot grant coach rights", `select set_coach('${COACH}', true)`, "FORBIDDEN");
+await as(ADMIN);
+await db.query(`select set_coach('${COACH}', true)`);
+
+await as(COACH);
+await expectError("agreed price cannot exceed list price",
+  `select create_coach_booking(array[1,2]::smallint[], '${coachDay(0)}', 2, true, 9999)`, "INVALID_AMOUNT");
+const { rows: [cb] } = await db.query(`select * from create_coach_booking(array[1,2]::smallint[], '${coachDay(0)}', 2, true, 501)`);
+const coachRows = (await db.query(`select amount, list_amount, status, pay_later, paid_at from bookings where group_id = '${cb.group_id}' order by court_id`)).rows;
+check("pay-later bill is confirmed straight away", coachRows.every((r) => r.status === "confirmed" && r.pay_later && r.paid_at === null));
+check("agreed total is spread over the courts", coachRows.reduce((s, r) => s + Number(r.amount), 0) === 501
+  && coachRows.every((r) => Number(r.list_amount) > 0));
+check("pay-later courts show as booked", (await db.query(`select state from court_occupancy where booking_id = '${cb.id}'`)).rows[0]?.state === "booked");
+await expectError("an unpaid bill has nothing to refund",
+  `select request_cancel('${cb.id}', '${COACH}/${cb.id}-qr-1.png')`, "NO_REFUND_NEEDED");
+
+await expectError("coaches cannot mark their own bill paid", `select mark_booking_paid('${cb.id}')`, "FORBIDDEN");
+await as(ADMIN);
+await db.query(`select mark_booking_paid('${cb.id}')`);
+check("admin marks the whole bill paid",
+  (await db.query(`select bool_and(paid_at is not null) as ok from bookings where group_id = '${cb.group_id}'`)).rows[0].ok === true);
+
+await as(COACH);
+const { rows: [nowPay] } = await db.query(`select * from create_coach_booking(array[3]::smallint[], '${coachDay(0)}', 1, false, 100)`);
+check("pay-now coach booking waits for payment at the agreed price",
+  nowPay.status === "pending_payment" && Number(nowPay.amount) === 100 && Number(nowPay.list_amount) === 150);
+const { rows: [later2] } = await db.query(`select * from create_coach_booking(array[4]::smallint[], '${coachDay(0)}', 1, true, null)`);
+await db.query(`select cancel_booking('${later2.id}')`);
+check("coach cancels an unpaid pay-later booking without a refund", (await bookingRow(later2.id)).status === "cancelled");
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

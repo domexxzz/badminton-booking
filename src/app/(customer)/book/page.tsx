@@ -12,7 +12,7 @@ export default async function BookPage({
   searchParams: Promise<{ date?: string; court?: string; hour?: string }>;
 }) {
   const params = await searchParams;
-  const [{ supabase, user, displayName }, { openHour, closeHour }] = await Promise.all([
+  const [{ supabase, user, displayName, isCoach }, { openHour, closeHour }] = await Promise.all([
     getSessionUser(),
     getVenueHours(),
   ]);
@@ -33,6 +33,7 @@ export default async function BookPage({
       courts={courts}
       isLoggedIn={Boolean(user)}
       bookerName={displayName}
+      isCoach={isCoach}
       openHour={openHour}
       closeHour={closeHour}
       initial={{

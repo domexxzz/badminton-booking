@@ -19,8 +19,10 @@ export async function createBooking(input: {
   courtIds?: number[];
   startsAt: string;
   hours: number;
+  /** Coach accounts only (the database checks): pay later and/or an agreed bill total. */
+  coach?: { payLater: boolean; total: number | null };
 }): Promise<ActionResult<{ id: string }>> {
-  const { courtId, courtIds, startsAt, hours } = input;
+  const { courtId, courtIds, startsAt, hours, coach } = input;
   const ids = Array.isArray(courtIds) && courtIds.length > 0
     ? courtIds
     : Number.isInteger(courtId)
@@ -36,15 +38,28 @@ export async function createBooking(input: {
     ids.length === 0 ||
     ids.some((id) => !Number.isInteger(id)) ||
     !validHours ||
-    Number.isNaN(Date.parse(startsAt))
+    Number.isNaN(Date.parse(startsAt)) ||
+    (coach !== undefined &&
+      (typeof coach.payLater !== "boolean" ||
+        (coach.total !== null && (!Number.isInteger(coach.total) || coach.total <= 0))))
   ) {
     return { ok: false, error: "ข้อมูลการจองไม่ถูกต้อง" };
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .rpc("create_multi_booking", { p_court_ids: ids, p_starts_at: startsAt, p_hours: hours })
-    .single<{ id: string }>();
+  const { data, error } = coach
+    ? await supabase
+        .rpc("create_coach_booking", {
+          p_court_ids: ids,
+          p_starts_at: startsAt,
+          p_hours: hours,
+          p_pay_later: coach.payLater,
+          p_total: coach.total,
+        })
+        .single<{ id: string }>()
+    : await supabase
+        .rpc("create_multi_booking", { p_court_ids: ids, p_starts_at: startsAt, p_hours: hours })
+        .single<{ id: string }>();
 
   if (error || !data) return { ok: false, error: friendlyError(error) };
   revalidatePath("/me");

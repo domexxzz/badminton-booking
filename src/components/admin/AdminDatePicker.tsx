@@ -9,9 +9,17 @@ const shift = (day: string, days: number) =>
   new Date(Date.parse(`${day}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
 
 /** Day picker for the admin dashboard; past days are allowed (revenue history). */
-export function AdminDatePicker({ date, today }: { date: string; today: string }) {
+export function AdminDatePicker({
+  date,
+  today,
+  basePath = "/admin",
+}: {
+  date: string;
+  today: string;
+  basePath?: string;
+}) {
   const router = useRouter();
-  const go = (day: string) => router.push(day === today ? "/admin" : `/admin?date=${day}`);
+  const go = (day: string) => router.push(day === today ? basePath : `${basePath}?date=${day}`);
 
   return (
     <div className="date-nav">

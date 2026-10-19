@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   { href: "/admin", label: "ภาพรวม" },
+  { href: "/admin/board", label: "🗓️ ตารางสนาม" },
   { href: "/admin/analytics", label: "📊 รายงานและสถิติ" },
   { href: "/admin/review", label: "ตรวจสลิป / เงินเข้า" },
   { href: "/admin/requests", label: "คำขอ" },

@@ -40,3 +40,22 @@ export async function updateVenueHoursAction(openHour: number, closeHour: number
   return { ok: true, data: null };
 }
 
+export async function setCoach(userId: string, isCoach: boolean): Promise<ActionResult> {
+  if (!UUID_RE.test(userId) || typeof isCoach !== "boolean") return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_coach", { p_user_id: userId, p_is_coach: isCoach });
+  if (error) return { ok: false, error: friendlyError(error) };
+  revalidatePath("/admin/team");
+  return { ok: true, data: null };
+}
+
+/** The shop received the money for a pay-later bill. */
+export async function markBookingPaid(bookingId: string): Promise<ActionResult> {
+  if (!UUID_RE.test(bookingId)) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("mark_booking_paid", { p_booking_id: bookingId });
+  if (error) return { ok: false, error: friendlyError(error) };
+  revalidatePath("/admin", "layout");
+  revalidatePath(`/bookings/${bookingId}`);
+  return { ok: true, data: null };
+}

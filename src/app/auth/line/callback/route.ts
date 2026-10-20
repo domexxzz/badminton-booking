@@ -1,3 +1,4 @@
+import { publicOrigin } from "@/lib/site-url";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
@@ -26,7 +27,8 @@ function readSaved(raw: string | undefined): SavedLogin | null {
 }
 
 export async function GET(request: NextRequest) {
-  const { origin, searchParams } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
+  const origin = publicOrigin(request.url);
   const fail = (reason: string) => NextResponse.redirect(`${origin}/login?error=${reason}`);
 
   const config = lineLoginConfig();

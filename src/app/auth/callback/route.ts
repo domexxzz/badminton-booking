@@ -1,3 +1,4 @@
+import { publicOrigin } from "@/lib/site-url";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { safeNext as toSafeNext } from "@/lib/safe-next";
@@ -8,7 +9,8 @@ import { createClient } from "@/lib/supabase/server";
 //    in a different browser or a LINE/Gmail in-app browser.
 //  - code (PKCE default): only works in the browser that requested the link.
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
+  const origin = publicOrigin(request.url);
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const type = (searchParams.get("type") ?? "email") as EmailOtpType;

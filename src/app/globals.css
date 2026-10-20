@@ -25,7 +25,7 @@ html, body { margin: 0; }
 body {
   background: var(--bg);
   color: var(--text);
-  line-height: 1.5;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
@@ -83,13 +83,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
   display: grid; place-items: center; align-content: center; gap: 2px;
   border-radius: 14px;
   color: var(--muted);
-  font-size: 11px; font-weight: 500;
+  font-size: 12px; font-weight: 500;
 }
 .tab.active { background: var(--primary-soft); color: var(--primary-strong); font-weight: 600; }
 
 /* ---------- Basics ---------- */
-h1 { font-size: 22px; margin: 0; font-weight: 600; }
-h2 { font-size: 16px; margin: 0; font-weight: 600; }
+h1 { font-size: 22px; line-height: 1.35; margin: 0; font-weight: 600; }
+h2 { font-size: 16px; line-height: 1.4; margin: 0; font-weight: 600; }
 .muted { color: var(--muted); font-size: 14px; }
 .error { color: var(--danger); font-size: 14px; margin: 0; }
 .stack { display: grid; gap: 14px; }
@@ -105,7 +105,7 @@ h2 { font-size: 16px; margin: 0; font-weight: 600; }
 
 .page-head { display: flex; align-items: center; gap: 8px; }
 .back {
-  width: 38px; height: 38px; display: grid; place-items: center;
+  width: 44px; height: 44px; display: grid; place-items: center;
   border-radius: 12px; background: var(--surface); box-shadow: var(--shadow);
 }
 
@@ -113,6 +113,7 @@ h2 { font-size: 16px; margin: 0; font-weight: 600; }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 48px; padding: 0 20px;
+  line-height: 1.4;
   border: 0; border-radius: 14px;
   background: var(--primary); color: var(--primary-ink);
   font-weight: 600; font-size: 16px;
@@ -120,7 +121,7 @@ h2 { font-size: 16px; margin: 0; font-weight: 600; }
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-block { width: 100%; }
-.btn-sm { min-height: 36px; padding: 0 14px; font-size: 14px; border-radius: 12px; }
+.btn-sm { min-height: 44px; padding: 0 14px; font-size: 14px; line-height: 1.4; border-radius: 12px; }
 .btn-ghost { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-line { background: #06c755; color: #fff; }
@@ -150,15 +151,15 @@ input[type="file"] { font-size: 14px; }
 .banner {
   position: relative; overflow: hidden;
   border-radius: var(--radius);
-  padding: 20px;
-  background: linear-gradient(135deg, #6cc79a, #45a777);
+  padding: 20px 18px;
+  background: linear-gradient(135deg, #53b683, #389766);
   color: #fff;
-  box-shadow: 0 10px 24px rgba(69, 167, 119, 0.3);
+  box-shadow: 0 10px 24px rgba(56, 151, 102, 0.25);
 }
-.banner h2 { font-size: 22px; font-weight: 600; }
-.banner p { margin: 4px 0 0; font-size: 13px; opacity: 0.9; }
-.banner .shuttle { position: absolute; right: -6px; bottom: -10px; opacity: 0.35; pointer-events: none; }
-.banner-badge-wrap { margin-bottom: 10px; }
+.banner h2 { font-size: 22px; font-weight: 700; line-height: 1.35; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+.banner p { margin: 6px 0 0; font-size: 13.5px; font-weight: 500; color: #ffffff; white-space: nowrap; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); }
+.banner .shuttle { position: absolute; right: -6px; bottom: -10px; opacity: 0.3; pointer-events: none; }
+.banner-badge-wrap { margin-bottom: 12px; }
 
 /* Pulse Dots */
 .pulse-dot {
@@ -166,8 +167,8 @@ input[type="file"] { font-size: 14px; }
   animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 .pulse-dot.green {
-  background: #4ade80;
-  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.4);
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.45);
 }
 .pulse-dot.red {
   background: #f87171;
@@ -180,10 +181,12 @@ input[type="file"] { font-size: 14px; }
 
 .open-live-badge {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 3px 10px; border-radius: 9999px;
+  padding: 4px 12px; border-radius: 9999px;
   background: rgba(255, 255, 255, 0.22);
-  color: #ffffff; font-size: 12px; font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #ffffff; font-size: 13px; font-weight: 600;
   backdrop-filter: blur(4px);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 /* Closed Store Night Banner */
@@ -326,7 +329,7 @@ input[type="file"] { font-size: 14px; }
 .court-section h2 span { font-size: 13px; color: var(--muted); font-weight: 400; }
 .chip-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .chip {
-  min-height: 40px; border-radius: 10px;
+  min-height: 44px; border-radius: 10px;
   border: 1px solid var(--border); background: var(--surface-2);
   font-size: 14px; font-weight: 500; color: var(--text);
   cursor: pointer;
@@ -354,17 +357,13 @@ input[type="file"] { font-size: 14px; }
   cursor: not-allowed;
 }
 .legend-booked {
-  background: var(--surface-3, #222b38);
-  border: 1px solid var(--border);
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-  vertical-align: middle;
-}
-[data-theme="light"] .legend-booked {
   background: #f1f5f9;
-  border-color: #cbd5e1;
+  border: 1px solid #cbd5e1;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  vertical-align: middle;
 }
 .chip-lock-icon {
   font-size: 10px;
@@ -411,7 +410,7 @@ input[type="file"] { font-size: 14px; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 48px;
+  min-height: 44px;
   padding: 4px 2px;
   line-height: 1.15;
 }
@@ -492,8 +491,35 @@ input[type="file"] { font-size: 14px; }
   opacity: 0.95;
 }
 
-.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); }
-.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 5px; vertical-align: -1px; border: 1px solid var(--border); }
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend i {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  vertical-align: middle;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
 .live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #b8c2cc; }
 .live-dot.on { background: var(--primary); animation: pulse 2s infinite; }
@@ -1273,5 +1299,5 @@ details summary { cursor: pointer; }
 .coach-terms { border-top: 1px dashed var(--border); padding-top: 10px; }
 
 /* ---------- Contact the shop ---------- */
-.contact-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.contact-actions .btn { flex: 1 1 160px; text-align: center; }
+.contact-actions { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.contact-actions .btn { width: 100%; text-align: center; }

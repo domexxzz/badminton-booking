@@ -89,7 +89,7 @@ export async function recheckSlip(bookingId: string): Promise<ActionResult> {
   const { isAdmin } = await getSessionUser();
   if (!isAdmin) return { ok: false, error: friendlyError({ message: "FORBIDDEN" }) };
   if (!isSlipVerificationEnabled()) {
-    return { ok: false, error: "ยังไม่ได้ตั้งค่า EASYSLIP_API_KEY / SUPABASE_SERVICE_ROLE_KEY" };
+    return { ok: false, error: "ยังไม่ได้ตั้งค่า API Key สำหรับ OCR (EASYSLIP หรือ TYPHOON) หรือ SUPABASE_SERVICE_ROLE_KEY" };
   }
 
   const status = await verifyLatestSlip(bookingId);

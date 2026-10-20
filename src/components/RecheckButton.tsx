@@ -21,7 +21,7 @@ export function RecheckButton({ bookingId }: { bookingId: string }) {
   return (
     <div>
       <button className="btn btn-ghost btn-sm" onClick={recheck} disabled={pending}>
-        {pending ? "กำลังตรวจ…" : "🔄 ตรวจสลิปอัตโนมัติอีกครั้ง"}
+        {pending ? "กำลังตรวจ OCR…" : "🔍 ตรวจสลิปด้วย OCR"}
       </button>
       {error && <p className="error">{error}</p>}
     </div>

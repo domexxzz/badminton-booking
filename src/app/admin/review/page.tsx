@@ -3,7 +3,6 @@ import { RecheckButton } from "@/components/RecheckButton";
 import { ReviewButtons } from "@/components/ReviewButtons";
 import { formatBaht, formatSlot } from "@/lib/format";
 import { isBankMatchingEnabled } from "@/lib/bank/settings";
-import { isSlipVerificationEnabled } from "@/lib/slip/verify-booking";
 import { getSessionUser } from "@/lib/supabase/server";
 import { BankInbox } from "../BankInbox";
 
@@ -30,11 +29,12 @@ type Row = {
 };
 
 const VERIFY_HEADLINE: Record<string, string> = {
+  verified: "✅ ข้อมูลในสลิปถูกต้อง",
   unchecked: "ยังไม่ได้ตรวจอัตโนมัติ ตรวจเองก่อนกดยืนยัน",
-  mismatch: "⚠️ ตรวจอัตโนมัติไม่ผ่าน",
-  error: "ตรวจอัตโนมัติไม่สำเร็จ ตรวจเองหรือกดตรวจอีกครั้ง",
+  mismatch: "⚠️ ตรวจอัตโนมัติไม่ผ่าน (ยอดเงินหรือข้อมูลไม่ตรง)",
+  error: "ตรวจอัตโนมัติไม่สำเร็จ",
   duplicate: "🚫 สลิปนี้ถูกใช้กับการจองอื่นแล้ว",
-  unreadable: "⚠️ ระบบอ่านสลิปไม่ได้ อาจไม่ใช่สลิปจริงหรือรูปไม่ชัด",
+  unreadable: "🚫 ไม่ใช่สลิปโอนเงิน หรือรูปไม่ชัดเจน",
 };
 
 const latestPayment = (payments: Payment[]) =>
@@ -82,7 +82,6 @@ export default async function ReviewPage() {
       return url ? [[id, url] as const] : [];
     }),
   );
-  const autoCheck = isSlipVerificationEnabled();
 
   return (
     <>
@@ -92,8 +91,12 @@ export default async function ReviewPage() {
         {review.data.length === 0 && <div className="card muted">ไม่มีสลิปค้างตรวจ</div>}
         {review.data.map((b) => {
           const payment = latestPayment(b.payments);
+          const isNotSlip = payment?.verify_status === "unreadable";
+          const isMismatch = payment?.verify_status === "mismatch" || payment?.verify_status === "duplicate";
+          const isVerified = payment?.verify_status === "verified";
+          const statusClass = isNotSlip ? "review-not-slip" : isMismatch ? "review-mismatch" : isVerified ? "review-verified" : "";
           return (
-            <div key={b.id} className="card review">
+            <div key={b.id} className={`card review ${statusClass}`.trim()}>
               <div className="list-item">
                 <div className="meta">
                   <strong>{who.get(b.user_id)?.display_name ?? "ลูกค้า"}</strong>
@@ -118,11 +121,17 @@ export default async function ReviewPage() {
               )}
               {payment && (
                 <div
-                  className={["mismatch", "duplicate", "unreadable"].includes(payment.verify_status) ? "error" : "muted"}
+                  className={
+                    ["mismatch", "duplicate", "unreadable"].includes(payment.verify_status)
+                      ? "error"
+                      : isVerified
+                      ? "success"
+                      : "muted"
+                  }
                   style={{ fontSize: 14 }}
                 >
                   <strong>{VERIFY_HEADLINE[payment.verify_status] ?? VERIFY_HEADLINE.unchecked}</strong>
-                  {payment.verify_reasons.length > 0 && (
+                  {(payment.verify_reasons?.length ?? 0) > 0 && (
                     <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
                       {payment.verify_reasons.map((r) => (
                         <li key={r}>{r}</li>
@@ -131,7 +140,7 @@ export default async function ReviewPage() {
                   )}
                 </div>
               )}
-              {autoCheck && <RecheckButton bookingId={b.id} />}
+              <RecheckButton bookingId={b.id} />
               <ReviewButtons bookingId={b.id} />
             </div>
           );

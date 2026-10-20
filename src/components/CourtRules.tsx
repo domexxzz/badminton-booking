@@ -16,7 +16,7 @@ export function CourtRules() {
   return (
     <section className="card stack court-rules" style={{ gap: 12 }}>
       <div className="section-head" style={{ marginBottom: 0 }}>
-        <h2 style={{ fontSize: "1.05rem", display: "flex", alignItems: "center", gap: 8, margin: 0 }}>
+        <h2 style={{ fontSize: 16, display: "flex", alignItems: "center", gap: 8, margin: 0 }}>
           <span>📋</span> กติกาและข้อปฏิบัติของสนาม แบดมินตัน@สินธานี
         </h2>
       </div>
@@ -28,8 +28,8 @@ export function CourtRules() {
           display: "flex",
           flexDirection: "column",
           gap: 8,
-          fontSize: "0.92rem",
-          lineHeight: 1.55,
+          fontSize: 14,
+          lineHeight: 1.6,
           color: "var(--foreground)",
         }}
       >

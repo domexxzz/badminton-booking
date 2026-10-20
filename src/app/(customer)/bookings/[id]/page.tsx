@@ -215,14 +215,14 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           <div className="stack" style={{ gap: 12 }}>
             <div className="bbl-payment-info card" style={{ background: "var(--surface-2)", border: "1px solid var(--border)", padding: "12px 14px", borderRadius: "10px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontWeight: 700, color: "var(--foreground)", fontSize: "0.95rem" }}>
+                <span style={{ fontWeight: 700, color: "var(--foreground)", fontSize: 15 }}>
                   🏦 ธนาคารกรุงเทพ (Bangkok Bank)
                 </span>
-                <span className="badge" style={{ fontSize: "0.75rem", background: "var(--primary)", color: "#fff" }}>
+                <span className="badge" style={{ fontSize: 12, background: "var(--primary)", color: "#fff" }}>
                   Merchant Pro
                 </span>
               </div>
-              <div style={{ fontSize: "0.88rem", display: "flex", flexDirection: "column", gap: 3 }}>
+              <div style={{ fontSize: 14, display: "flex", flexDirection: "column", gap: 3 }}>
                 <div>
                   <span className="muted">ชื่อบัญชี: </span>
                   <strong>{BBL_MERCHANT_INFO.accountName}</strong>
@@ -237,7 +237,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
             <div style={{ textAlign: "center" }}>
               <div className="muted">ยอดที่ต้องโอน {isMultiCourt ? `(รวม ${allBookings.length} สนาม)` : ""}</div>
               <div className="amount">{formatBaht(totalAmount)}</div>
-              <div className="muted" style={{ fontSize: "0.85rem", marginTop: 2 }}>
+              <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
                 สแกน QR ด้วยแอปธนาคารแล้วยอดจะขึ้นให้อัตโนมัติ
               </div>
             </div>

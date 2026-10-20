@@ -134,9 +134,16 @@ export function BookingForm({
           <div className="row" style={{ marginBottom: 4 }}>
             <span>สนาม (เลือกได้หลายสนาม รวมบิลเดียว)</span>
             <button
-              type="button"
-              className="link-btn"
-              style={{ fontSize: 13, color: "var(--primary-strong)", fontWeight: 500 }}
+             type="button"
+  className="link-btn"
+  style={{
+    fontSize: 13,
+    color: "var(--primary-strong)",
+    fontWeight: 500,
+    padding: "2px 2px",         
+    display: "inline-flex",      
+    alignItems: "center",
+  }}
               onClick={() => {
                 setError(null);
                 if (selectedCourts.length === courts.length) {

@@ -11,6 +11,7 @@ export function ReviewButtons({ bookingId }: { bookingId: string }) {
   const [pending, startTransition] = useTransition();
 
   function decide(approve: boolean) {
+    if (!approve && !window.confirm("ยืนยันปฏิเสธสลิปและยกเลิกคิวสนามนี้ทันที?")) return;
     startTransition(async () => {
       const result = await reviewPayment(bookingId, approve, note.trim());
       if (result.ok) router.refresh();

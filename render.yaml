@@ -1,0 +1,33 @@
+# Render Blueprint: Render dashboard -> New -> Blueprint -> pick this repo.
+# Singapore, next to the Supabase database. Secrets are entered in the dashboard
+# (sync: false), never committed.
+services:
+  - type: web
+    name: badminton-booking
+    runtime: node
+    region: singapore
+    # starter stays awake; free spins down after 15 idle minutes (~1 min cold start for customers)
+    plan: starter
+    branch: main
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start -- -p $PORT
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      # The public address of this service, e.g. https://badminton-booking.onrender.com.
+      # Read at build time: redeploy after changing it.
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: PROMPTPAY_ID
+        sync: false
+      - key: LINE_LOGIN_CHANNEL_ID
+        sync: false
+      - key: LINE_LOGIN_CHANNEL_SECRET
+        sync: false

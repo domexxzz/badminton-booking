@@ -35,8 +35,11 @@ export const bookingConfirmedText = (b: BookingSummary) => `✅ ยืนยั�
 export const newBookingAlertText = (b: BookingSummary) =>
   `⚡ มีการจองคิวใหม่ (รอชำระเงิน)\n${describe(b)}\n⏳ ล็อกคิวรอชำระเงิน 5 นาที`;
 
+// Links in LINE messages follow wherever the site is hosted (NEXT_PUBLIC_SITE_URL).
+const siteUrl = () => (process.env.NEXT_PUBLIC_SITE_URL ?? "https://badminton-booking-ihw1.onrender.com").replace(/\/$/, "");
+
 export const customerBookingConfirmedText = (b: BookingSummary, bookingId: string) =>
-  `🎉 การจองสนามแบดมินตันของคุณได้รับการยืนยันแล้ว!\n${b.court} · ${formatSlot(b.startsAt, b.endsAt)}\nยอดชำระ: ${formatBaht(b.amount)} (เรียบร้อย)\nดูรายละเอียดคิว: https://badminton-booking-steel.vercel.app/bookings/${bookingId}`;
+  `🎉 การจองสนามแบดมินตันของคุณได้รับการยืนยันแล้ว!\n${b.court} · ${formatSlot(b.startsAt, b.endsAt)}\nยอดชำระ: ${formatBaht(b.amount)} (เรียบร้อย)\nดูรายละเอียดคิว: ${siteUrl()}/bookings/${bookingId}`;
 
 export const customerSlipSubmittedText = (b: BookingSummary) =>
   `🧾 ได้รับสลิปของคุณแล้ว\n${b.court} · ${formatSlot(b.startsAt, b.endsAt)}\nระบบกำลังส่งให้แอดมินตรวจสอบคิว ขอบคุณครับ`;

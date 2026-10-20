@@ -3,6 +3,9 @@ export type SlipFacts = {
   transRef: string;
   amount: number; // THB, may have satang
   date: string; // ISO 8601 with offset
+  sender?: {
+    name: string | null;
+  };
   receiver: {
     names: string[]; // Thai and/or English; banks often truncate them
     bankAccount: string | null; // usually masked, e.g. "xxx-x-x5678-x"

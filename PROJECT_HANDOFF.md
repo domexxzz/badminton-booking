@@ -7,7 +7,9 @@
 
 ## 1. ข้อมูลภาพรวมและลิงก์โปรดักชัน (Executive Summary)
 - **ชื่อโครงการ:** ระบบจองสนามแบดมินตัน แบดมินตัน@สินธานี
-- **Production URL:** [https://badminton-booking-steel.vercel.app](https://badminton-booking-steel.vercel.app)
+- **Production URL:** [https://badminton-booking-ihw1.onrender.com](https://badminton-booking-ihw1.onrender.com) (Render, Singapore, Starter)
+- **หลังร้าน:** https://badminton-booking-ihw1.onrender.com/admin
+- **หมายเหตุ:** ย้ายจาก Vercel (`badminton-booking-steel.vercel.app`) มา Render เมื่อ 20 ต.ค. 2569 เพราะบัญชี Vercel ทั้งบัญชีถูกพักจากการใช้เกินโควต้าฟรี
 - **สถานะปัจจุบัน:** 
   - ✅ Production Deployment สำเร็จ (Live บน Vercel)
   - ✅ Vitest Unit Tests: 10/10 files (127/127 tests passed)
@@ -191,10 +193,10 @@ npm run test:db
 npm run build
 ```
 
-### Deploy ขึ้น Vercel Production
-```bash
-npx vercel --prod --yes
-```
+### Deploy ขึ้น Render Production
+push เข้า `main` แล้ว Render จะ build และ deploy ให้เอง (ตั้งค่าจาก `render.yaml`) หรือกด **Manual Deploy → Deploy latest commit** ในหน้า service `badminton-booking`
+
+ค่า `NEXT_PUBLIC_SITE_URL` ถูกฝังตอน build: แก้ค่าแล้วต้อง deploy ใหม่ และต้องตรงกับ Callback URL ใน LINE Developers (`<URL>/auth/line/callback`)
 
 ---
 
@@ -206,7 +208,7 @@ npx vercel --prod --yes
 | `SUPABASE_SERVICE_ROLE_KEY` | จำเป็น | Service role key สำหรับ Server Actions / Admin |
 | `SUPABASE_DB_URL` | สำคัญ | Connection string ต่อตรงเข้า Postgres |
 | `PROMPTPAY_ID` | จำเป็น | เบอร์โทรศัพท์ หรือเลขบัตร ปชช. พร้อมเพย์ของสนาม (เช่น `0829457278`) |
-| `NEXT_PUBLIC_SITE_URL` | จำเป็น | URL เว็บ (Local: `http://localhost:3000`, Prod: `https://badminton-booking-steel.vercel.app`) |
+| `NEXT_PUBLIC_SITE_URL` | จำเป็น | URL เว็บ (Local: `http://localhost:3000`, Prod: `https://badminton-booking-ihw1.onrender.com`) |
 | `LINE_LOGIN_CHANNEL_ID` | ตัวเลือก | LINE Login channel ID |
 | `LINE_LOGIN_CHANNEL_SECRET` | ตัวเลือก | LINE Login secret |
 | `LINE_MESSAGING_TOKEN` | ตัวเลือก | LINE OA Messaging token ส่งแจ้งเตือนหาร้าน |

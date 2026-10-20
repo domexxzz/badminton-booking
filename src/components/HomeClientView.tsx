@@ -55,19 +55,19 @@ export function HomeClientView({
           <div className="banner-badge-wrap">
             <span className="open-live-badge">
               <span className="pulse-dot green" />
-              เปิดให้บริการอยู่ ({formatHour(openHour)}–{formatHour(closeHour)} น.)
+              เปิดให้บริการอยู่
             </span>
           </div>
           <h2>จองสนามแบดได้ใน 1 นาที</h2>
           <p>
-            {courts.length} สนาม · {formatBaht(minPrice)}/ชม. · เปิดทุกวัน {formatHour(openHour)}–{formatHour(closeHour)}
+            {courts.length} สนาม · {formatBaht(minPrice)}/ชม. · เปิด {formatHour(openHour)}–{formatHour(closeHour)} น.
           </p>
           <Link
             href="/book"
             className="btn btn-sm btn-banner-cta"
-            style={{ marginTop: 14, background: "#fff", color: "#2e7d55" }}
+            style={{ marginTop: 14, background: "#fff", color: "var(--primary-strong)", fontWeight: 600, boxShadow: "0 4px 12px rgba(0,0,0,0.12)" }}
           >
-            จองเลย
+            🏸 จองสนามเลย
           </Link>
           <ShuttleIcon size={110} className="shuttle" />
         </section>

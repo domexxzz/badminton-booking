@@ -48,9 +48,9 @@ export function ScheduleBoard({
       <DatePills dates={dates} value={date} onChange={setDate} />
 
       <div className="legend">
-        <span><i style={{ background: "var(--surface-2)" }} />ว่าง (แตะเพื่อจอง)</span>
-        <span><i className="legend-booked" />🔒 จองแล้ว / ก๊วนประจำ (Non-active)</span>
-        <span><i style={{ background: "var(--held)" }} />รอชำระ</span>
+        <span><i style={{ background: "var(--surface)", borderColor: "var(--primary)" }} />ว่าง (แตะเพื่อจอง)</span>
+        <span><i style={{ background: "var(--held)", borderColor: "#f3dfa6" }} />รอชำระ</span>
+        <span><i className="legend-booked" />🔒 จองแล้ว</span>
       </div>
 
       {loadError && <p className="error">{loadError}</p>}

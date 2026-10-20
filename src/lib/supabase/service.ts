@@ -10,7 +10,7 @@ let client: SupabaseClient | null | undefined;
  */
 export function getServiceClient(): SupabaseClient | null {
   if (client !== undefined) return client;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   client = key
     ? createClient(SUPABASE_URL, key, { auth: { persistSession: false, autoRefreshToken: false } })
     : null;

@@ -44,17 +44,23 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   if (!code) return fail("line_state");
 
+  // Which step broke goes into the URL (no secrets), so a failed sign-in can be
+  // diagnosed from the address bar when server logs are out of reach.
+  let step = "token";
   try {
     const idToken = await exchangeCode(config, code);
+    step = "verify";
     const profile = await verifyIdToken(config, idToken, saved.nonce);
+    step = "account";
     const { tokenHash, type } = await issueLineSession(profile);
 
+    step = "session";
     const supabase = await createClient();
     const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
     if (error) throw error;
     return NextResponse.redirect(`${origin}${saved.next}`);
   } catch (error) {
-    console.error("LINE login failed:", error);
-    return fail("line_failed");
+    console.error(`LINE login failed at ${step}:`, error);
+    return fail(`line_failed&step=${step}`);
   }
 }

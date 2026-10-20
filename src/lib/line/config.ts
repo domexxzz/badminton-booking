@@ -6,9 +6,10 @@ export const LINE_OAUTH_COOKIE = "line_oauth";
 
 /** LINE Login settings, or null when LINE Login is not set up. */
 export function lineLoginConfig(): LineLoginConfig | null {
-  const channelId = process.env.LINE_LOGIN_CHANNEL_ID;
-  const channelSecret = process.env.LINE_LOGIN_CHANNEL_SECRET;
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  // Trimmed: a pasted secret with a stray space or line break fails LINE's check.
+  const channelId = process.env.LINE_LOGIN_CHANNEL_ID?.trim();
+  const channelSecret = process.env.LINE_LOGIN_CHANNEL_SECRET?.trim();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   if (!channelId || !channelSecret || !siteUrl || !getServiceClient()) return null;
   return {
     channelId,

@@ -4,9 +4,9 @@
  * configured public URL and fall back to the request's own origin.
  */
 export function publicOrigin(requestUrl: string, configured = process.env.NEXT_PUBLIC_SITE_URL): string {
-  if (configured) {
+  if (configured?.trim()) {
     try {
-      return new URL(configured).origin;
+      return new URL(configured.trim()).origin;
     } catch {
       // Misconfigured value: fall through to the request origin.
     }

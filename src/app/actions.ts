@@ -124,6 +124,7 @@ export async function reviewPayment(
     p_approve: approve,
     p_note: note.slice(0, 300) || null,
   });
+  if (error) return { ok: false, error: friendlyError(error) };
   // If rejected, cancel the booking immediately to release the court slot from the overview board.
   if (!approve) {
     const { error: cancelError } = await supabase.rpc("cancel_booking", { p_booking_id: bookingId });

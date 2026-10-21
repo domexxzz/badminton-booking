@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -7,7 +8,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CourtOutlineIcon,
-  ShuttleIcon,
   UserCircleIcon,
 } from "@/components/icons";
 import { BOOKING_RULES } from "@/lib/config";
@@ -154,38 +154,15 @@ export function ScheduleBoard({
         </div>
       </div>
 
-      {/* 5. Bottom decorative background wave with 3D shuttlecock */}
+      {/* 5. Bottom decorative artwork (01.png) */}
       <div className="schedule-bottom-decoration" aria-hidden="true">
-        <svg
-          className="schedule-swoosh"
-          viewBox="0 0 390 110"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M-20 110 C90 70, 210 100, 410 30 L410 110 Z"
-            fill="url(#schedGrad1)"
-            opacity="0.22"
-          />
-          <path
-            d="M-20 110 C110 90, 240 60, 410 50 L410 110 Z"
-            fill="url(#schedGrad2)"
-            opacity="0.28"
-          />
-          <defs>
-            <linearGradient id="schedGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#10b981" />
-              <stop offset="100%" stopColor="#007a5e" />
-            </linearGradient>
-            <linearGradient id="schedGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#86efac" />
-              <stop offset="100%" stopColor="#22c55e" />
-            </linearGradient>
-          </defs>
-        </svg>
-        <div className="schedule-shuttle-art">
-          <ShuttleIcon size={76} />
-        </div>
+        <Image
+          src="/brand/01.png"
+          alt="Badminton Play Train Be Better"
+          width={500}
+          height={250}
+          className="schedule-bottom-img"
+        />
       </div>
     </div>
   );

@@ -2168,33 +2168,32 @@ details summary { cursor: pointer; }
   background: #94a3b8;
 }
 
-/* 5. Bottom Decorative Swoosh & 3D Shuttlecock */
+/* 5. Bottom Decorative Artwork (01.png) */
 .schedule-bottom-decoration {
   position: relative;
-  height: 70px;
-  margin-top: 4px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 2px;
   overflow: hidden;
   pointer-events: none;
 }
 
-.schedule-swoosh {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+.schedule-bottom-img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  max-width: 380px;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  mix-blend-mode: multiply;
 }
 
-.schedule-shuttle-art {
-  position: absolute;
-  right: 14px;
-  bottom: 2px;
-  color: #ffffff;
-  opacity: 0.95;
-  filter: drop-shadow(0 4px 10px rgba(0, 80, 50, 0.22));
-  transform: rotate(-12deg);
+@media (prefers-color-scheme: dark) {
+  .schedule-bottom-img {
+    mix-blend-mode: normal;
+    border-radius: 16px;
+  }
 }
 
 /* Dark Mode Overrides for Schedule */

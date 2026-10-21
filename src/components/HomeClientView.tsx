@@ -65,8 +65,8 @@ export function HomeClientView({
           <Image
             src="/brand/02.jpg"
             alt="แบดมินตัน @สินธานี"
-            width={1785}
-            height={1932}
+            width={1024}
+            height={1024}
             priority
             sizes="(max-width: 480px) 100vw, 448px"
             className="home-hero-banner-img"
@@ -77,12 +77,12 @@ export function HomeClientView({
           >
             <span>จองสนามเลย</span>
             <svg
-              width="20"
-              height="20"
+              width="19"
+              height="19"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="1.9"
               strokeLinecap="round"
               strokeLinejoin="round"
               aria-hidden="true"
@@ -91,7 +91,6 @@ export function HomeClientView({
               <path d="M8 7h9v9" />
             </svg>
           </Link>
-          <span className="home-hero-caption">ภาพประกอบบรรยากาศสนาม</span>
         </div>
 
         {/* Bottom Info Bar */}
@@ -103,7 +102,7 @@ export function HomeClientView({
             <div className="info-pill-text">
               <span className="info-pill-label">เปิดให้บริการ</span>
               <strong className="info-pill-val">
-                {formatHour(openHour)}:00–{formatHour(closeHour)}:00 น.
+                {formatHour(openHour)}–{formatHour(closeHour)} น.
               </strong>
             </div>
           </div>

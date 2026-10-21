@@ -9,6 +9,7 @@ import { notifyAfterSlip, notifyNewBooking, notifyPaymentReviewed } from "@/lib/
 import { safeNext } from "@/lib/safe-next";
 import { isSlipVerificationEnabled, verifyLatestSlip } from "@/lib/slip/verify-booking";
 import { createClient, getSessionUser } from "@/lib/supabase/server";
+import { getServiceClient } from "@/lib/supabase/service";
 
 export type ActionResult<T = null> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -114,6 +115,7 @@ export async function reviewPayment(
   bookingId: string,
   approve: boolean,
   note: string,
+  editedAmount?: number,
 ): Promise<ActionResult> {
   if (!UUID_RE.test(bookingId) || typeof approve !== "boolean") {
     return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
@@ -125,6 +127,18 @@ export async function reviewPayment(
     p_note: note.slice(0, 300) || null,
   });
   if (error) return { ok: false, error: friendlyError(error) };
+
+  // If amount was edited by admin, record it in the payment record
+  if (typeof editedAmount === "number" && !isNaN(editedAmount) && editedAmount > 0) {
+    const service = getServiceClient();
+    if (service) {
+      await service
+        .from("payments")
+        .update({ slip_amount: editedAmount })
+        .eq("booking_id", bookingId);
+    }
+  }
+
   // If rejected, cancel the booking immediately to release the court slot from the overview board.
   if (!approve) {
     const { error: cancelError } = await supabase.rpc("cancel_booking", { p_booking_id: bookingId });
@@ -226,6 +240,87 @@ export async function signInWithEmail(_prev: string | null, formData: FormData):
     return "ส่งลิงก์เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่";
   }
   return "sent";
+}
+
+const SLIP_EXTENSIONS: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+
+/**
+ * Admin-only: upload a slip image for any booking (bypasses Storage RLS).
+ * Used when the admin creates a booking on behalf of a customer and wants to
+ * attach the payment slip right away.
+ */
+export async function adminUploadSlipFile(formData: FormData): Promise<ActionResult<{ path: string }>> {
+  const bookingId = String(formData.get("bookingId") ?? "");
+  const file = formData.get("file") as File | null;
+
+  if (!UUID_RE.test(bookingId) || !file || file.size === 0) {
+    return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
+  }
+  const { isAdmin } = await getSessionUser();
+  if (!isAdmin) return { ok: false, error: friendlyError({ message: "FORBIDDEN" }) };
+
+  const supabase = getServiceClient();
+  if (!supabase) return { ok: false, error: "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ (ยังไม่ได้ตั้งค่า Service Role Key)" };
+
+  // Fetch booking details
+  const { data: booking, error: bookingErr } = await supabase
+    .from("bookings")
+    .select("id, user_id, amount")
+    .eq("id", bookingId)
+    .single();
+
+  if (bookingErr || !booking) {
+    return { ok: false, error: "ไม่พบข้อมูลการจอง" };
+  }
+
+  const ext = SLIP_EXTENSIONS[file.type] ?? "jpg";
+  const path = `${booking.user_id}/${bookingId}-${Date.now()}.${ext}`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  const { error: uploadError } = await supabase.storage
+    .from("slips")
+    .upload(path, buffer, { contentType: file.type });
+  if (uploadError) {
+    console.error("Admin slip upload failed:", uploadError);
+    return { ok: false, error: "อัปโหลดไม่สำเร็จ กรุณาลองใหม่" };
+  }
+
+  // Insert payment record
+  const { error: paymentError } = await supabase.from("payments").insert({
+    booking_id: bookingId,
+    user_id: booking.user_id,
+    amount: booking.amount,
+    slip_path: path,
+    status: "submitted",
+  });
+  if (paymentError) {
+    console.error("Admin payment insert failed:", paymentError);
+    return { ok: false, error: "บันทึกข้อมูลการชำระเงินไม่สำเร็จ" };
+  }
+
+  // Update booking status to awaiting_review so it appears on the review page
+  const { error: updateError } = await supabase
+    .from("bookings")
+    .update({
+      status: "awaiting_review",
+      hold_expires_at: null,
+      review_note: null,
+    })
+    .eq("id", bookingId);
+  if (updateError) {
+    console.error("Admin booking update failed:", updateError);
+    return { ok: false, error: "อัปเดตสถานะการจองไม่สำเร็จ" };
+  }
+
+  // Auto-check with OCR and notify
+  const verifyStatus = await verifyLatestSlip(bookingId);
+  await notifyAfterSlip(bookingId, verifyStatus);
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/review");
+  revalidatePath(`/bookings/${bookingId}`);
+
+  return { ok: true, data: { path } };
 }
 
 export async function signOut() {

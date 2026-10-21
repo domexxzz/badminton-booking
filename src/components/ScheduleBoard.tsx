@@ -180,11 +180,9 @@ export function ScheduleBoard({
                         const endStr = formatHour(h + 0.5).replace(":", ".");
                         const statusText = free
                           ? `– ${endStr}`
-                          : state === "booked"
-                            ? "🔒 จองแล้ว"
-                            : state === "held"
-                              ? "⏳ รอชำระ"
-                              : "เลยเวลา";
+                          : state === "held"
+                            ? "⏳ รอชำระ"
+                            : "🔒 ล็อกแล้ว";
 
                         return (
                           <button
@@ -227,15 +225,15 @@ export function ScheduleBoard({
       <div className="schedule-legend" aria-label="คำอธิบายสถานะ">
         <div className="legend-item">
           <span className="legend-dot dot-free" aria-hidden="true" />
-          <span>ว่าง</span>
-        </div>
-        <div className="legend-item">
-          <span className="legend-dot dot-booked" aria-hidden="true" />
-          <span>จองแล้ว</span>
+          <span>ว่าง (จองได้)</span>
         </div>
         <div className="legend-item">
           <span className="legend-dot dot-held" aria-hidden="true" />
           <span>รอชำระ</span>
+        </div>
+        <div className="legend-item">
+          <span className="legend-dot dot-booked" aria-hidden="true" />
+          <span>ล็อก</span>
         </div>
       </div>
 

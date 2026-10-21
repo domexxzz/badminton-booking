@@ -2141,11 +2141,11 @@ details summary { cursor: pointer; }
   box-shadow: inset 0 0 0 1.5px #ffffff;
 }
 
-.timeline-slot.booked {
+.timeline-slot.held {
   background: #facc15;
 }
 
-.timeline-slot.held {
+.timeline-slot.booked {
   background: #94a3b8;
 }
 
@@ -2176,6 +2176,38 @@ details summary { cursor: pointer; }
   flex-direction: column;
   gap: 14px;
   animation: fadeIn 0.2s ease-out;
+}
+
+.schedule-court-expanded .chip.time-slot.free {
+  background: #d1fae5;
+  border-color: #10b981;
+  color: #065f46;
+}
+
+.schedule-court-expanded .chip.time-slot.free:hover {
+  background: #008767;
+  border-color: #008767;
+  color: #ffffff;
+}
+
+.schedule-court-expanded .chip.time-slot.held {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.schedule-court-expanded .chip.time-slot.booked,
+.schedule-court-expanded .chip.time-slot.unavailable {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #64748b;
+  text-decoration: none;
+  opacity: 0.9;
+}
+
+.schedule-court-expanded .chip.time-slot.booked .chip-time-end,
+.schedule-court-expanded .chip.time-slot.unavailable .chip-time-end {
+  color: #64748b;
 }
 
 .expanded-divider {
@@ -2251,11 +2283,11 @@ details summary { cursor: pointer; }
   background: #008767;
 }
 
-.legend-dot.dot-booked {
+.legend-dot.dot-held {
   background: #facc15;
 }
 
-.legend-dot.dot-held {
+.legend-dot.dot-booked {
   background: #94a3b8;
 }
 

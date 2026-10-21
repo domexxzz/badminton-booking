@@ -315,7 +315,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         <div className="card stack" style={{ gap: 8 }}>
           <h2>ยกเลิกแล้ว · รอร้านโอนคืน</h2>
           <p className="muted" style={{ margin: 0 }}>
-            ร้านจะโอนคืน {formatBaht(Number(refundPending.refund_amount ?? totalAmount))} เข้า QR ที่คุณแนบไว้
+            ร้านจะโอนคืน {formatBaht(Number(refundPending.refund_amount ?? totalAmount))} ตาม QR หรือบัญชีที่คุณแจ้งไว้
             เมื่อโอนแล้วสลิปคืนเงินจะขึ้นที่หน้านี้
           </p>
         </div>

@@ -20,6 +20,7 @@ const MIGRATIONS = [
   "0013_self_cancel_deadline.sql",
   "0014_coach_terms.sql",
   "0015_shop_contact.sql",
+  "0016_refund_bank_account.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -577,6 +578,54 @@ await db.query(`select update_shop_contact(' Akkanay ', '082-945-7278', '@sintha
 const contact = (await db.query(`select contact_name, contact_phone, contact_line from venue_settings where id = 1`)).rows[0];
 check("admin saves the shop contact (phone digits only)",
   contact.contact_name === "Akkanay" && contact.contact_phone === "0829457278" && contact.contact_line === "@sinthani");
+
+// ---- Optional QR or bank account for refunds (0016) ----
+const refundUser = "abababab-abab-abab-abab-abababababab";
+await db.exec(`insert into auth.users (id, email) values ('${refundUser}', 'refund-test@example.invalid')`);
+const accountBooking = await paidBooking(refundUser, 1, at(24 * 7), 1);
+await as(refundUser);
+await expectError("refund rejects neither QR nor account",
+  `select request_cancel('${accountBooking.id}', null, null, null)`, "REFUND_DETAILS_REQUIRED");
+await expectError("refund rejects whitespace account",
+  `select request_cancel('${accountBooking.id}', null, null, '   ')`, "REFUND_DETAILS_REQUIRED");
+await expectError("refund rejects tabs and line breaks without an account",
+  `select request_cancel('${accountBooking.id}', null, null, chr(9) || chr(10))`, "REFUND_DETAILS_REQUIRED");
+await expectError("refund rejects oversized account",
+  `select request_cancel('${accountBooking.id}', null, null, repeat('1', 301))`, "INVALID_REFUND_ACCOUNT");
+check("invalid refund details keep the booking confirmed", (await bookingRow(accountBooking.id)).status === "confirmed");
+await as(U1);
+await expectError("account refund cannot cancel someone else's booking",
+  `select request_cancel('${accountBooking.id}', null, null, 'Test Bank 0000000000 Test Customer')`, "BOOKING_NOT_FOUND");
+await as(refundUser);
+const { rows: [accountRequest] } = await db.query(
+  `select * from request_cancel($1, null, 'Account only', $2)`,
+  [accountBooking.id, '  Test Bank\n0000000000\nTest Customer  ']);
+check("account-only refund preserves account and has no QR", accountRequest.refund_qr_path === null
+  && accountRequest.refund_account === 'Test Bank\n0000000000\nTest Customer'
+  && accountRequest.status === 'refund_pending' && Number(accountRequest.refund_amount) === Number(accountBooking.amount));
+check("account-only cancellation frees the court", (await bookingRow(accountBooking.id)).status === 'cancelled'
+  && (await db.query(`select 1 from court_occupancy where booking_id = '${accountBooking.id}'`)).rows.length === 0);
+await expectError("cancelled account request cannot be submitted twice",
+  `select request_cancel('${accountBooking.id}', null, null, '0000000000')`, "INVALID_STATUS");
+await as(ADMIN);
+await expectError("account refund still requires admin refund slip",
+  `select resolve_request('${accountRequest.id}', true)`, "REFUND_SLIP_REQUIRED");
+await expectError("pending account refund cannot be rejected",
+  `select resolve_request('${accountRequest.id}', false)`, "INVALID_STATUS");
+await db.exec(`insert into storage.objects (bucket_id, name) values ('refunds', '${refundUser}/${accountBooking.id}-refund-1.jpg')`);
+await db.query(`select resolve_request('${accountRequest.id}', true, null, '${refundUser}/${accountBooking.id}-refund-1.jpg')`);
+check("admin can finish account refund with audit and slip",
+  (await db.query(`select * from booking_requests where id = '${accountRequest.id}'`)).rows[0].resolved_by === ADMIN);
+
+const bothBooking = await paidBooking(refundUser, 2, at(24 * 7), 1);
+await as(refundUser);
+await expectError("invalid attached QR cannot bypass validation with an account",
+  `select request_cancel('${bothBooking.id}', 'invalid.png', null, '0000000000')`, "INVALID_QR");
+await db.exec(`insert into storage.objects (bucket_id, name) values ('refunds', '${refundUser}/${bothBooking.id}-qr-1.png')`);
+const { rows: [bothRequest] } = await db.query(`select * from request_cancel('${bothBooking.id}', '${refundUser}/${bothBooking.id}-qr-1.png', null, '0000000000')`);
+check("refund accepts QR and account together", Boolean(bothRequest.refund_qr_path) && bothRequest.refund_account === '0000000000');
+check("anonymous users cannot call account refund RPC",
+  !(await db.query(`select has_function_privilege('anon', 'public.request_cancel(uuid,text,text,text)', 'execute') as allowed`)).rows[0].allowed);
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

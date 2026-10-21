@@ -67,7 +67,7 @@ export function BookingChangePanel({
         <h2>⏳ รอแอดมินตอบคำขอ</h2>
         <p className="muted" style={{ margin: 0 }}>
           {pending.kind === "cancel"
-            ? "ขอยกเลิกและคืนเงิน แอดมินจะโอนคืนเข้า QR ที่คุณแนบไว้"
+            ? "ขอยกเลิกและคืนเงิน แอดมินจะโอนคืนตามข้อมูลรับเงินที่คุณแจ้งไว้"
             : `ขอเลื่อนเป็น ${pending.newCourtName ?? "สนาม"} · ${formatSlot(pending.new_starts_at!, pending.new_ends_at!)}`}
         </p>
         <p className="muted" style={{ margin: 0 }}>การจองเดิมยังใช้ได้จนกว่าแอดมินจะอนุมัติ</p>

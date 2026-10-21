@@ -44,15 +44,19 @@ export async function requestReschedule(input: {
   return { ok: true, data: null };
 }
 
-export async function requestCancel(bookingId: string, qrPath: string, reason: string): Promise<ActionResult> {
-  if (!UUID_RE.test(bookingId) || typeof qrPath !== "string" || typeof reason !== "string") {
+export async function requestCancel(bookingId: string, qrPath: string | null, reason: string, account: string = ""): Promise<ActionResult> {
+  if (!UUID_RE.test(bookingId) || (qrPath !== null && typeof qrPath !== "string") || typeof reason !== "string" || typeof account !== "string" || account.length > MAX_TEXT) {
     return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
+  }
+  if (!qrPath && !account.trim()) {
+    return { ok: false, error: "กรุณาแนบ QR หรือกรอกบัญชีรับเงินคืนอย่างใดอย่างหนึ่ง" };
   }
   const supabase = await createClient();
   const { error } = await supabase.rpc("request_cancel", {
     p_booking_id: bookingId,
     p_qr_path: qrPath,
     p_reason: reason.slice(0, MAX_TEXT) || null,
+    p_refund_account: account.trim() || null,
   });
   if (error) return { ok: false, error: friendlyError(error) };
   await notifyBookingRequest(bookingId, "cancel");

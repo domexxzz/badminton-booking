@@ -94,11 +94,6 @@ export async function resolveRequest(input: {
     p_refund_slip_path: refundSlipPath,
   });
   if (error) return { ok: false, error: friendlyError(error) };
-  // If the admin rejects the request, automatically withdraw it so it disappears from the pending list.
-  if (!approve) {
-    const { error: withdrawError } = await supabase.rpc("withdraw_request", { p_request_id: requestId });
-    if (withdrawError) console.error("Failed to withdraw rejected request:", withdrawError);
-  }
   if (req?.kind) {
     await notifyRequestResolvedToCustomer(bookingId, req.kind, approve, note);
   }

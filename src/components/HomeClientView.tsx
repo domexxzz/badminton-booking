@@ -59,55 +59,42 @@ export function HomeClientView({
 
   return (
     <div className="home-view">
-      {/* Top Hero Card: Logos + Court Background + Info Pill */}
+      {/* Top Hero Card: Banner 02.jpg + CTA + Info Bar */}
       <section className="home-hero-card" aria-label="แบดมินตัน@สินธานี">
-        {/* Top White Header with Logos */}
-        <div className="home-hero-header">
-          <div className="home-hero-logos">
-            <Image
-              src="/brand/chivago-logo.png"
-              alt="Chiva Go"
-              width={100}
-              height={66}
-              className="home-logo-chivago"
-              priority
-            />
-            <span className="home-logo-x" aria-hidden="true">✕</span>
-            <Image
-              src="/brand/sinthani-logo.png"
-              alt="สนามแบดมินตัน สินธานี"
-              width={64}
-              height={64}
-              className="home-logo-sinthani"
-              priority
-            />
-          </div>
-        </div>
-
-        {/* Hero Court Photo & Title */}
-        <div className="home-hero-body">
+        <div className="home-hero-banner">
           <Image
-            src="/brand/court-hero.png"
-            alt="สนามแบดมินตัน"
-            fill
+            src="/brand/02.jpg"
+            alt="แบดมินตัน @สินธานี"
+            width={1785}
+            height={1932}
             priority
             sizes="(max-width: 480px) 100vw, 448px"
-            className="home-hero-bg-art"
+            className="home-hero-banner-img"
           />
-          <div className="home-hero-overlay" />
-          <div className="home-hero-text">
-            <h1 className="home-hero-title">
-              แบดมินตัน<br />
-              <span>@สินธานี</span>
-            </h1>
-            <p className="home-hero-subtitle">
-              จองคอร์ดง่ายๆ<br />
-              เล่นได้ทุกวัน
-            </p>
-          </div>
+          <Link
+            href={status.isOpen ? "/book" : `/book?${targetDateParam}`}
+            className="home-hero-cta"
+          >
+            <span>จองสนามเลย</span>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M7 17L17 7" />
+              <path d="M8 7h9v9" />
+            </svg>
+          </Link>
+          <span className="home-hero-caption">ภาพประกอบบรรยากาศสนาม</span>
         </div>
 
-        {/* Floating Info Pill at Bottom of Card */}
+        {/* Bottom Info Bar */}
         <div className="home-hero-info-pill">
           <div className="info-pill-item">
             <div className="info-pill-icon">
@@ -116,7 +103,7 @@ export function HomeClientView({
             <div className="info-pill-text">
               <span className="info-pill-label">เปิดให้บริการ</span>
               <strong className="info-pill-val">
-                {formatHour(openHour)}:00 – {formatHour(closeHour)}:00 น.
+                {formatHour(openHour)}:00–{formatHour(closeHour)}:00 น.
               </strong>
             </div>
           </div>
@@ -128,12 +115,10 @@ export function HomeClientView({
               <CourtOutlineIcon size={24} />
             </div>
             <div className="info-pill-text">
-              <strong className="info-pill-val">{courts.length} สนาม</strong>
-              <span className="info-pill-sub">
-                {Number.isFinite(minPrice)
-                  ? `${formatBaht(minPrice)}/ชม. (${formatBaht(Math.round(minPrice / 2))}/30 นาที)`
-                  : "฿130/ชม. (฿65/30 นาที)"}
-              </span>
+              <span className="info-pill-label">{courts.length} สนาม</span>
+              <strong className="info-pill-val">
+                {Number.isFinite(minPrice) ? `${formatBaht(minPrice)}/ชม.` : "฿150/ชม."}
+              </strong>
             </div>
           </div>
         </div>

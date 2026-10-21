@@ -1,8 +1,9 @@
 import "server-only";
 import { getServiceClient } from "@/lib/supabase/service";
+import { buildCheckRecord, receiverFromEnv, type CheckRecord } from "./check-record";
 import { verifyWithEasySlip } from "./easyslip";
 import { verifyWithTyphoon } from "./typhoon";
-import type { ProviderResult, VerifyStatus } from "./types";
+import type { ProviderResult } from "./types";
 
 type PendingPayment = {
   id: string;
@@ -11,61 +12,17 @@ type PendingPayment = {
   bookings: { amount: number; created_at: string; status: string } | null;
 };
 
-type CheckRecord = {
-  status: VerifyStatus;
-  reasons: string[];
-  transRef?: string;
-  amount?: number;
-  date?: string;
-  raw?: unknown;
-};
-
 export function isSlipVerificationEnabled(): boolean {
   return Boolean(process.env.EASYSLIP_API_KEY || process.env.TYPHOON_API_KEY) && getServiceClient() !== null;
 }
 
 function toRecord(result: ProviderResult, payment: PendingPayment): CheckRecord {
-  if (result.kind !== "ok") {
-    return { status: result.kind, reasons: [result.message] };
-  }
-  const expectedAmount = Number(payment.amount ?? payment.bookings!.amount);
-  const isAmountMatch = Math.round(result.slip.amount * 100) === Math.round(expectedAmount * 100);
-  const senderName = result.slip.sender?.name || "ไม่ระบุ";
-  const receiverName = result.slip.receiver.names[0] || "ไม่ระบุ";
-
-  let timeFormatted = result.slip.date;
-  try {
-    const d = new Date(result.slip.date);
-    if (!Number.isNaN(d.getTime())) {
-      timeFormatted =
-        d.toLocaleString("th-TH", {
-          timeZone: "Asia/Bangkok",
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }) + " น.";
-    }
-  } catch {}
-
-  const displayReasons: string[] = [
-    `ชื่อผู้โอน: ${senderName}`,
-    `ชื่อผู้รับ: ${receiverName}`,
-    isAmountMatch
-      ? `ยอดเงิน: ฿${result.slip.amount.toFixed(2)} (ตรงกับยอดที่ต้องชำระ)`
-      : `ยอดเงิน: ฿${result.slip.amount.toFixed(2)} (ไม่ตรงกับยอดที่ต้องชำระ ฿${expectedAmount.toFixed(2)})`,
-    `เวลา: ${timeFormatted}`,
-  ];
-
-  return {
-    status: isAmountMatch ? "verified" : "mismatch",
-    reasons: displayReasons,
-    transRef: result.slip.transRef,
-    amount: result.slip.amount,
-    date: result.slip.date,
-    raw: result.raw,
-  };
+  return buildCheckRecord(result, {
+    amountBaht: Number(payment.amount ?? payment.bookings!.amount),
+    bookingCreatedAt: payment.bookings!.created_at,
+    now: new Date(),
+    ...receiverFromEnv(process.env),
+  });
 }
 
 /**

@@ -27,6 +27,13 @@ services:
         sync: false
       - key: PROMPTPAY_ID
         sync: false
+      # Slip check: without these every slip is labelled "mismatch" for the admin.
+      - key: EASYSLIP_API_KEY
+        sync: false
+      - key: SLIP_RECEIVER_NAME
+        sync: false
+      - key: SLIP_RECEIVER_BANK_ACCOUNT
+        sync: false
       - key: LINE_LOGIN_CHANNEL_ID
         sync: false
       - key: LINE_LOGIN_CHANNEL_SECRET

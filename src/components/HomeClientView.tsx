@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
+import { BrandPromo } from "@/components/BrandPromo";
 import { CourtArt } from "@/components/CourtArt";
 import { CourtRules } from "@/components/CourtRules";
-import { CalendarIcon, ClockIcon, CourtIcon, MoonIcon, ReceiptIcon, ShuttleIcon } from "@/components/icons";
+import { CalendarIcon, ClockIcon, CourtIcon, MoonIcon, ReceiptIcon } from "@/components/icons";
 import { formatBaht, formatTime } from "@/lib/format";
 import { formatHour, getVenueStatus, isActive, type Occupancy, type VenueStatus } from "@/lib/slots";
 
@@ -49,29 +51,21 @@ export function HomeClientView({
 
   return (
     <>
-      {status.isOpen ? (
-        /* Daytime Open Banner */
-        <section className="banner">
-          <div className="banner-badge-wrap">
-            <span className="open-live-badge">
-              <span className="pulse-dot green" />
-              เปิดให้บริการอยู่
-            </span>
-          </div>
-          <h2>จองสนามแบดได้ใน 1 นาที</h2>
-          <p>
-            {courts.length} สนาม · {formatBaht(minPrice)}/ชม. · เปิด {formatHour(openHour)}–{formatHour(closeHour)} น.
-          </p>
-          <Link
-            href="/book"
-            className="btn btn-sm btn-banner-cta"
-            style={{ marginTop: 14, background: "#fff", color: "var(--primary-strong)", fontWeight: 600, boxShadow: "0 4px 12px rgba(0,0,0,0.12)" }}
-          >
-            🏸 จองสนามเลย
-          </Link>
-          <ShuttleIcon size={110} className="shuttle" />
-        </section>
-      ) : (
+      <section className="venue-hero" aria-label="แบดมินตัน@สินธานี">
+        <Image src="/brand/court-hero.png" alt="" fill priority sizes="(max-width: 480px) 100vw, 448px" className="venue-hero-art" />
+        <div className="venue-hero-copy">
+          <span className="hero-status"><span className={`pulse-dot ${status.isOpen ? "green" : "red"}`} />{status.isOpen ? "เปิดให้บริการอยู่" : "จองล่วงหน้าได้ทุกวัน"}</span>
+          <span className="brand-eyebrow">YOUR EVERYDAY COURT</span>
+          <h1>แบดมินตัน<br /><span>@สินธานี</span></h1>
+          <p>จองคอร์ทง่าย ๆ<br />แล้วมาเล่นให้เต็มที่</p>
+          <Link href={status.isOpen ? "/book" : `/book?${targetDateParam}`} className="btn hero-cta">จองสนามเลย <span aria-hidden="true">→</span></Link>
+        </div>
+        <div className="hero-facts">
+          <div><ClockIcon size={22} /><span>เปิดให้บริการ<strong>{formatHour(openHour)}–{formatHour(closeHour)} น.</strong></span></div>
+          <div><CourtIcon size={22} /><span>{courts.length} สนาม<strong>{Number.isFinite(minPrice) ? `${formatBaht(minPrice)}/ชม.` : "ตรวจสอบราคาที่หน้าจอง"}</strong></span></div>
+        </div>
+      </section>
+      {!status.isOpen && (
         /* Nighttime / Closed Hybrid Banner */
         <section className="banner-closed">
           <div className="closed-badge-row">
@@ -157,6 +151,8 @@ export function HomeClientView({
           การจองของฉัน
         </Link>
       </section>
+
+      <BrandPromo />
 
       {/* Today's Queue */}
       <section>

@@ -6,6 +6,7 @@ import { BOOKING_RULES } from "@/lib/config";
 import { formatBaht } from "@/lib/format";
 import { cellState, formatHour, openingSlots, upcomingDates } from "@/lib/slots";
 import { DatePills } from "./DatePills";
+import { CourtArt } from "./CourtArt";
 import { useOccupancy } from "./useOccupancy";
 
 type Court = { id: number; name: string; price_per_hour: number };
@@ -57,9 +58,12 @@ export function ScheduleBoard({
 
       {courts.map((court) => (
         <section key={court.id} className="card court-section">
+          <div className="schedule-court-heading">
+            <CourtArt label={court.name} />
           <h2>
             {court.name} <span>{formatBaht(court.price_per_hour)}/ชม. ({formatBaht(court.price_per_hour / 2)}/30 นาที)</span>
           </h2>
+          </div>
           <div className="chip-grid">
             {openingSlots(0.5, openHour, closeHour).map((hour) => {
               const state = cellState(court.id, date, hour, occupancy, now);

@@ -1301,3 +1301,154 @@ details summary { cursor: pointer; }
 /* ---------- Contact the shop ---------- */
 .contact-actions { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .contact-actions .btn { width: 100%; text-align: center; }
+/* ---------- ChivaGo × Sinthani customer identity ---------- */
+.customer-app {
+  color: var(--text);
+  --bg: #f1f8f3;
+  --surface: #ffffff;
+  --surface-2: #f2f7f5;
+  --text: #132a2a;
+  --muted: #627b78;
+  --border: #dfece5;
+  --primary: #008867;
+  --primary-strong: #006b55;
+  --primary-soft: #e2f4eb;
+  --held: #fff2c0;
+  --held-ink: #765600;
+  --shadow: 0 5px 22px rgba(18, 78, 58, .055);
+  background: radial-gradient(ellipse at 100% 12%, #e5f5d0 0, transparent 37%),
+    linear-gradient(165deg, #fff 12%, var(--bg) 62%, #e6f3eb);
+}
+.customer-app .app-header {
+  gap: 10px;
+  padding-top: calc(14px + env(safe-area-inset-top));
+  padding-bottom: 12px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+.brand-lockup { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.brand-chivago { width: 78px; height: 52px; object-fit: contain; }
+.brand-sinthani { width: 50px; height: 50px; object-fit: cover; border-radius: 50%; }
+.brand-cross { color: var(--primary-strong); font-size: 20px; font-weight: 400; }
+.customer-app .greeting { margin-left: auto; min-width: 0; text-align: right; }
+.customer-app .greeting .muted { font-size: 10px; }
+.customer-app .greeting strong { font-size: 13px; max-width: 105px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-welcome { margin-left: auto; font-size: 10px; color: var(--muted); line-height: 1.6; text-align: right; }
+.brand-welcome strong { color: var(--primary-strong); font-weight: 600; }
+.customer-app .avatar { width: 34px; height: 34px; flex-shrink: 0; background: var(--primary-strong); font-size: 14px; }
+.customer-app .app-header > .btn { min-height: 36px; padding: 0 10px; font-size: 11px; }
+.customer-app .app-main { padding: 14px 16px 24px; gap: 22px; }
+.customer-app h1 { font-size: 22px; font-weight: 600; letter-spacing: -.6px; }
+.customer-app h2 { font-weight: 600; }
+.customer-app .card { border: 1px solid color-mix(in srgb, var(--border) 65%, transparent); }
+.customer-app .btn:where(:not(.btn-ghost, .btn-danger, .btn-line)) {
+  background: linear-gradient(120deg, #00765e, #009875);
+  box-shadow: 0 4px 10px rgba(0, 117, 86, .13);
+}
+.customer-app .btn { border-radius: 13px; }
+.customer-app .btn-ghost { box-shadow: none; }
+.customer-app .btn-danger { background: var(--danger); }
+.customer-app :is(a, button, input, textarea, select):focus-visible { outline: 3px solid #78bfa1; outline-offset: 3px; }
+.customer-app .btn:hover:not(:disabled) { filter: brightness(1.05); }
+.customer-app .bottom-nav { background: color-mix(in srgb, var(--surface) 96%, transparent); backdrop-filter: blur(16px); padding-top: 8px; box-shadow: 0 -5px 22px rgba(18, 78, 58, .04); border-color: var(--border); }
+.customer-app .tab { font-size: 10px; gap: 4px; border-radius: 13px; color: #476a68; }
+.customer-app .tab.active { color: #fff; background: linear-gradient(140deg, #009271, #006953); box-shadow: 0 4px 10px #00695318; }
+.venue-hero { position: relative; min-height: 355px; overflow: hidden; border-radius: 24px; isolation: isolate; background: #004c40; box-shadow: 0 12px 26px #005c4220; }
+.venue-hero::before { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(0, 43, 37, .88), rgba(0, 53, 44, .2) 80%); }
+.venue-hero-copy { position: relative; padding: 22px 20px 92px; color: #fff; display: grid; justify-items: start; gap: 12px; }
+.hero-status { display: inline-flex; align-items: center; gap: 6px; color: #edfff3; background: #ffffff18; border: 1px solid #ffffff30; border-radius: 99px; padding: 5px 10px; font-size: 10px; }
+.brand-eyebrow { font-size: 9px; font-weight: 600; letter-spacing: 1.7px; }
+.venue-hero .brand-eyebrow { color: #bce1c5; margin-top: 9px; }
+.customer-app .venue-hero h1 { color: #fff; font-size: clamp(30px, 9vw, 41px); line-height: 1.28; font-weight: 600; letter-spacing: -1.4px; text-shadow: 0 2px 12px #00362940; }
+.venue-hero h1 span { color: #d7f8ad; }
+.venue-hero p { margin: 0; font-size: 13px; line-height: 1.6; color: #e0f2ea; }
+.customer-app .venue-hero .hero-cta { min-height: 42px; font-size: 13px; padding: 0 15px; background: #fff; color: #006953; box-shadow: 0 4px 14px #002f4230; }
+.hero-cta span { margin-left: 12px; }
+.hero-facts { position: absolute; bottom: 10px; left: 10px; right: 10px; display: grid; grid-template-columns: 1fr 1fr; border-radius: 15px; background: #fafff8f5; color: #006953; padding: 13px 10px; box-shadow: 0 3px 10px #003d3515; }
+.hero-facts > div { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.hero-facts > div + div { border-left: 1px solid #d6e7dc; }
+.hero-facts span { display: grid; font-size: 11px; font-weight: 600; }
+.hero-facts strong { font-size: 10px; color: #4e7067; font-weight: 400; }
+.customer-app .quick-actions { gap: 8px; padding: 8px; background: var(--surface); border-radius: 21px; box-shadow: var(--shadow); margin-top: -8px; }
+.customer-app .quick { padding: 12px 4px; gap: 8px; font-size: 11px; box-shadow: none; background: var(--surface-2); border-radius: 15px; }
+.customer-app .quick .icon { width: 34px; height: 34px; background: transparent; }
+.customer-app .quick:first-child { color: white; background: linear-gradient(135deg, #009a75, #006b53); }
+.customer-app .quick:first-child .icon { color: white; }
+.brand-promo { position: relative; display: flex; align-items: center; min-height: 156px; overflow: hidden; border-radius: 20px; padding: 20px; background: linear-gradient(115deg, #005a4c 10%, #00856a 60%, #99d975); color: #fff; isolation: isolate; }
+.brand-promo::before, .brand-promo::after { content: ''; position: absolute; z-index: -1; width: 250px; height: 75px; border-radius: 50%; transform: rotate(-36deg); background: #d6f58458; right: -80px; bottom: 8px; }
+.brand-promo::after { bottom: 65px; right: -100px; background: #b3ed9a45; }
+.brand-promo > div { display: grid; gap: 8px; }
+.brand-promo strong { font-size: 25px; line-height: 1.06; letter-spacing: -.6px; font-weight: 700; }
+.brand-promo > div > span:last-child { font-size: 11px; color: #e6f9e6; }
+.promo-shuttle { position: absolute; right: 14px; bottom: 28px; color: #f1ffe6; transform: rotate(-24deg); opacity: .55; }
+.promo-arrow { position: absolute; right: 12px; bottom: 12px; width: 28px; height: 28px; display: grid; place-items: center; color: #006953; background: #fff; border-radius: 50%; font-size: 20px; }
+.customer-app .court-cards { grid-auto-flow: initial; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; overflow: visible; margin: 0; padding: 0; }
+.customer-app .court-card { padding: 8px; gap: 8px; border: 1px solid var(--border); border-radius: 18px; }
+.court-art { width: 100%; height: auto; aspect-ratio: 1.55; object-fit: cover; object-position: center; display: block; border-radius: 11px; }
+.customer-app .court-card .price { color: var(--primary-strong); font-size: 12px; }
+.customer-app .court-card > strong { padding: 0 2px; }
+.customer-app .court-card .btn { min-height: 36px; padding: 0 5px; font-size: 11px; }
+.customer-app .date-scroll { gap: 8px; padding: 3px 1px 9px; }
+.customer-app .date-pill { min-width: 62px; min-height: 79px; justify-content: center; border: 0; background: var(--surface); box-shadow: var(--shadow); border-radius: 14px; font-size: 11px; }
+.customer-app .date-pill strong { font-size: 23px; }
+.customer-app .date-pill[aria-pressed="true"] { color: #e5f7ed; background: linear-gradient(145deg, #009775, #006651); box-shadow: 0 6px 12px #00715620; }
+.customer-app .date-pill[aria-pressed="true"] strong { color: #fff; }
+.customer-app .court-chip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.customer-app .court-select-pill { position: relative; align-items: stretch; min-height: 150px; padding: 7px; border-radius: 16px; background: var(--surface); text-align: left; border: 1px solid var(--border); gap: 6px; box-shadow: var(--shadow); }
+.customer-app .court-select-pill .court-art { aspect-ratio: 1.5; }
+.customer-app .court-select-pill .court-pill-title { padding: 0 4px; font-size: 14px; color: var(--text); }
+.customer-app .court-select-pill .court-pill-sub { padding: 0 4px 4px; color: var(--primary-strong); opacity: 1; font-size: 11px; }
+.customer-app .court-select-pill.selected { background: var(--surface); border: 2px solid var(--primary); padding: 6px; }
+.court-selected-mark { position: absolute; top: 13px; right: 13px; background: #fff; color: #008463; border-radius: 50%; width: 24px; height: 24px; display: grid; place-items: center; font-size: 16px; box-shadow: 0 2px 8px #00473730; }
+.customer-app .chip-grid { gap: 7px; }
+.customer-app .chip:not(.court-select-pill) { border: 1px solid var(--border); background: var(--surface); min-height: 46px; border-radius: 12px; font-size: 13px; }
+.customer-app .chip:is(.selected, .in-range):not(.court-select-pill) { background: linear-gradient(145deg, #009d78, #007059); color: #fff; border-color: #008565; box-shadow: 0 3px 6px #00735916; }
+.customer-app .chip.booked:not(.court-select-pill) { color: #6b7b7b; background: #e0e5e5; border-color: #d7dfdd; opacity: 1; }
+.customer-app .chip.booked .chip-time-end { color: #6b7b7b; }
+.customer-app .chip.held:not(.court-select-pill) { background: var(--held); border-color: #efdc8c; color: var(--held-ink); }
+.customer-app .chip.past:not(.court-select-pill) { background: var(--surface-2); }
+.customer-app .chip.unavailable:not(.court-select-pill) { color: var(--muted); background: var(--surface-2); }
+.customer-app .badge.confirmed { color: #00654c; background: #baf1d0; }
+.customer-app .badge.pending_payment, .customer-app .badge.awaiting_review { color: #745600; background: #ffe38a; }
+.customer-app .badge.cancelled, .customer-app .badge.expired { color: #99554d; background: #fae0dc; }
+.customer-app .queue-table th { background: #007b60; }
+.customer-app .my-booking-card { display: grid; grid-template-columns: 68px minmax(0, 1fr) auto; gap: 10px; padding: 12px; align-items: center; }
+.booking-court-thumbnail .court-art { aspect-ratio: 1; height: 68px; border-radius: 12px; }
+.customer-app .my-booking-card .meta strong { font-size: 13px; }
+.customer-app .my-booking-card .muted { font-size: 11px; }
+.customer-app .my-booking-card .badge { font-size: 10px; padding: 3px 7px; white-space: nowrap; }
+.customer-app .banner-closed { background: linear-gradient(140deg, #073f36, #082c2a); box-shadow: var(--shadow); }
+.customer-app .countdown-box { background: #052e29; }
+.customer-app .countdown-box strong, .customer-app .countdown-next-note { color: #a9e8b0; }
+@media (max-width: 359px) {
+  .brand-chivago { width: 62px; height: 44px; }
+  .brand-sinthani { width: 42px; height: 42px; }
+  .brand-lockup { gap: 6px; }
+  .brand-welcome { display: none; }
+  .customer-app .greeting strong { max-width: 70px; }
+  .customer-app .my-booking-card { grid-template-columns: 50px minmax(0, 1fr); }
+  .customer-app .my-booking-card > div:last-child { grid-column: 2; text-align: left !important; }
+}
+@media (prefers-color-scheme: dark) {
+  .customer-app { color-scheme: dark; --bg: #102b25; --surface: #19372f; --surface-2: #21453a; --text: #eef9ef; --muted: #b3cbc0; --border: #34564b; --primary: #1fbb89; --primary-strong: #9ce8c0; --primary-soft: #224f3e; --held: #58491e; --held-ink: #ffe79b; --shadow: 0 5px 22px #00170e25; background: radial-gradient(ellipse at 100% 12%, #214d35, transparent 40%), #102b25; }
+  .customer-app .brand-lockup { background: #fafff7; border-radius: 12px; padding: 3px 7px; }
+  .customer-app .brand-cross { color: #006b55; }
+  .customer-app .tab { color: #b9d9ca; }
+  .customer-app .chip.booked:not(.court-select-pill) { background: #3a5049; border-color: #496257; color: #bccdc5; }
+  .customer-app .chip.booked .chip-time-end { color: #bccdc5; }
+  .customer-app .court-selected-mark { color: #006b55; }
+  .customer-app .legend-booked { background: #3a5049; border-color: #496257; }
+  .customer-app .badge.confirmed { background: #285c42; color: #baf1d0; }
+  .customer-app :is(.badge.pending_payment, .badge.awaiting_review) { background: #58491e; color: #ffe79b; }
+  .customer-app .hero-facts { background: #fafff8f5; }
+  .customer-app .avatar { background: #007e5f; color: #fff; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .customer-app *, .customer-app *::before, .customer-app *::after { scroll-behavior: auto; }
+}
+
+.venue-hero-art { object-fit: cover; object-position: center; z-index: -2; }
+.customer-app .schedule-court-heading { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
+.customer-app .schedule-court-heading > .court-art { width: 74px; height: 56px; flex-shrink: 0; }
+.customer-app .schedule-court-heading h2 { display: grid; gap: 4px; margin: 0; }
+.customer-app .schedule-court-heading h2 span { font-size: 11px; }

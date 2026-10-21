@@ -1,4 +1,6 @@
 import { ShopContactCard } from "@/components/ShopContactCard";
+import { BrandPromo } from "@/components/BrandPromo";
+import { CourtArt } from "@/components/CourtArt";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions";
@@ -87,7 +89,8 @@ export default async function MyBookingsPage() {
         )}
         <div className="list">
           {groupedBookings.map(({ lead, courts, totalAmount }) => (
-            <Link key={lead.id} href={`/bookings/${lead.id}`} className="card list-item">
+            <Link key={lead.id} href={`/bookings/${lead.id}`} className="card list-item my-booking-card">
+              <div className="booking-court-thumbnail"><CourtArt label={courts.join(", ")} /></div>
               <div className="meta">
                 <strong>{courts.join(", ")}</strong>
                 <span className="muted">{formatSlot(lead.starts_at, lead.ends_at)}</span>
@@ -100,6 +103,7 @@ export default async function MyBookingsPage() {
           ))}
         </div>
       </section>
+      <BrandPromo />
       <ShopContactCard />
     </>
   );

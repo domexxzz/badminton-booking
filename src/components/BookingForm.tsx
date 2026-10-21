@@ -7,6 +7,7 @@ import { BOOKING_RULES } from "@/lib/config";
 import { formatBaht, formatDayLong } from "@/lib/format";
 import { cellState, formatHour, getVenueStatus, maxBookableHours, openingSlots, slotStart, upcomingDates } from "@/lib/slots";
 import { DatePills } from "./DatePills";
+import { CourtArt } from "./CourtArt";
 import { ChevronDown } from "./icons";
 import { useOccupancy } from "./useOccupancy";
 
@@ -176,6 +177,8 @@ export function BookingForm({
                   }}
                   aria-pressed={isSelected}
                 >
+                  <CourtArt label={c.name} />
+                  {isSelected && <span className="court-selected-mark" aria-hidden="true">✓</span>}
                   <span className="court-pill-title">{c.name}</span>
                   <span className="court-pill-sub">{formatBaht(c.price_per_hour)}/ชม.</span>
                 </button>

@@ -1,9 +1,9 @@
 import { formatPhone, lineUrl } from "@/lib/contact-format";
-import { getShopContact } from "@/lib/shop-contact";
+import { getPublicShopContact } from "@/lib/public-data";
 
 /** "Ask the shop" card for customers; renders nothing until an admin fills it in. */
 export async function ShopContactCard({ title = "สอบถาม / ติดต่อแอดมิน" }: { title?: string }) {
-  const { name, phone, line } = await getShopContact();
+  const { name, phone, line } = await getPublicShopContact();
   if (!phone && !line) return null;
 
   return (

@@ -1,6 +1,6 @@
 import { BookingForm } from "@/components/BookingForm";
+import { getPublicCourts, getPublicVenueHours } from "@/lib/public-data";
 import { getSessionUser } from "@/lib/supabase/server";
-import { getVenueHours } from "@/lib/venue-settings";
 
 export const dynamic = "force-dynamic";
 
@@ -12,18 +12,13 @@ export default async function BookPage({
   searchParams: Promise<{ date?: string; court?: string; hour?: string }>;
 }) {
   const params = await searchParams;
-  const [{ supabase, user, displayName, isCoach }, { openHour, closeHour }] = await Promise.all([
+  const [{ user, displayName, isCoach }, { openHour, closeHour }, courts] = await Promise.all([
     getSessionUser(),
-    getVenueHours(),
+    getPublicVenueHours(),
+    getPublicCourts(),
   ]);
-  const { data: courts, error } = await supabase
-    .from("courts")
-    .select("id, name, price_per_hour")
-    .eq("is_active", true)
-    .order("id");
 
-  if (error || !courts?.length) {
-    console.error("Failed to load courts:", error);
+  if (!courts?.length) {
     return <p className="error">โหลดข้อมูลสนามไม่สำเร็จ กรุณารีเฟรช</p>;
   }
 

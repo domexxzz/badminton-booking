@@ -1861,3 +1861,376 @@ details summary { cursor: pointer; }
     color: #94a3b8;
   }
 }
+
+/* ==========================================================================
+   Redesigned Schedule Page (Matching Design Screenshot)
+   ========================================================================== */
+
+/* Hide default header on schedule page */
+.customer-app:has(.schedule-view) .app-header {
+  display: none;
+}
+
+.customer-app:has(.schedule-view) .app-main {
+  padding-top: calc(10px + env(safe-area-inset-top));
+  padding-left: 16px;
+  padding-right: 16px;
+  gap: 12px;
+}
+
+.schedule-view {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  min-height: 100%;
+}
+
+/* 1. Top Header */
+.schedule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0 6px;
+}
+
+.schedule-back-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid rgba(0, 100, 70, 0.08);
+  display: grid;
+  place-items: center;
+  color: #1e293b;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.schedule-back-btn:hover {
+  transform: scale(1.05);
+}
+
+.schedule-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.schedule-profile-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #007a5e;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  text-decoration: none;
+  box-shadow: 0 3px 10px rgba(0, 122, 94, 0.28);
+  transition: transform 0.15s ease;
+}
+
+.schedule-profile-btn:hover {
+  transform: scale(1.05);
+}
+
+/* 2. Date Selection (3-line pill cards) */
+.schedule-date-section .date-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+  scrollbar-width: none;
+}
+
+.schedule-date-section .date-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.customer-app .date-pill {
+  min-width: 58px;
+  min-height: 74px;
+  padding: 8px 4px 7px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 100, 70, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  box-shadow: 0 3px 10px rgba(0, 50, 35, 0.04);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.customer-app .date-pill .pill-weekday {
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.customer-app .date-pill .pill-date {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.15;
+}
+
+.customer-app .date-pill .pill-month {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.customer-app .date-pill[aria-pressed="true"] {
+  background: linear-gradient(145deg, #008767, #006e53);
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(0, 110, 83, 0.3);
+}
+
+.customer-app .date-pill[aria-pressed="true"] .pill-weekday,
+.customer-app .date-pill[aria-pressed="true"] .pill-date,
+.customer-app .date-pill[aria-pressed="true"] .pill-month {
+  color: #ffffff;
+}
+
+/* 3. Court Timeline Cards */
+.schedule-court-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.schedule-court-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 14px 16px 14px;
+  border: 1px solid rgba(0, 100, 70, 0.06);
+  box-shadow: 0 4px 16px rgba(0, 50, 35, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.schedule-court-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-decoration: none;
+  color: inherit;
+}
+
+.court-badge-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #005a43;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 90, 67, 0.2);
+}
+
+.court-name {
+  font-size: 16.5px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-left: 12px;
+  flex: 1;
+}
+
+.court-chevron {
+  color: #64748b;
+  transition: transform 0.15s ease;
+}
+
+.schedule-court-top:hover .court-chevron {
+  transform: translateX(2px);
+  color: #007a5e;
+}
+
+/* Timeline Track */
+.timeline-track-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px 0 0;
+}
+
+.timeline-track {
+  height: 18px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+  padding: 0;
+  border: 0;
+}
+
+.timeline-slot {
+  flex: 1;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.35);
+  outline: none;
+  cursor: default;
+  transition: filter 0.15s ease;
+}
+
+.timeline-slot:last-child {
+  border-right: 0;
+}
+
+.timeline-slot.free {
+  background: #008767;
+  cursor: pointer;
+}
+
+.timeline-slot.free:hover {
+  filter: brightness(1.15);
+}
+
+.timeline-slot.booked {
+  background: #facc15;
+}
+
+.timeline-slot.held {
+  background: #94a3b8;
+}
+
+.timeline-slot.past {
+  background: #cbd5e1;
+}
+
+/* Timeline Axis Ticks */
+.timeline-ticks {
+  position: relative;
+  height: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.timeline-tick {
+  position: absolute;
+  transform: translateX(-50%);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* 4. Legend Section */
+.schedule-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 8px 12px;
+  margin-top: 2px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.legend-dot.dot-free {
+  background: #008767;
+}
+
+.legend-dot.dot-booked {
+  background: #facc15;
+}
+
+.legend-dot.dot-held {
+  background: #94a3b8;
+}
+
+/* 5. Bottom Decorative Swoosh & 3D Shuttlecock */
+.schedule-bottom-decoration {
+  position: relative;
+  height: 70px;
+  margin-top: 4px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.schedule-swoosh {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.schedule-shuttle-art {
+  position: absolute;
+  right: 14px;
+  bottom: 2px;
+  color: #ffffff;
+  opacity: 0.95;
+  filter: drop-shadow(0 4px 10px rgba(0, 80, 50, 0.22));
+  transform: rotate(-12deg);
+}
+
+/* Dark Mode Overrides for Schedule */
+@media (prefers-color-scheme: dark) {
+  .schedule-back-btn {
+    background: #173d32;
+    border-color: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+  }
+  .schedule-title {
+    color: #f8fafc;
+  }
+  .schedule-court-card {
+    background: #14372e;
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  }
+  .court-badge-icon {
+    background: #004d39;
+  }
+  .court-name {
+    color: #f8fafc;
+  }
+  .court-chevron {
+    color: #94a3b8;
+  }
+  .timeline-track {
+    background: #1e453a;
+  }
+  .timeline-slot.past {
+    background: #2b564a;
+  }
+  .timeline-ticks {
+    color: #94a3b8;
+  }
+  .legend-item {
+    color: #cbd5e1;
+  }
+}

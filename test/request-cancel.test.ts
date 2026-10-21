@@ -36,7 +36,30 @@ describe("requestCancel", () => {
 
   test("keeps QR-only requests working", async () => {
     expect((await requestCancel(id, "user/booking-qr-1.png", "")).ok).toBe(true);
-    expect(mocks.rpc).toHaveBeenCalledWith("request_cancel", expect.objectContaining({ p_refund_account: null, p_qr_path: "user/booking-qr-1.png" }));
+    expect(mocks.rpc).toHaveBeenCalledWith("request_cancel", {
+      p_booking_id: id, p_qr_path: "user/booking-qr-1.png", p_reason: null,
+    });
+  });
+
+  test("uses the old QR signature when account contains only whitespace", async () => {
+    await requestCancel(id, "user/booking-qr-1.png", "", " \n ");
+    expect(mocks.rpc).toHaveBeenCalledWith("request_cancel", {
+      p_booking_id: id, p_qr_path: "user/booking-qr-1.png", p_reason: null,
+    });
+  });
+
+  test("explains missing database support without dropping account details or cancelling", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.rpc.mockResolvedValue({ error: { code: "PGRST202", message: "Function not found" } });
+    try {
+      const result = await requestCancel(id, "user/booking-qr-1.png", "", "0000000000");
+      expect(result).toEqual({ ok: false, error: expect.stringContaining("ระบบรับบัญชีคืนเงินยังไม่พร้อมใช้งาน") });
+      expect(mocks.rpc).toHaveBeenCalledTimes(1);
+      expect(mocks.notify).not.toHaveBeenCalled();
+      expect(mocks.revalidate).not.toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+    }
   });
 
   test("sends both details when both are supplied", async () => {

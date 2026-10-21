@@ -19,7 +19,7 @@ type Row = {
   new_ends_at: string | null;
   reason: string | null;
   refund_qr_path: string | null;
-  refund_account: string | null;
+  refund_account?: string | null;
   created_at: string;
   bookings: { court_id: number; starts_at: string; ends_at: string; amount: number; courts: { name: string } | null } | null;
 };
@@ -29,7 +29,8 @@ export default async function RequestsPage() {
   const requests = await supabase
     .from("booking_requests")
     .select(
-      "id, booking_id, user_id, kind, status, refund_amount, new_court_id, new_starts_at, new_ends_at, reason, refund_qr_path, refund_account, created_at, bookings(court_id, starts_at, ends_at, amount, courts(name))",
+      // Includes refund_account when present without failing before migration 0016.
+      "*, bookings(court_id, starts_at, ends_at, amount, courts(name))",
     )
     .in("status", ["pending", "refund_pending"])
     .order("created_at", { ascending: true })

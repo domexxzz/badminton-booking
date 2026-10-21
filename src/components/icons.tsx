@@ -91,6 +91,50 @@ export const ShuttleIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const ChevronRight = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="m9 18 6-6-6-6" />
+  </Svg>
+);
+
+export const CalendarGridIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="4" width="18" height="17" rx="3" />
+    <path d="M3 9h18M8 2v4M16 2v4" />
+    <path d="M7.5 13h2M14.5 13h2M7.5 17h2M14.5 17h2" />
+  </Svg>
+);
+
+export const CalendarGraphIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="4" width="18" height="17" rx="3" />
+    <path d="M3 9h18M8 2v4M16 2v4" />
+    <path d="m7 16 3-3 2.5 2 4.5-4.5" />
+  </Svg>
+);
+
+export const ClipboardListIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+    <rect x="8" y="2" width="8" height="4" rx="1.5" />
+    <path d="M8 11h8M8 15h8M8 19h5" />
+  </Svg>
+);
+
+export const UserCircleIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="7.5" r="3.5" />
+    <path d="M5.5 19.5c1-3 3.5-4.5 6.5-4.5s5.5 1.5 6.5 4.5" />
+  </Svg>
+);
+
+export const CourtOutlineIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M3 12h18M7.5 3v18M16.5 3v18M7.5 7.5h9M7.5 16.5h9" />
+  </Svg>
+);
+
 export const MoonIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />

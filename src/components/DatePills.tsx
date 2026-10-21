@@ -13,12 +13,19 @@ export function DatePills({
 }) {
   return (
     <div className="date-scroll" role="group" aria-label="เลือกวัน">
-      {dates.map((d, i) => {
-        const { weekday, date } = formatDayParts(d);
+      {dates.map((d) => {
+        const { weekday, date, month } = formatDayParts(d);
         return (
-          <button key={d} type="button" className="date-pill" aria-pressed={d === value} onClick={() => onChange(d)}>
-            <span>{i === 0 ? "วันนี้" : weekday}</span>
-            <strong>{date}</strong>
+          <button
+            key={d}
+            type="button"
+            className="date-pill"
+            aria-pressed={d === value}
+            onClick={() => onChange(d)}
+          >
+            <span className="pill-weekday">{weekday}</span>
+            <strong className="pill-date">{date}</strong>
+            <span className="pill-month">{month}</span>
           </button>
         );
       })}

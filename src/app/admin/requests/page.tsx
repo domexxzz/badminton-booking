@@ -19,6 +19,7 @@ type Row = {
   new_ends_at: string | null;
   reason: string | null;
   refund_qr_path: string | null;
+  refund_account?: string | null;
   created_at: string;
   bookings: { court_id: number; starts_at: string; ends_at: string; amount: number; courts: { name: string } | null } | null;
 };
@@ -28,7 +29,8 @@ export default async function RequestsPage() {
   const requests = await supabase
     .from("booking_requests")
     .select(
-      "id, booking_id, user_id, kind, status, refund_amount, new_court_id, new_starts_at, new_ends_at, reason, refund_qr_path, created_at, bookings(court_id, starts_at, ends_at, amount, courts(name))",
+      // Includes refund_account when present without failing before migration 0016.
+      "*, bookings(court_id, starts_at, ends_at, amount, courts(name))",
     )
     .in("status", ["pending", "refund_pending"])
     .order("created_at", { ascending: true })
@@ -96,7 +98,7 @@ export default async function RequestsPage() {
               {r.kind === "cancel" && (
                 <div className="stack" style={{ gap: 4 }}>
                   <span>
-                    QR รับเงินของลูกค้า · โอนคืน{" "}
+                    ข้อมูลรับเงินของลูกค้า · โอนคืน{" "}
                     <strong>{formatBaht(Number(r.refund_amount ?? b?.amount ?? 0))}</strong>
                     {r.status === "refund_pending" && <span className="muted"> (สนามถูกปล่อยแล้ว)</span>}
                   </span>
@@ -105,10 +107,16 @@ export default async function RequestsPage() {
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img className="qr" src={qr} alt="QR รับเงินของลูกค้า" />
                     </a>
-                  ) : (
+                  ) : r.refund_qr_path ? (
                     <p className="error">โหลดรูป QR ไม่ได้</p>
+                  ) : null}
+                  {r.refund_qr_path && <span className="muted">แตะรูปเพื่อเปิดเต็มจอ / บันทึก แล้วสแกนจากแอปธนาคารเพื่อโอนคืน</span>}
+                  {r.refund_account && (
+                    <div className="card" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+                      <strong>บัญชีรับเงินคืน</strong>
+                      <div>{r.refund_account}</div>
+                    </div>
                   )}
-                  <span className="muted">แตะรูปเพื่อเปิดเต็มจอ / บันทึก แล้วสแกนจากแอปธนาคารเพื่อโอนคืน</span>
                 </div>
               )}
               <RequestActions

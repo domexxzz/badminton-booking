@@ -57,7 +57,7 @@ export function RequestActions({
           file={slip}
           onChange={(next, problem) => { setSlip(next); setError(problem); }}
           label="แนบสลิปโอนเงินคืน"
-          hint="โอนเข้า QR ด้านบนแล้วแนบสลิปที่นี่"
+          hint="โอนเข้า QR หรือบัญชีที่ลูกค้าแจ้งด้านบน แล้วแนบสลิปที่นี่"
         />
       )}
       <input

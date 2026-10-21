@@ -1301,3 +1301,965 @@ details summary { cursor: pointer; }
 /* ---------- Contact the shop ---------- */
 .contact-actions { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .contact-actions .btn { width: 100%; text-align: center; }
+/* ---------- ChivaGo × Sinthani customer & admin identity ---------- */
+:is(.customer-app, .admin-app) {
+  color: var(--text);
+  --bg: #f1f8f3;
+  --surface: #ffffff;
+  --surface-2: #f2f7f5;
+  --text: #132a2a;
+  --muted: #627b78;
+  --border: #dfece5;
+  --primary: #008867;
+  --primary-strong: #006b55;
+  --primary-soft: #e2f4eb;
+  --held: #fff2c0;
+  --held-ink: #765600;
+  --shadow: 0 5px 22px rgba(18, 78, 58, .055);
+  background: radial-gradient(ellipse at 100% 12%, #e5f5d0 0, transparent 37%),
+    linear-gradient(165deg, #fff 12%, var(--bg) 62%, #e6f3eb);
+}
+.customer-app .app-header,
+.admin-app .admin-header {
+  gap: 10px;
+  padding: calc(12px + env(safe-area-inset-top)) 14px 12px;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+.admin-app .admin-tab {
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+.admin-app .admin-tab:hover:not(.active) {
+  border-color: var(--primary);
+  color: var(--primary-strong);
+}
+.admin-app .admin-tab.active {
+  color: #fff;
+  background: linear-gradient(140deg, #009271, #006953);
+  border-color: transparent;
+  box-shadow: 0 4px 10px #00695322;
+}
+.brand-lockup { display: flex; align-items: center; gap: 11px; flex-shrink: 0; text-decoration: none; }
+.brand-sinthani { width: 48px; height: 48px; object-fit: cover; border-radius: 50%; flex-shrink: 0; }
+.brand-lockup-text { display: flex; flex-direction: column; gap: 2px; line-height: 1.15; }
+.brand-title { font-size: 19px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+.brand-subtitle { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: 2.1px; text-transform: uppercase; }
+.admin-app .brand-subtitle { letter-spacing: 0.4px; text-transform: none; font-size: 11.5px; }
+.customer-app .greeting { margin-left: auto; min-width: 0; text-align: right; }
+.customer-app .greeting .muted { font-size: 10px; }
+.customer-app .greeting strong { font-size: 13px; max-width: 105px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.customer-app .avatar { width: 34px; height: 34px; flex-shrink: 0; background: var(--primary-strong); font-size: 14px; }
+.customer-app .app-header > .btn { min-height: 44px; padding: 0 22px; font-size: 15px; font-weight: 600; border-radius: 15px; }
+:is(.customer-app, .admin-app) .app-main { padding: 14px 16px 24px; gap: 22px; }
+:is(.customer-app, .admin-app) h1 { font-size: 22px; font-weight: 600; letter-spacing: -.6px; }
+:is(.customer-app, .admin-app) h2 { font-weight: 600; }
+:is(.customer-app, .admin-app) .card { border: 1px solid color-mix(in srgb, var(--border) 65%, transparent); }
+:is(.customer-app, .admin-app) .btn:where(:not(.btn-ghost, .btn-danger, .btn-line)) {
+  background: linear-gradient(120deg, #00765e, #009875);
+  box-shadow: 0 4px 10px rgba(0, 117, 86, .13);
+}
+:is(.customer-app, .admin-app) .btn { border-radius: 13px; }
+:is(.customer-app, .admin-app) .btn-ghost { box-shadow: none; }
+:is(.customer-app, .admin-app) .btn-danger { background: var(--danger); }
+:is(.customer-app, .admin-app) :is(a, button, input, textarea, select):focus-visible { outline: 3px solid #78bfa1; outline-offset: 3px; }
+:is(.customer-app, .admin-app) .btn:hover:not(:disabled) { filter: brightness(1.05); }
+.customer-app .bottom-nav { background: color-mix(in srgb, var(--surface) 96%, transparent); backdrop-filter: blur(16px); padding-top: 8px; box-shadow: 0 -5px 22px rgba(18, 78, 58, .04); border-color: var(--border); }
+.customer-app .tab { font-size: 10px; gap: 4px; border-radius: 13px; color: #476a68; }
+.customer-app .tab.active { color: #fff; background: linear-gradient(140deg, #009271, #006953); box-shadow: 0 4px 10px #00695318; }
+.venue-hero { position: relative; min-height: 355px; overflow: hidden; border-radius: 24px; isolation: isolate; background: #004c40; box-shadow: 0 12px 26px #005c4220; }
+.venue-hero::before { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(0, 43, 37, .88), rgba(0, 53, 44, .2) 80%); }
+.venue-hero-copy { position: relative; padding: 22px 20px 92px; color: #fff; display: grid; justify-items: start; gap: 12px; }
+.hero-status { display: inline-flex; align-items: center; gap: 6px; color: #edfff3; background: #ffffff18; border: 1px solid #ffffff30; border-radius: 99px; padding: 5px 10px; font-size: 10px; }
+.brand-eyebrow { font-size: 9px; font-weight: 600; letter-spacing: 1.7px; }
+.venue-hero .brand-eyebrow { color: #bce1c5; margin-top: 9px; }
+.customer-app .venue-hero h1 { color: #fff; font-size: clamp(30px, 9vw, 41px); line-height: 1.28; font-weight: 600; letter-spacing: -1.4px; text-shadow: 0 2px 12px #00362940; }
+.venue-hero h1 span { color: #d7f8ad; }
+.venue-hero p { margin: 0; font-size: 13px; line-height: 1.6; color: #e0f2ea; }
+.customer-app .venue-hero .hero-cta { min-height: 42px; font-size: 13px; padding: 0 15px; background: #fff; color: #006953; box-shadow: 0 4px 14px #002f4230; }
+.hero-cta span { margin-left: 12px; }
+.hero-facts { position: absolute; bottom: 10px; left: 10px; right: 10px; display: grid; grid-template-columns: 1fr 1fr; border-radius: 15px; background: #fafff8f5; color: #006953; padding: 13px 10px; box-shadow: 0 3px 10px #003d3515; }
+.hero-facts > div { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.hero-facts > div + div { border-left: 1px solid #d6e7dc; }
+.hero-facts span { display: grid; font-size: 11px; font-weight: 600; }
+.hero-facts strong { font-size: 10px; color: #4e7067; font-weight: 400; }
+.customer-app .quick-actions { gap: 8px; padding: 8px; background: var(--surface); border-radius: 21px; box-shadow: var(--shadow); margin-top: -8px; }
+.customer-app .quick { padding: 12px 4px; gap: 8px; font-size: 11px; box-shadow: none; background: var(--surface-2); border-radius: 15px; }
+.customer-app .quick .icon { width: 34px; height: 34px; background: transparent; }
+.customer-app .quick:first-child { color: white; background: linear-gradient(135deg, #009a75, #006b53); }
+.customer-app .quick:first-child .icon { color: white; }
+.brand-promo { position: relative; display: flex; align-items: center; min-height: 156px; overflow: hidden; border-radius: 20px; padding: 20px; background: linear-gradient(115deg, #005a4c 10%, #00856a 60%, #99d975); color: #fff; isolation: isolate; }
+.brand-promo::before, .brand-promo::after { content: ''; position: absolute; z-index: -1; width: 250px; height: 75px; border-radius: 50%; transform: rotate(-36deg); background: #d6f58458; right: -80px; bottom: 8px; }
+.brand-promo::after { bottom: 65px; right: -100px; background: #b3ed9a45; }
+.brand-promo > div { display: grid; gap: 8px; }
+.brand-promo strong { font-size: 25px; line-height: 1.06; letter-spacing: -.6px; font-weight: 700; }
+.brand-promo > div > span:last-child { font-size: 11px; color: #e6f9e6; }
+.promo-shuttle { position: absolute; right: 14px; bottom: 28px; color: #f1ffe6; transform: rotate(-24deg); opacity: .55; }
+.promo-arrow { position: absolute; right: 12px; bottom: 12px; width: 28px; height: 28px; display: grid; place-items: center; color: #006953; background: #fff; border-radius: 50%; font-size: 20px; }
+.customer-app .court-cards { grid-auto-flow: initial; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; overflow: visible; margin: 0; padding: 0; }
+.customer-app .court-card { padding: 8px; gap: 8px; border: 1px solid var(--border); border-radius: 18px; }
+.court-art { width: 100%; height: auto; aspect-ratio: 1.55; object-fit: cover; object-position: center; display: block; border-radius: 11px; }
+.customer-app .court-card .price { color: var(--primary-strong); font-size: 12px; }
+.customer-app .court-card > strong { padding: 0 2px; }
+.customer-app .court-card .btn { min-height: 36px; padding: 0 5px; font-size: 11px; }
+:is(.customer-app, .admin-app) .date-scroll { gap: 8px; padding: 3px 1px 9px; }
+:is(.customer-app, .admin-app) .date-pill { min-width: 62px; min-height: 79px; justify-content: center; border: 0; background: var(--surface); box-shadow: var(--shadow); border-radius: 14px; font-size: 11px; }
+:is(.customer-app, .admin-app) .date-pill strong { font-size: 23px; }
+:is(.customer-app, .admin-app) .date-pill[aria-pressed="true"] { color: #e5f7ed; background: linear-gradient(145deg, #009775, #006651); box-shadow: 0 6px 12px #00715620; }
+:is(.customer-app, .admin-app) .date-pill[aria-pressed="true"] strong { color: #fff; }
+:is(.customer-app, .admin-app) .court-chip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+:is(.customer-app, .admin-app) .court-select-pill { position: relative; align-items: stretch; min-height: 150px; padding: 7px; border-radius: 16px; background: var(--surface); text-align: left; border: 1px solid var(--border); gap: 6px; box-shadow: var(--shadow); }
+:is(.customer-app, .admin-app) .court-select-pill .court-art { aspect-ratio: 1.5; }
+:is(.customer-app, .admin-app) .court-select-pill .court-pill-title { padding: 0 4px; font-size: 14px; color: var(--text); }
+:is(.customer-app, .admin-app) .court-select-pill .court-pill-sub { padding: 0 4px 4px; color: var(--primary-strong); opacity: 1; font-size: 11px; }
+:is(.customer-app, .admin-app) .court-select-pill.selected { background: var(--surface); border: 2px solid var(--primary); padding: 6px; }
+.court-selected-mark { position: absolute; top: 13px; right: 13px; background: #fff; color: #008463; border-radius: 50%; width: 24px; height: 24px; display: grid; place-items: center; font-size: 16px; box-shadow: 0 2px 8px #00473730; }
+:is(.customer-app, .admin-app) .chip-grid { gap: 7px; }
+:is(.customer-app, .admin-app) .chip:not(.court-select-pill) { border: 1px solid var(--border); background: var(--surface); min-height: 46px; border-radius: 12px; font-size: 13px; }
+:is(.customer-app, .admin-app) .chip:is(.selected, .in-range):not(.court-select-pill) { background: linear-gradient(145deg, #009d78, #007059); color: #fff; border-color: #008565; box-shadow: 0 3px 6px #00735916; }
+:is(.customer-app, .admin-app) .chip.booked:not(.court-select-pill) { color: #6b7b7b; background: #e0e5e5; border-color: #d7dfdd; opacity: 1; }
+:is(.customer-app, .admin-app) .chip.booked .chip-time-end { color: #6b7b7b; }
+:is(.customer-app, .admin-app) .chip.held:not(.court-select-pill) { background: var(--held); border-color: #efdc8c; color: var(--held-ink); }
+:is(.customer-app, .admin-app) .chip.past:not(.court-select-pill) { background: var(--surface-2); }
+:is(.customer-app, .admin-app) .chip.unavailable:not(.court-select-pill) { color: var(--muted); background: var(--surface-2); }
+:is(.customer-app, .admin-app) .badge.confirmed { color: #00654c; background: #baf1d0; }
+:is(.customer-app, .admin-app) :is(.badge.pending_payment, .badge.awaiting_review) { color: #745600; background: #ffe38a; }
+:is(.customer-app, .admin-app) :is(.badge.cancelled, .badge.expired) { color: #99554d; background: #fae0dc; }
+:is(.customer-app, .admin-app) .queue-table th { background: #007b60; }
+.customer-app .my-booking-card { display: grid; grid-template-columns: 68px minmax(0, 1fr) auto; gap: 10px; padding: 12px; align-items: center; }
+.booking-court-thumbnail .court-art { aspect-ratio: 1; height: 68px; border-radius: 12px; }
+.customer-app .my-booking-card .meta strong { font-size: 13px; }
+.customer-app .my-booking-card .muted { font-size: 11px; }
+.customer-app .my-booking-card .badge { font-size: 10px; padding: 3px 7px; white-space: nowrap; }
+.customer-app .banner-closed { background: linear-gradient(140deg, #073f36, #082c2a); box-shadow: var(--shadow); }
+.customer-app .countdown-box { background: #052e29; }
+.customer-app .countdown-box strong, .customer-app .countdown-next-note { color: #a9e8b0; }
+@media (max-width: 359px) {
+  .brand-sinthani { width: 42px; height: 42px; }
+  .brand-lockup { gap: 8px; }
+  .brand-title { font-size: 17px; }
+  .brand-subtitle { font-size: 9px; letter-spacing: 1.6px; }
+  .customer-app .greeting strong { max-width: 70px; }
+  .customer-app .my-booking-card { grid-template-columns: 50px minmax(0, 1fr); }
+  .customer-app .my-booking-card > div:last-child { grid-column: 2; text-align: left !important; }
+}
+@media (prefers-color-scheme: dark) {
+  :is(.customer-app, .admin-app) { color-scheme: dark; --bg: #102b25; --surface: #19372f; --surface-2: #21453a; --text: #eef9ef; --muted: #b3cbc0; --border: #34564b; --primary: #1fbb89; --primary-strong: #9ce8c0; --primary-soft: #224f3e; --held: #58491e; --held-ink: #ffe79b; --shadow: 0 5px 22px #00170e25; background: radial-gradient(ellipse at 100% 12%, #214d35, transparent 40%), #102b25; }
+  .customer-app .tab { color: #b9d9ca; }
+  :is(.customer-app, .admin-app) .chip.booked:not(.court-select-pill) { background: #3a5049; border-color: #496257; color: #bccdc5; }
+  :is(.customer-app, .admin-app) .chip.booked .chip-time-end { color: #bccdc5; }
+  :is(.customer-app, .admin-app) .court-selected-mark { color: #006b55; }
+  :is(.customer-app, .admin-app) .legend-booked { background: #3a5049; border-color: #496257; }
+  :is(.customer-app, .admin-app) .badge.confirmed { background: #285c42; color: #baf1d0; }
+  :is(.customer-app, .admin-app) :is(.badge.pending_payment, .badge.awaiting_review) { background: #58491e; color: #ffe79b; }
+  .customer-app .hero-facts { background: #fafff8f5; }
+  .customer-app .avatar { background: #007e5f; color: #fff; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .customer-app *, .customer-app *::before, .customer-app *::after { scroll-behavior: auto; }
+}
+
+.venue-hero-art { object-fit: cover; object-position: center; z-index: -2; }
+.customer-app .schedule-court-heading { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
+.customer-app .schedule-court-heading > .court-art { width: 74px; height: 56px; flex-shrink: 0; }
+.customer-app .schedule-court-heading h2 { display: grid; gap: 4px; margin: 0; }
+.customer-app .schedule-court-heading h2 span { font-size: 11px; }
+
+/* ==========================================================================
+   Redesigned Customer Homepage (Matching Mockup Screenshot)
+   ========================================================================== */
+
+.customer-app:has(.home-view) .app-main {
+  padding-top: 12px;
+  padding-left: 14px;
+  padding-right: 14px;
+  gap: 16px;
+}
+
+.home-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ---------- 1. Top Hero Card ---------- */
+.home-hero-card {
+  position: relative;
+  border-radius: 26px;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(0, 60, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+}
+
+.home-hero-banner {
+  position: relative;
+  width: 100%;
+  border-radius: 26px;
+  overflow: hidden;
+  background: #012b23;
+}
+
+.home-hero-banner-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 26px;
+}
+
+.home-hero-cta {
+  position: absolute;
+  left: 9.8%;
+  bottom: 9.5%;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-width: 185px;
+  min-height: 46px;
+  padding: 0 20px;
+  border-radius: 15px;
+  background: #d4f29a;
+  color: #08372a;
+  font-size: 15.5px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 6px 18px rgba(0, 25, 18, 0.28);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.home-hero-cta:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+
+/* Bottom Info Bar */
+.home-hero-info-pill {
+  background: #ffffff;
+  padding: 16px 20px 18px;
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  align-items: center;
+  gap: 16px;
+}
+
+.info-pill-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.info-pill-icon {
+  color: #006b55;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.info-pill-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.25;
+}
+
+.info-pill-label {
+  font-size: 13.5px;
+  color: #006b55;
+  font-weight: 600;
+}
+
+.info-pill-val {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #526b67;
+}
+
+.info-pill-divider {
+  width: 1px;
+  height: 38px;
+  background: #dfece5;
+}
+
+/* ---------- 2. Quick Action Buttons (4 Columns) ---------- */
+.home-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 9px;
+}
+
+.home-quick-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 4px 12px;
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 4px 14px rgba(0, 50, 35, 0.05);
+  border: 1px solid rgba(0, 100, 70, 0.06);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  text-align: center;
+  text-decoration: none;
+}
+
+.home-quick-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 50, 35, 0.1);
+}
+
+.home-quick-card.active {
+  background: linear-gradient(145deg, #008f6d, #007659);
+  border-color: transparent;
+  box-shadow: 0 6px 18px rgba(0, 118, 89, 0.28);
+}
+
+.home-quick-icon-wrap {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: #007659;
+}
+
+.home-quick-card.active .home-quick-icon-wrap {
+  color: #ffffff;
+}
+
+.home-quick-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.2;
+}
+
+.home-quick-card.active .home-quick-label {
+  color: #ffffff;
+}
+
+/* ---------- 3. PLAY CONNECT EARN Promo Banner ---------- */
+.promo-banner {
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  display: block;
+  box-shadow: 0 8px 24px rgba(0, 80, 55, 0.16);
+  text-decoration: none;
+}
+
+.promo-banner-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 20px;
+}
+
+.promo-btn-circle {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #007659;
+  display: grid;
+  place-items: center;
+  z-index: 4;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+
+.promo-banner:hover .promo-btn-circle {
+  transform: scale(1.08);
+}
+
+/* ---------- 4. Bottom Nav Active Tab Pill ---------- */
+.customer-app .bottom-nav {
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(16px);
+  padding: 6px 12px env(safe-area-inset-bottom);
+  border-top: 1px solid rgba(0, 100, 70, 0.08);
+  box-shadow: 0 -4px 20px rgba(0, 50, 35, 0.06);
+}
+
+.customer-app .tab {
+  font-size: 11px;
+  gap: 2px;
+  padding: 6px 4px;
+  border-radius: 14px;
+  color: #476a68;
+}
+
+.customer-app .tab.active {
+  background: linear-gradient(145deg, #008f6d, #007659);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 118, 89, 0.25);
+  font-weight: 600;
+}
+
+.customer-app .tab.active svg {
+  color: #ffffff;
+}
+
+/* ---------- Dark Mode Overrides ---------- */
+@media (prefers-color-scheme: dark) {
+  .customer-app:has(.home-view) {
+    background: radial-gradient(circle at 100% 0%, #153c31 0%, #0d2822 45%, #091d18 100%);
+  }
+  .home-hero-card {
+    background: #12332a;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  }
+  .home-hero-header {
+    background: #12332a;
+  }
+  .home-logo-x {
+    color: #6ee7b7;
+  }
+  .home-hero-info-pill {
+    background: #173d32;
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  }
+  .info-pill-icon {
+    color: #34d399;
+  }
+  .info-pill-label, .info-pill-sub {
+    color: #94a3b8;
+  }
+  .info-pill-val {
+    color: #f8fafc;
+  }
+  .info-pill-divider {
+    background: rgba(255, 255, 255, 0.12);
+  }
+  .home-quick-card {
+    background: #163a30;
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  }
+  .home-quick-card .home-quick-icon-wrap {
+    color: #34d399;
+  }
+  .home-quick-label {
+    color: #f1f5f9;
+  }
+  .customer-app .bottom-nav {
+    background: rgba(16, 43, 37, 0.95);
+    border-top-color: rgba(255, 255, 255, 0.08);
+  }
+  .customer-app .tab {
+    color: #94a3b8;
+  }
+}
+
+/* ==========================================================================
+   Redesigned Schedule Page (Matching Design Screenshot)
+   ========================================================================== */
+
+/* Hide default header on schedule page */
+.customer-app:has(.schedule-view) .app-header {
+  display: none;
+}
+
+.customer-app:has(.schedule-view) .app-main {
+  padding-top: calc(10px + env(safe-area-inset-top));
+  padding-left: 16px;
+  padding-right: 16px;
+  gap: 12px;
+}
+
+.schedule-view {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  min-height: 100%;
+}
+
+/* 1. Top Header */
+.schedule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0 6px;
+}
+
+.schedule-back-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid rgba(0, 100, 70, 0.08);
+  display: grid;
+  place-items: center;
+  color: #1e293b;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.schedule-back-btn:hover {
+  transform: scale(1.05);
+}
+
+.schedule-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.schedule-profile-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #007a5e;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  text-decoration: none;
+  box-shadow: 0 3px 10px rgba(0, 122, 94, 0.28);
+  transition: transform 0.15s ease;
+}
+
+.schedule-profile-btn:hover {
+  transform: scale(1.05);
+}
+
+/* 2. Date Selection (3-line pill cards) */
+.schedule-date-section .date-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+  scrollbar-width: none;
+}
+
+.schedule-date-section .date-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.customer-app .date-pill {
+  min-width: 58px;
+  min-height: 74px;
+  padding: 8px 4px 7px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 100, 70, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  box-shadow: 0 3px 10px rgba(0, 50, 35, 0.04);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.customer-app .date-pill .pill-weekday {
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.customer-app .date-pill .pill-date {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.15;
+}
+
+.customer-app .date-pill .pill-month {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.customer-app .date-pill[aria-pressed="true"] {
+  background: linear-gradient(145deg, #008767, #006e53);
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(0, 110, 83, 0.3);
+}
+
+.customer-app .date-pill[aria-pressed="true"] .pill-weekday,
+.customer-app .date-pill[aria-pressed="true"] .pill-date,
+.customer-app .date-pill[aria-pressed="true"] .pill-month {
+  color: #ffffff;
+}
+
+/* 3. Court Timeline Cards */
+.schedule-court-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.schedule-court-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 14px 16px 14px;
+  border: 1px solid rgba(0, 100, 70, 0.06);
+  box-shadow: 0 4px 16px rgba(0, 50, 35, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.schedule-court-card.expanded {
+  border-color: rgba(0, 135, 103, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 80, 55, 0.12);
+}
+
+.schedule-court-top {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.court-badge-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #005a43;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 90, 67, 0.2);
+}
+
+.court-title-group {
+  display: flex;
+  flex-direction: column;
+  margin-left: 12px;
+  flex: 1;
+  line-height: 1.25;
+}
+
+.court-name {
+  font-size: 16.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.court-price-sub {
+  font-size: 11.5px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.court-expand-arrow {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #334155;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: transform 0.22s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.schedule-court-top:hover .court-expand-arrow {
+  background: #e2f4eb;
+  color: #007a5e;
+}
+
+.court-expand-arrow.open {
+  transform: rotate(180deg);
+  background: #007a5e;
+  color: #ffffff;
+}
+
+/* Timeline Track */
+.timeline-track-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px 0 0;
+}
+
+.timeline-track {
+  height: 18px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+  padding: 0;
+  border: 0;
+}
+
+.timeline-slot {
+  flex: 1;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.35);
+  outline: none;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.timeline-slot:last-child {
+  border-right: 0;
+}
+
+.timeline-slot.free {
+  background: #008767;
+}
+
+.timeline-slot.free:hover {
+  filter: brightness(1.15);
+}
+
+.timeline-slot.selected-slot {
+  background: #005a43;
+  box-shadow: inset 0 0 0 1.5px #ffffff;
+}
+
+.timeline-slot.held {
+  background: #facc15;
+}
+
+.timeline-slot.booked {
+  background: #94a3b8;
+}
+
+.timeline-slot.past {
+  background: #cbd5e1;
+}
+
+/* Timeline Axis Ticks */
+.timeline-ticks {
+  position: relative;
+  height: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.timeline-tick {
+  position: absolute;
+  transform: translateX(-50%);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* Expanded In-Depth Court Slots & Booking Panel */
+.schedule-court-expanded {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.schedule-court-expanded .chip.time-slot.free {
+  background: #d1fae5;
+  border-color: #10b981;
+  color: #065f46;
+}
+
+.schedule-court-expanded .chip.time-slot.free:hover {
+  background: #008767;
+  border-color: #008767;
+  color: #ffffff;
+}
+
+.schedule-court-expanded .chip.time-slot.held {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.schedule-court-expanded .chip.time-slot.booked,
+.schedule-court-expanded .chip.time-slot.unavailable {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #64748b;
+  text-decoration: none;
+  opacity: 0.9;
+}
+
+.schedule-court-expanded .chip.time-slot.booked .chip-time-end,
+.schedule-court-expanded .chip.time-slot.unavailable .chip-time-end {
+  color: #64748b;
+}
+
+.expanded-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+
+.expanded-booking-panel {
+  padding-top: 2px;
+}
+
+.schedule-booking-summary {
+  background: var(--surface-2);
+  border-radius: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+}
+
+.multi-court-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--primary-soft);
+  border: 1px dashed rgba(0, 135, 103, 0.35);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.multi-court-link {
+  color: var(--primary-strong);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.multi-court-link:hover {
+  text-decoration: underline;
+}
+
+/* 4. Legend Section */
+.schedule-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 8px 12px;
+  margin-top: 2px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.legend-dot.dot-free {
+  background: #008767;
+}
+
+.legend-dot.dot-held {
+  background: #facc15;
+}
+
+.legend-dot.dot-booked {
+  background: #94a3b8;
+}
+
+/* 5. Bottom Decorative Artwork (01.png) */
+.schedule-bottom-decoration {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 2px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.schedule-bottom-img {
+  width: 100%;
+  max-width: 380px;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  mix-blend-mode: multiply;
+}
+
+@media (prefers-color-scheme: dark) {
+  .schedule-bottom-img {
+    mix-blend-mode: normal;
+    border-radius: 16px;
+  }
+}
+
+/* Dark Mode Overrides for Schedule */
+@media (prefers-color-scheme: dark) {
+  .schedule-back-btn {
+    background: #173d32;
+    border-color: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+  }
+  .schedule-title {
+    color: #f8fafc;
+  }
+  .schedule-court-card {
+    background: #14372e;
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  }
+  .schedule-court-card.expanded {
+    border-color: rgba(52, 211, 153, 0.45);
+  }
+  .court-badge-icon {
+    background: #004d39;
+  }
+  .court-name {
+    color: #f8fafc;
+  }
+  .court-price-sub {
+    color: #94a3b8;
+  }
+  .court-expand-arrow {
+    background: #1e453a;
+    color: #cbd5e1;
+  }
+  .court-expand-arrow.open {
+    background: #008767;
+    color: #ffffff;
+  }
+  .timeline-track {
+    background: #1e453a;
+  }
+  .timeline-slot.past {
+    background: #2b564a;
+  }
+  .timeline-ticks {
+    color: #94a3b8;
+  }
+  .legend-item {
+    color: #cbd5e1;
+  }
+}

@@ -1,10 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
+import { BrandPromo } from "@/components/BrandPromo";
 import { CourtArt } from "@/components/CourtArt";
 import { CourtRules } from "@/components/CourtRules";
-import { CalendarIcon, ClockIcon, CourtIcon, MoonIcon, ReceiptIcon, ShuttleIcon } from "@/components/icons";
+import {
+  CalendarGridIcon,
+  CalendarGraphIcon,
+  ClipboardListIcon,
+  UserCircleIcon,
+  CourtOutlineIcon,
+  ClockIcon,
+  MoonIcon,
+} from "@/components/icons";
 import { formatBaht, formatTime } from "@/lib/format";
 import { formatHour, getVenueStatus, isActive, type Occupancy, type VenueStatus } from "@/lib/slots";
 
@@ -48,30 +58,72 @@ export function HomeClientView({
   const targetDateParam = `date=${status.targetDateStr}`;
 
   return (
-    <>
-      {status.isOpen ? (
-        /* Daytime Open Banner */
-        <section className="banner">
-          <div className="banner-badge-wrap">
-            <span className="open-live-badge">
-              <span className="pulse-dot green" />
-              เปิดให้บริการอยู่
-            </span>
-          </div>
-          <h2>จองสนามแบดได้ใน 1 นาที</h2>
-          <p>
-            {courts.length} สนาม · {formatBaht(minPrice)}/ชม. · เปิด {formatHour(openHour)}–{formatHour(closeHour)} น.
-          </p>
+    <div className="home-view">
+      {/* Top Hero Card: Banner 02.jpg + CTA + Info Bar */}
+      <section className="home-hero-card" aria-label="แบดมินตัน@สินธานี">
+        <div className="home-hero-banner">
+          <Image
+            src="/brand/02.jpg"
+            alt="แบดมินตัน @สินธานี"
+            width={1024}
+            height={1024}
+            priority
+            sizes="(max-width: 480px) 100vw, 448px"
+            className="home-hero-banner-img"
+          />
           <Link
-            href="/book"
-            className="btn btn-sm btn-banner-cta"
-            style={{ marginTop: 14, background: "#fff", color: "var(--primary-strong)", fontWeight: 600, boxShadow: "0 4px 12px rgba(0,0,0,0.12)" }}
+            href={status.isOpen ? "/book" : `/book?${targetDateParam}`}
+            className="home-hero-cta"
           >
-            🏸 จองสนามเลย
+            <span>จองสนามเลย</span>
+            <svg
+              width="19"
+              height="19"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.9"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M7 17L17 7" />
+              <path d="M8 7h9v9" />
+            </svg>
           </Link>
-          <ShuttleIcon size={110} className="shuttle" />
-        </section>
-      ) : (
+        </div>
+
+        {/* Bottom Info Bar */}
+        <div className="home-hero-info-pill">
+          <div className="info-pill-item">
+            <div className="info-pill-icon">
+              <ClockIcon size={24} />
+            </div>
+            <div className="info-pill-text">
+              <span className="info-pill-label">เปิดให้บริการ</span>
+              <strong className="info-pill-val">
+                {formatHour(openHour)}–{formatHour(closeHour)} น.
+              </strong>
+            </div>
+          </div>
+
+          <div className="info-pill-divider" />
+
+          <div className="info-pill-item">
+            <div className="info-pill-icon">
+              <CourtOutlineIcon size={24} />
+            </div>
+            <div className="info-pill-text">
+              <span className="info-pill-label">{courts.length} สนาม</span>
+              <strong className="info-pill-val">
+                {Number.isFinite(minPrice) ? `${formatBaht(minPrice)}/ชม.` : "฿150/ชม."}
+              </strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {!status.isOpen && (
         /* Nighttime / Closed Hybrid Banner */
         <section className="banner-closed">
           <div className="closed-badge-row">
@@ -142,21 +194,47 @@ export function HomeClientView({
         </section>
       )}
 
-      {/* Quick Actions */}
-      <section className="quick-actions" aria-label="เมนูลัด">
-        <Link href={status.isOpen ? "/book" : `/book?${targetDateParam}`} className="quick">
-          <span className="icon"><CourtIcon /></span>
-          {status.isOpen ? "จองสนาม" : "จองวันพรุ่งนี้"}
+      {/* 4 Quick Action Cards */}
+      <section className="home-quick-actions" aria-label="เมนูลัด">
+        <Link
+          href={status.isOpen ? "/book" : `/book?${targetDateParam}`}
+          className="home-quick-card active"
+        >
+          <div className="home-quick-icon-wrap">
+            <CalendarGridIcon size={26} />
+          </div>
+          <span className="home-quick-label">
+            {status.isOpen ? "จองสนาม" : "จองวันพรุ่งนี้"}
+          </span>
         </Link>
-        <Link href={status.isOpen ? "/schedule" : `/schedule?${targetDateParam}`} className="quick">
-          <span className="icon"><CalendarIcon /></span>
-          ตารางคิว
+
+        <Link
+          href={status.isOpen ? "/schedule" : `/schedule?${targetDateParam}`}
+          className="home-quick-card"
+        >
+          <div className="home-quick-icon-wrap">
+            <CalendarGraphIcon size={26} />
+          </div>
+          <span className="home-quick-label">ตารางคิว</span>
         </Link>
-        <Link href="/me" className="quick">
-          <span className="icon"><ReceiptIcon /></span>
-          การจองของฉัน
+
+        <Link href="/me" className="home-quick-card">
+          <div className="home-quick-icon-wrap">
+            <ClipboardListIcon size={26} />
+          </div>
+          <span className="home-quick-label">การจองของฉัน</span>
+        </Link>
+
+        <Link href="/me" className="home-quick-card">
+          <div className="home-quick-icon-wrap">
+            <UserCircleIcon size={26} />
+          </div>
+          <span className="home-quick-label">โปรไฟล์</span>
         </Link>
       </section>
+
+      {/* PLAY CONNECT EARN Banner */}
+      <BrandPromo />
 
       {/* Today's Queue */}
       <section>
@@ -241,6 +319,6 @@ export function HomeClientView({
       </section>
 
       <CourtRules />
-    </>
+    </div>
   );
 }

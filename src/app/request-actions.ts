@@ -44,16 +44,26 @@ export async function requestReschedule(input: {
   return { ok: true, data: null };
 }
 
-export async function requestCancel(bookingId: string, qrPath: string, reason: string): Promise<ActionResult> {
-  if (!UUID_RE.test(bookingId) || typeof qrPath !== "string" || typeof reason !== "string") {
+export async function requestCancel(bookingId: string, qrPath: string | null, reason: string, account: string = ""): Promise<ActionResult> {
+  if (!UUID_RE.test(bookingId) || (qrPath !== null && typeof qrPath !== "string") || typeof reason !== "string" || typeof account !== "string" || account.length > MAX_TEXT) {
     return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
   }
+  if (!qrPath && !account.trim()) {
+    return { ok: false, error: "กรุณาแนบ QR หรือกรอกบัญชีรับเงินคืนอย่างใดอย่างหนึ่ง" };
+  }
   const supabase = await createClient();
+  const refundAccount = account.trim();
   const { error } = await supabase.rpc("request_cancel", {
     p_booking_id: bookingId,
     p_qr_path: qrPath,
     p_reason: reason.slice(0, MAX_TEXT) || null,
+    // QR-only cancellations also work before migration 0016 is applied.
+    ...(refundAccount ? { p_refund_account: refundAccount } : {}),
   });
+  if (error?.code === "PGRST202" && refundAccount) {
+    console.error("Bank-account refunds unavailable: apply migration 0016_refund_bank_account.sql and reload the schema cache.");
+    return { ok: false, error: "ระบบรับบัญชีคืนเงินยังไม่พร้อมใช้งาน กรุณาติดต่อร้าน หรือเว้นช่องบัญชีแล้วแนบ QR รับเงินแทน" };
+  }
   if (error) return { ok: false, error: friendlyError(error) };
   await notifyBookingRequest(bookingId, "cancel");
   refresh(bookingId);

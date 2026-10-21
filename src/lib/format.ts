@@ -17,8 +17,13 @@ export const formatDate = (iso: string) => dateFmt.format(new Date(iso));
 // For Bangkok calendar days given as "YYYY-MM-DD" (noon avoids any day shift).
 const dayDate = (day: string) => new Date(`${day}T12:00:00+07:00`);
 const weekdayFmt = new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", weekday: "short" });
+const monthFmt = new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", month: "short" });
 const dayLongFmt = new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", weekday: "long", day: "numeric", month: "long" });
-export const formatDayParts = (day: string) => ({ weekday: weekdayFmt.format(dayDate(day)), date: Number(day.slice(8, 10)) });
+export const formatDayParts = (day: string) => ({
+  weekday: weekdayFmt.format(dayDate(day)),
+  date: Number(day.slice(8, 10)),
+  month: monthFmt.format(dayDate(day)),
+});
 export const formatDayLong = (day: string) => dayLongFmt.format(dayDate(day));
 export const formatTime = (iso: string) => timeFmt.format(new Date(iso));
 export const formatBaht = (amount: number) =>

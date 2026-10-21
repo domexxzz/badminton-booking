@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { adminCreateBooking, type AdminBookingInput } from "@/app/actions";
+import { AdminSlipUploader } from "./AdminSlipUploader";
 import { BOOKING_RULES } from "@/lib/config";
 import { CHANNEL_LABEL, formatBaht } from "@/lib/format";
 import { formatHour, openingSlots } from "@/lib/slots";
@@ -34,6 +35,7 @@ export function AdminBookingForm({
   const router = useRouter();
   const [form, setForm] = useState(() => emptyForm(dates[0], courts[0]?.id ?? 1));
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const maxHours = Math.max(0.5, closeHour - form.hour);
@@ -43,6 +45,7 @@ export function AdminBookingForm({
   function submit(event: React.FormEvent) {
     event.preventDefault();
     setMessage(null);
+    setCreatedBookingId(null);
     startTransition(async () => {
       const result = await adminCreateBooking({ ...form, hours: Math.min(form.hours, maxHours) });
       if (!result.ok) {
@@ -50,6 +53,7 @@ export function AdminBookingForm({
         return;
       }
       setMessage({ ok: true, text: `บันทึกการจองของ ${form.name.trim()} แล้ว` });
+      setCreatedBookingId(result.data.id);
       setForm(emptyForm(form.date, form.courtId));
       router.refresh();
     });
@@ -166,6 +170,16 @@ export function AdminBookingForm({
         </button>
       </div>
       {message && <p className={message.ok ? "muted" : "error"}>{message.text}</p>}
+
+      {createdBookingId && (
+        <div className="stack" style={{ gap: 10, borderTop: "1px dashed var(--border)", paddingTop: 12 }}>
+          <h3 style={{ margin: 0, fontSize: 15 }}>💳 ลูกค้าจ่ายเงินด้วย? แนบสลิปได้เลย</h3>
+          <span className="muted" style={{ fontSize: 13 }}>
+            แนบสลิปแล้วจะไปรอที่หน้า "ตรวจสลิป" เพื่อตรวจสอบ (ไม่บังคับ ข้ามได้ถ้ายังไม่ได้รับเงิน)
+          </span>
+          <AdminSlipUploader bookingId={createdBookingId} />
+        </div>
+      )}
     </form>
   );
 }

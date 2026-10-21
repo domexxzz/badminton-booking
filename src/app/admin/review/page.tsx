@@ -1,7 +1,7 @@
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { RecheckButton } from "@/components/RecheckButton";
-import { ReviewButtons } from "@/components/ReviewButtons";
-import { formatBaht, formatSlot } from "@/lib/format";
+import { ReviewButtonsWithAmount } from "@/components/ReviewButtonsWithAmount";
+import { CHANNEL_LABEL, formatBaht, formatSlot } from "@/lib/format";
 import { isBankMatchingEnabled } from "@/lib/bank/settings";
 import { getSessionUser } from "@/lib/supabase/server";
 import { BankInbox } from "../BankInbox";
@@ -16,6 +16,7 @@ type Payment = {
   created_at: string;
   verify_status: string;
   verify_reasons: string[];
+  slip_amount: number | null;
 };
 
 type Row = {
@@ -24,6 +25,10 @@ type Row = {
   starts_at: string;
   ends_at: string;
   amount: number;
+  channel: string;
+  customer_name: string | null;
+  customer_phone: string | null;
+  admin_note: string | null;
   courts: { name: string } | null;
   payments: Payment[];
 };
@@ -44,7 +49,7 @@ export default async function ReviewPage() {
   const { supabase } = await getSessionUser();
   const review = await supabase
     .from("bookings")
-    .select("id, user_id, starts_at, ends_at, amount, courts(name), payments(slip_path, status, created_at, verify_status, verify_reasons)")
+    .select("id, user_id, starts_at, ends_at, amount, channel, customer_name, customer_phone, admin_note, courts(name), payments(slip_path, status, created_at, verify_status, verify_reasons, slip_amount)")
     .eq("status", "awaiting_review")
     .order("updated_at", { ascending: true })
     .returns<Row[]>();
@@ -99,14 +104,46 @@ export default async function ReviewPage() {
             <div key={b.id} className={`card review ${statusClass}`.trim()}>
               <div className="list-item">
                 <div className="meta">
-                  <strong>{who.get(b.user_id)?.display_name ?? "ลูกค้า"}</strong>
-                  <span className="muted">
-                    {b.courts?.name} · {formatSlot(b.starts_at, b.ends_at)}
-                  </span>
-                  {who.get(b.user_id)?.phone && (
-                    <a className="muted" href={`tel:${who.get(b.user_id)?.phone}`}>
-                      📞 {who.get(b.user_id)?.phone}
-                    </a>
+                  {b.customer_name ? (
+                    <>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <strong style={{ fontSize: 16 }}>👤 {b.customer_name}</strong>
+                        <span className="badge" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#059669", fontWeight: 700, fontSize: 12 }}>
+                          🛡️ แอดมินจองให้ ({CHANNEL_LABEL[b.channel] ?? b.channel})
+                        </span>
+                      </div>
+                      <span className="muted">
+                        {b.courts?.name} · {formatSlot(b.starts_at, b.ends_at)}
+                      </span>
+                      {b.customer_phone && (
+                        <a className="muted" href={`tel:${b.customer_phone}`} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          📞 {b.customer_phone}
+                        </a>
+                      )}
+                      {b.admin_note && (
+                        <span className="muted" style={{ fontSize: 13 }}>
+                          📝 หมายเหตุ: {b.admin_note}
+                        </span>
+                      )}
+                      <span className="muted" style={{ fontSize: 11, opacity: 0.8 }}>
+                        (ทำรายการโดยแอดมิน: {who.get(b.user_id)?.display_name ?? "แอดมิน"})
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <strong>{who.get(b.user_id)?.display_name ?? "ลูกค้า"}</strong>
+                        <span className="badge" style={{ fontSize: 12 }}>🌐 ออนไลน์</span>
+                      </div>
+                      <span className="muted">
+                        {b.courts?.name} · {formatSlot(b.starts_at, b.ends_at)}
+                      </span>
+                      {who.get(b.user_id)?.phone && (
+                        <a className="muted" href={`tel:${who.get(b.user_id)?.phone}`}>
+                          📞 {who.get(b.user_id)?.phone}
+                        </a>
+                      )}
+                    </>
                   )}
                 </div>
                 <span className="amount" style={{ fontSize: 22 }}>{formatBaht(b.amount)}</span>
@@ -141,7 +178,11 @@ export default async function ReviewPage() {
                 </div>
               )}
               <RecheckButton bookingId={b.id} />
-              <ReviewButtons bookingId={b.id} />
+              <ReviewButtonsWithAmount
+                bookingId={b.id}
+                expectedAmount={b.amount}
+                slipAmount={payment?.slip_amount ?? null}
+              />
             </div>
           );
         })}

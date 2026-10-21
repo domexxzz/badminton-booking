@@ -1301,8 +1301,8 @@ details summary { cursor: pointer; }
 /* ---------- Contact the shop ---------- */
 .contact-actions { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .contact-actions .btn { width: 100%; text-align: center; }
-/* ---------- ChivaGo × Sinthani customer identity ---------- */
-.customer-app {
+/* ---------- ChivaGo × Sinthani customer & admin identity ---------- */
+:is(.customer-app, .admin-app) {
   color: var(--text);
   --bg: #f1f8f3;
   --surface: #ffffff;
@@ -1319,35 +1319,52 @@ details summary { cursor: pointer; }
   background: radial-gradient(ellipse at 100% 12%, #e5f5d0 0, transparent 37%),
     linear-gradient(165deg, #fff 12%, var(--bg) 62%, #e6f3eb);
 }
-.customer-app .app-header {
+.customer-app .app-header,
+.admin-app .admin-header {
   gap: 10px;
   padding: calc(12px + env(safe-area-inset-top)) 14px 12px;
   background: color-mix(in srgb, var(--surface) 96%, transparent);
+  backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
+}
+.admin-app .admin-tab {
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+.admin-app .admin-tab:hover:not(.active) {
+  border-color: var(--primary);
+  color: var(--primary-strong);
+}
+.admin-app .admin-tab.active {
+  color: #fff;
+  background: linear-gradient(140deg, #009271, #006953);
+  border-color: transparent;
+  box-shadow: 0 4px 10px #00695322;
 }
 .brand-lockup { display: flex; align-items: center; gap: 11px; flex-shrink: 0; text-decoration: none; }
 .brand-sinthani { width: 48px; height: 48px; object-fit: cover; border-radius: 50%; flex-shrink: 0; }
 .brand-lockup-text { display: flex; flex-direction: column; gap: 2px; line-height: 1.15; }
 .brand-title { font-size: 19px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
 .brand-subtitle { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: 2.1px; text-transform: uppercase; }
+.admin-app .brand-subtitle { letter-spacing: 0.4px; text-transform: none; font-size: 11.5px; }
 .customer-app .greeting { margin-left: auto; min-width: 0; text-align: right; }
 .customer-app .greeting .muted { font-size: 10px; }
 .customer-app .greeting strong { font-size: 13px; max-width: 105px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .customer-app .avatar { width: 34px; height: 34px; flex-shrink: 0; background: var(--primary-strong); font-size: 14px; }
 .customer-app .app-header > .btn { min-height: 44px; padding: 0 22px; font-size: 15px; font-weight: 600; border-radius: 15px; }
-.customer-app .app-main { padding: 14px 16px 24px; gap: 22px; }
-.customer-app h1 { font-size: 22px; font-weight: 600; letter-spacing: -.6px; }
-.customer-app h2 { font-weight: 600; }
-.customer-app .card { border: 1px solid color-mix(in srgb, var(--border) 65%, transparent); }
-.customer-app .btn:where(:not(.btn-ghost, .btn-danger, .btn-line)) {
+:is(.customer-app, .admin-app) .app-main { padding: 14px 16px 24px; gap: 22px; }
+:is(.customer-app, .admin-app) h1 { font-size: 22px; font-weight: 600; letter-spacing: -.6px; }
+:is(.customer-app, .admin-app) h2 { font-weight: 600; }
+:is(.customer-app, .admin-app) .card { border: 1px solid color-mix(in srgb, var(--border) 65%, transparent); }
+:is(.customer-app, .admin-app) .btn:where(:not(.btn-ghost, .btn-danger, .btn-line)) {
   background: linear-gradient(120deg, #00765e, #009875);
   box-shadow: 0 4px 10px rgba(0, 117, 86, .13);
 }
-.customer-app .btn { border-radius: 13px; }
-.customer-app .btn-ghost { box-shadow: none; }
-.customer-app .btn-danger { background: var(--danger); }
-.customer-app :is(a, button, input, textarea, select):focus-visible { outline: 3px solid #78bfa1; outline-offset: 3px; }
-.customer-app .btn:hover:not(:disabled) { filter: brightness(1.05); }
+:is(.customer-app, .admin-app) .btn { border-radius: 13px; }
+:is(.customer-app, .admin-app) .btn-ghost { box-shadow: none; }
+:is(.customer-app, .admin-app) .btn-danger { background: var(--danger); }
+:is(.customer-app, .admin-app) :is(a, button, input, textarea, select):focus-visible { outline: 3px solid #78bfa1; outline-offset: 3px; }
+:is(.customer-app, .admin-app) .btn:hover:not(:disabled) { filter: brightness(1.05); }
 .customer-app .bottom-nav { background: color-mix(in srgb, var(--surface) 96%, transparent); backdrop-filter: blur(16px); padding-top: 8px; box-shadow: 0 -5px 22px rgba(18, 78, 58, .04); border-color: var(--border); }
 .customer-app .tab { font-size: 10px; gap: 4px; border-radius: 13px; color: #476a68; }
 .customer-app .tab.active { color: #fff; background: linear-gradient(140deg, #009271, #006953); box-shadow: 0 4px 10px #00695318; }
@@ -1386,30 +1403,30 @@ details summary { cursor: pointer; }
 .customer-app .court-card .price { color: var(--primary-strong); font-size: 12px; }
 .customer-app .court-card > strong { padding: 0 2px; }
 .customer-app .court-card .btn { min-height: 36px; padding: 0 5px; font-size: 11px; }
-.customer-app .date-scroll { gap: 8px; padding: 3px 1px 9px; }
-.customer-app .date-pill { min-width: 62px; min-height: 79px; justify-content: center; border: 0; background: var(--surface); box-shadow: var(--shadow); border-radius: 14px; font-size: 11px; }
-.customer-app .date-pill strong { font-size: 23px; }
-.customer-app .date-pill[aria-pressed="true"] { color: #e5f7ed; background: linear-gradient(145deg, #009775, #006651); box-shadow: 0 6px 12px #00715620; }
-.customer-app .date-pill[aria-pressed="true"] strong { color: #fff; }
-.customer-app .court-chip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.customer-app .court-select-pill { position: relative; align-items: stretch; min-height: 150px; padding: 7px; border-radius: 16px; background: var(--surface); text-align: left; border: 1px solid var(--border); gap: 6px; box-shadow: var(--shadow); }
-.customer-app .court-select-pill .court-art { aspect-ratio: 1.5; }
-.customer-app .court-select-pill .court-pill-title { padding: 0 4px; font-size: 14px; color: var(--text); }
-.customer-app .court-select-pill .court-pill-sub { padding: 0 4px 4px; color: var(--primary-strong); opacity: 1; font-size: 11px; }
-.customer-app .court-select-pill.selected { background: var(--surface); border: 2px solid var(--primary); padding: 6px; }
+:is(.customer-app, .admin-app) .date-scroll { gap: 8px; padding: 3px 1px 9px; }
+:is(.customer-app, .admin-app) .date-pill { min-width: 62px; min-height: 79px; justify-content: center; border: 0; background: var(--surface); box-shadow: var(--shadow); border-radius: 14px; font-size: 11px; }
+:is(.customer-app, .admin-app) .date-pill strong { font-size: 23px; }
+:is(.customer-app, .admin-app) .date-pill[aria-pressed="true"] { color: #e5f7ed; background: linear-gradient(145deg, #009775, #006651); box-shadow: 0 6px 12px #00715620; }
+:is(.customer-app, .admin-app) .date-pill[aria-pressed="true"] strong { color: #fff; }
+:is(.customer-app, .admin-app) .court-chip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+:is(.customer-app, .admin-app) .court-select-pill { position: relative; align-items: stretch; min-height: 150px; padding: 7px; border-radius: 16px; background: var(--surface); text-align: left; border: 1px solid var(--border); gap: 6px; box-shadow: var(--shadow); }
+:is(.customer-app, .admin-app) .court-select-pill .court-art { aspect-ratio: 1.5; }
+:is(.customer-app, .admin-app) .court-select-pill .court-pill-title { padding: 0 4px; font-size: 14px; color: var(--text); }
+:is(.customer-app, .admin-app) .court-select-pill .court-pill-sub { padding: 0 4px 4px; color: var(--primary-strong); opacity: 1; font-size: 11px; }
+:is(.customer-app, .admin-app) .court-select-pill.selected { background: var(--surface); border: 2px solid var(--primary); padding: 6px; }
 .court-selected-mark { position: absolute; top: 13px; right: 13px; background: #fff; color: #008463; border-radius: 50%; width: 24px; height: 24px; display: grid; place-items: center; font-size: 16px; box-shadow: 0 2px 8px #00473730; }
-.customer-app .chip-grid { gap: 7px; }
-.customer-app .chip:not(.court-select-pill) { border: 1px solid var(--border); background: var(--surface); min-height: 46px; border-radius: 12px; font-size: 13px; }
-.customer-app .chip:is(.selected, .in-range):not(.court-select-pill) { background: linear-gradient(145deg, #009d78, #007059); color: #fff; border-color: #008565; box-shadow: 0 3px 6px #00735916; }
-.customer-app .chip.booked:not(.court-select-pill) { color: #6b7b7b; background: #e0e5e5; border-color: #d7dfdd; opacity: 1; }
-.customer-app .chip.booked .chip-time-end { color: #6b7b7b; }
-.customer-app .chip.held:not(.court-select-pill) { background: var(--held); border-color: #efdc8c; color: var(--held-ink); }
-.customer-app .chip.past:not(.court-select-pill) { background: var(--surface-2); }
-.customer-app .chip.unavailable:not(.court-select-pill) { color: var(--muted); background: var(--surface-2); }
-.customer-app .badge.confirmed { color: #00654c; background: #baf1d0; }
-.customer-app .badge.pending_payment, .customer-app .badge.awaiting_review { color: #745600; background: #ffe38a; }
-.customer-app .badge.cancelled, .customer-app .badge.expired { color: #99554d; background: #fae0dc; }
-.customer-app .queue-table th { background: #007b60; }
+:is(.customer-app, .admin-app) .chip-grid { gap: 7px; }
+:is(.customer-app, .admin-app) .chip:not(.court-select-pill) { border: 1px solid var(--border); background: var(--surface); min-height: 46px; border-radius: 12px; font-size: 13px; }
+:is(.customer-app, .admin-app) .chip:is(.selected, .in-range):not(.court-select-pill) { background: linear-gradient(145deg, #009d78, #007059); color: #fff; border-color: #008565; box-shadow: 0 3px 6px #00735916; }
+:is(.customer-app, .admin-app) .chip.booked:not(.court-select-pill) { color: #6b7b7b; background: #e0e5e5; border-color: #d7dfdd; opacity: 1; }
+:is(.customer-app, .admin-app) .chip.booked .chip-time-end { color: #6b7b7b; }
+:is(.customer-app, .admin-app) .chip.held:not(.court-select-pill) { background: var(--held); border-color: #efdc8c; color: var(--held-ink); }
+:is(.customer-app, .admin-app) .chip.past:not(.court-select-pill) { background: var(--surface-2); }
+:is(.customer-app, .admin-app) .chip.unavailable:not(.court-select-pill) { color: var(--muted); background: var(--surface-2); }
+:is(.customer-app, .admin-app) .badge.confirmed { color: #00654c; background: #baf1d0; }
+:is(.customer-app, .admin-app) :is(.badge.pending_payment, .badge.awaiting_review) { color: #745600; background: #ffe38a; }
+:is(.customer-app, .admin-app) :is(.badge.cancelled, .badge.expired) { color: #99554d; background: #fae0dc; }
+:is(.customer-app, .admin-app) .queue-table th { background: #007b60; }
 .customer-app .my-booking-card { display: grid; grid-template-columns: 68px minmax(0, 1fr) auto; gap: 10px; padding: 12px; align-items: center; }
 .booking-court-thumbnail .court-art { aspect-ratio: 1; height: 68px; border-radius: 12px; }
 .customer-app .my-booking-card .meta strong { font-size: 13px; }
@@ -1428,14 +1445,14 @@ details summary { cursor: pointer; }
   .customer-app .my-booking-card > div:last-child { grid-column: 2; text-align: left !important; }
 }
 @media (prefers-color-scheme: dark) {
-  .customer-app { color-scheme: dark; --bg: #102b25; --surface: #19372f; --surface-2: #21453a; --text: #eef9ef; --muted: #b3cbc0; --border: #34564b; --primary: #1fbb89; --primary-strong: #9ce8c0; --primary-soft: #224f3e; --held: #58491e; --held-ink: #ffe79b; --shadow: 0 5px 22px #00170e25; background: radial-gradient(ellipse at 100% 12%, #214d35, transparent 40%), #102b25; }
+  :is(.customer-app, .admin-app) { color-scheme: dark; --bg: #102b25; --surface: #19372f; --surface-2: #21453a; --text: #eef9ef; --muted: #b3cbc0; --border: #34564b; --primary: #1fbb89; --primary-strong: #9ce8c0; --primary-soft: #224f3e; --held: #58491e; --held-ink: #ffe79b; --shadow: 0 5px 22px #00170e25; background: radial-gradient(ellipse at 100% 12%, #214d35, transparent 40%), #102b25; }
   .customer-app .tab { color: #b9d9ca; }
-  .customer-app .chip.booked:not(.court-select-pill) { background: #3a5049; border-color: #496257; color: #bccdc5; }
-  .customer-app .chip.booked .chip-time-end { color: #bccdc5; }
-  .customer-app .court-selected-mark { color: #006b55; }
-  .customer-app .legend-booked { background: #3a5049; border-color: #496257; }
-  .customer-app .badge.confirmed { background: #285c42; color: #baf1d0; }
-  .customer-app :is(.badge.pending_payment, .badge.awaiting_review) { background: #58491e; color: #ffe79b; }
+  :is(.customer-app, .admin-app) .chip.booked:not(.court-select-pill) { background: #3a5049; border-color: #496257; color: #bccdc5; }
+  :is(.customer-app, .admin-app) .chip.booked .chip-time-end { color: #bccdc5; }
+  :is(.customer-app, .admin-app) .court-selected-mark { color: #006b55; }
+  :is(.customer-app, .admin-app) .legend-booked { background: #3a5049; border-color: #496257; }
+  :is(.customer-app, .admin-app) .badge.confirmed { background: #285c42; color: #baf1d0; }
+  :is(.customer-app, .admin-app) :is(.badge.pending_payment, .badge.awaiting_review) { background: #58491e; color: #ffe79b; }
   .customer-app .hero-facts { background: #fafff8f5; }
   .customer-app .avatar { background: #007e5f; color: #fff; }
 }

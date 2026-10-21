@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions";
@@ -27,10 +28,20 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <RealtimeNotificationBanner userId={user.id} isAdmin={true} />
       <header className="admin-header">
         <div className="row" style={{ flexWrap: "nowrap" }}>
-          <div className="greeting">
-            <span className="muted">หลังร้าน · {displayName ?? "แอดมิน"}</span>
-            <strong>จัดการสนามแบด</strong>
-          </div>
+          <Link href="/admin" className="brand-lockup">
+            <Image
+              src="/brand/logo.png"
+              alt="สินธานีแบดมินตัน"
+              width={46}
+              height={46}
+              className="brand-sinthani"
+              priority
+            />
+            <div className="brand-lockup-text">
+              <span className="brand-subtitle">หลังร้าน · {displayName ?? "แอดมิน"}</span>
+              <strong className="brand-title">จัดการสนามแบด</strong>
+            </div>
+          </Link>
           <div style={{ display: "flex", gap: 8 }}>
             <Link href="/" className="btn btn-sm btn-ghost" target="_blank">
               หน้าลูกค้า ↗

@@ -8,7 +8,7 @@ import { signOut } from "@/app/actions";
  */
 export function NoAdminAccess({ displayName }: { displayName: string | null }) {
   return (
-    <div className="app">
+    <div className="app admin-app">
       <main className="app-main">
         <section className="card stack" style={{ gap: 12, marginTop: 24, textAlign: "center" }}>
           <div style={{ fontSize: 40 }} aria-hidden="true">🔒</div>

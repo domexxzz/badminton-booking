@@ -150,7 +150,8 @@ end $$;
 
 create or replace function public.admin_create_cart_booking(
   p_items          jsonb,
-  p_channel        booking_channel,
+  -- bookings.channel is plain text with a check constraint (0001), not an enum.
+  p_channel        text,
   p_customer_name  text,
   p_customer_phone text default null,
   p_note           text default null
@@ -237,6 +238,6 @@ begin
 end $$;
 
 revoke execute on function public.create_cart_booking(jsonb, boolean, numeric) from public, anon;
-revoke execute on function public.admin_create_cart_booking(jsonb, booking_channel, text, text, text) from public, anon;
+revoke execute on function public.admin_create_cart_booking(jsonb, text, text, text, text) from public, anon;
 grant execute on function public.create_cart_booking(jsonb, boolean, numeric) to authenticated;
-grant execute on function public.admin_create_cart_booking(jsonb, booking_channel, text, text, text) to authenticated;
+grant execute on function public.admin_create_cart_booking(jsonb, text, text, text, text) to authenticated;

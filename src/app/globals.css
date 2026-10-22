@@ -2339,13 +2339,26 @@ details summary { cursor: pointer; }
   border-color: var(--brand);
 }
 
-.booking-court-horiz-card.active {
-  border-color: #15803d;
-  background: color-mix(in srgb, var(--brand-soft) 65%, var(--surface));
-  box-shadow: 0 6px 16px rgba(21, 128, 61, 0.14);
+.booking-court-horiz-card.selected {
+  border-color: #00765b;
+  background: linear-gradient(145deg, #009d78, #007059);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(0, 112, 89, 0.24);
 }
 
-.booking-court-horiz-card.in-cart:not(.active) {
+.booking-court-horiz-card.selected .booking-court-horiz-thumb {
+  border-color: rgba(255, 255, 255, 0.72);
+}
+
+.booking-court-horiz-card.selected .booking-court-horiz-info strong {
+  color: #fff;
+}
+
+.booking-court-horiz-card.selected .booking-court-horiz-info span {
+  color: #d9fff0;
+}
+
+.booking-court-horiz-card.in-cart:not(.selected) {
   border-color: color-mix(in srgb, var(--brand) 55%, var(--border));
 }
 

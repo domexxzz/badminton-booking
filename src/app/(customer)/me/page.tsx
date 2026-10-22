@@ -20,7 +20,7 @@ type Row = {
 };
 
 export default async function MyBookingsPage() {
-  const { supabase, user, isAdmin, displayName } = await getSessionUser();
+  const { supabase, user, isAdmin, isCoach, displayName } = await getSessionUser();
   if (!user) redirect("/login?next=/me");
 
   const { data, error } = await supabase
@@ -83,6 +83,14 @@ export default async function MyBookingsPage() {
             </button>
           </form>
         </div>
+        <Link href="/coaches" className="btn btn-block btn-ghost" style={{ textAlign: "center" }}>
+          🎓 เรียนกับโค้ช
+        </Link>
+        {isCoach && (
+          <Link href="/coach" className="btn btn-block btn-ghost" style={{ textAlign: "center" }}>
+            🏅 ตารางสอนและคลาสของฉัน
+          </Link>
+        )}
         {isAdmin && (
           <Link href="/admin" className="btn btn-block" style={{ textAlign: "center" }}>
             ⚙️ เข้าสู่ระบบหลังร้าน (Admin) ↗

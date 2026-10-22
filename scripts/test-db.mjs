@@ -22,6 +22,7 @@ const MIGRATIONS = [
   "0015_shop_contact.sql",
   "0016_refund_bank_account.sql",
   "0017_multi_slot_bookings.sql",
+  "0018_play_queue.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -627,6 +628,76 @@ const { rows: [bothRequest] } = await db.query(`select * from request_cancel('${
 check("refund accepts QR and account together", Boolean(bothRequest.refund_qr_path) && bothRequest.refund_account === '0000000000');
 check("anonymous users cannot call account refund RPC",
   !(await db.query(`select has_function_privilege('anon', 'public.request_cancel(uuid,text,text,text)', 'execute') as allowed`)).rows[0].allowed);
+
+// ---- Play queue (0018) ----
+const boardFor = async (court) =>
+  (await db.query(`select name, status from queue_board where court_id = ${court} order by queued_at`)).rows;
+const entryRow = async (id) => (await db.query(`select * from queue_entries where id = '${id}'`)).rows[0];
+
+await as(U1);
+await expectError("cannot join a closed queue", `select join_queue(1::smallint, 'เอ')`, "QUEUE_CLOSED");
+await expectError("customers cannot open a queue", `select set_court_queue(1::smallint, true, 4::smallint)`, "FORBIDDEN");
+await as(ADMIN);
+await expectError("players per game is 2 to 4", `select set_court_queue(1::smallint, true, 5::smallint)`, "INVALID_PLAYERS_PER_GAME");
+await db.query(`select set_court_queue(1::smallint, true, 2::smallint)`);
+await db.query(`select set_court_queue(2::smallint, true, 4::smallint)`);
+
+await as(U1);
+await expectError("a nickname is required", `select join_queue(1::smallint, '   ')`, "INVALID_NAME");
+const { rows: [qe1] } = await db.query(`select * from join_queue(1::smallint, '  เอ   ตัวจริง  ')`);
+check("join tidies the nickname and waits", qe1.status === "waiting" && qe1.name === "เอ ตัวจริง" && qe1.user_id === U1);
+await expectError("one place per person across courts", `select join_queue(2::smallint, 'เอ')`, "ALREADY_IN_QUEUE");
+await as(U2);
+const { rows: [qe2] } = await db.query(`select * from join_queue(1::smallint, 'บี')`);
+await as(ADMIN);
+const { rows: [qe3] } = await db.query(`select * from admin_add_to_queue(1::smallint, 'ซี walk-in')`);
+check("admin adds a walk-in without an account", qe3.user_id === null && qe3.created_by === ADMIN);
+
+await as(U1);
+await expectError("customers cannot call the next game", `select queue_next_game(1::smallint)`, "FORBIDDEN");
+await expectError("customers cannot move others", `select queue_entry_action('${qe2.id}', 'remove')`, "FORBIDDEN");
+const boardCols = (await db.query(
+  `select string_agg(column_name, ',' order by column_name) as c from information_schema.columns
+   where table_schema = 'public' and table_name = 'queue_board'`)).rows[0].c;
+check("the public board carries no user id", !boardCols.includes("user"), boardCols);
+check("board shows the line in order", (await boardFor(1)).map((r) => r.name).join("|") === "เอ ตัวจริง|บี|ซี walk-in");
+
+await as(ADMIN);
+const called = (await db.query(`select queue_next_game(1::smallint) as n`)).rows[0].n;
+check("next game calls players_per_game from the front", called === 2
+  && (await entryRow(qe1.id)).status === "playing" && (await entryRow(qe2.id)).status === "playing"
+  && (await entryRow(qe3.id)).status === "waiting");
+await db.query(`select queue_entry_action('${qe1.id}', 'back')`);
+check("send to back puts a player behind the line", (await entryRow(qe1.id)).status === "waiting"
+  && (await boardFor(1)).filter((r) => r.status === "waiting").map((r) => r.name).join("|") === "ซี walk-in|เอ ตัวจริง");
+await db.query(`select queue_next_game(1::smallint)`);
+check("next game finishes the players on court", (await entryRow(qe2.id)).status === "done"
+  && (await entryRow(qe3.id)).status === "playing" && (await entryRow(qe1.id)).status === "playing");
+check("finished players leave the public board", !(await boardFor(1)).some((r) => r.name === "บี"));
+await expectError("cannot play someone already playing", `select queue_entry_action('${qe1.id}', 'play')`, "INVALID_QUEUE_ACTION");
+
+await as(U2);
+const { rows: [qe2b] } = await db.query(`select * from join_queue(1::smallint, 'บี')`);
+check("a finished player can join again", qe2b.status === "waiting");
+await db.query(`select leave_queue('${qe2b.id}')`);
+check("a player can leave", (await entryRow(qe2b.id)).status === "left");
+await as(U1);
+await expectError("cannot leave someone else's place", `select leave_queue('${qe3.id}')`, "QUEUE_ENTRY_NOT_FOUND");
+
+// A place left over from yesterday ends by itself.
+await as(U2);
+const { rows: [stale] } = await db.query(`select * from join_queue(2::smallint, 'บี')`);
+await db.exec(`update queue_entries set queued_at = now() - interval '2 days' where id = '${stale.id}'`);
+await as(U5);
+await db.query(`select join_queue(2::smallint, 'อี')`);
+check("yesterday's places end on the next use", (await entryRow(stale.id)).status === "left");
+
+await as(ADMIN);
+await db.query(`select set_court_queue(1::smallint, false, 2::smallint)`);
+check("closing a queue ends every place in it", (await boardFor(1)).length === 0
+  && (await entryRow(qe1.id)).status === "done");
+check("anonymous users cannot join", !(await db.query(
+  `select has_function_privilege('anon', 'public.join_queue(smallint,text)', 'execute') as p`)).rows[0].p);
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

@@ -36,6 +36,13 @@ const MESSAGES: Record<string, string> = {
   INVALID_LINE: "LINE ไม่ถูกต้อง ใส่ LINE ID, @บัญชีทางการ หรือลิงก์ที่ขึ้นต้นด้วย https://line.me/ หรือ https://lin.ee/",
   TOO_MANY_SLIP_ATTEMPTS: "ส่งสลิปไม่ผ่านครบ 3 ครั้งแล้ว กรุณาติดต่อแอดมินพร้อมหลักฐานการโอน",
   INVALID_HOURS: "เวลาเปิดและเวลาปิดสนามไม่ถูกต้อง",
+  QUEUE_CLOSED: "สนามนี้ยังไม่เปิดคิวก๊วน",
+  INVALID_NAME: "กรุณาใส่ชื่อที่จะแสดงในคิว",
+  ALREADY_IN_QUEUE: "คุณมีคิวอยู่แล้ว ออกจากคิวเดิมก่อนแล้วค่อยต่อคิวใหม่",
+  TOO_MANY_QUEUE_JOINS: "ต่อคิวบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่",
+  QUEUE_ENTRY_NOT_FOUND: "ไม่พบคิวนี้ อาจถูกเรียกลงสนามหรือออกจากคิวไปแล้ว",
+  INVALID_PLAYERS_PER_GAME: "จำนวนคนต่อเกมต้องเป็น 2–4 คน",
+  INVALID_QUEUE_ACTION: "ทำรายการนี้กับคิวนี้ไม่ได้",
 };
 
 export function friendlyError(error: { message?: string } | null | undefined): string {

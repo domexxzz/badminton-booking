@@ -44,6 +44,10 @@ export const BBL_MERCHANT_INFO = {
   shortName: "อัครเนย์",
   merchantId: "1077272",
   type: "Bangkok Bank Merchant Pro",
+  // Biller ID carried in tag 30 of BBL_MERCHANT_PRO_QR above; slips of a bill
+  // payment name this as the receiver instead of a bank account. Change it
+  // together with the QR, or override it with SLIP_RECEIVER_BILLER_ID.
+  billerId: "010753600037406",
 } as const;
 
 function parseEmvCoTags(payload: string): { id: string; val: string }[] {

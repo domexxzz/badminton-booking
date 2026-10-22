@@ -28,9 +28,18 @@ const exp = (overrides: Partial<Expectation> = {}): Expectation => ({
   now: new Date("2026-10-20T18:06:00+07:00"),
   promptPayId: "0812345678",
   bankAccount: null,
+  billerId: null,
   receiverNames: ["สมชาย ใจดี"],
   ...overrides,
 });
+
+// What EasySlip reports for a Bangkok Bank Merchant Pro bill payment: no bank
+// account at all, just the shop's biller ID behind a mask.
+const billSlip = (account = "XXXXXXXXXXX7406") =>
+  slip({}, { names: ["akkanay"], bankAccount: null, proxyType: "BILLERID", proxyAccount: account });
+
+const billExp = (overrides: Partial<Expectation> = {}) =>
+  exp({ promptPayId: null, billerId: "010753600037406", receiverNames: ["akkanay"], ...overrides });
 
 describe("maskedMatches", () => {
   test("compares position by position", () => {
@@ -127,6 +136,26 @@ describe("evaluateSlip", () => {
 
   test("allows a few minutes of clock skew", () => {
     expect(evaluateSlip(slip({ date: "2026-10-20T17:57:00+07:00" }), exp()).status).toBe("verified");
+  });
+
+  test("accepts a bill payment that names the shop's biller ID", () => {
+    expect(evaluateSlip(billSlip(), billExp()).status).toBe("verified");
+  });
+
+  test("flags a bill payment to someone else's biller ID", () => {
+    const result = evaluateSlip(billSlip("XXXXXXXXXXX9999"), billExp());
+    expect(result.status).toBe("mismatch");
+    expect(result.reasons).toContain("บัญชีผู้รับไม่ตรงกับร้าน (XXXXXXXXXXX9999)");
+  });
+
+  test("flags a bill payment when no biller ID is configured", () => {
+    expect(evaluateSlip(billSlip(), billExp({ billerId: null })).status).toBe("mismatch");
+  });
+
+  test("does not accept a biller ID as if it were a PromptPay proxy", () => {
+    // Same digits, but the slip calls it a biller: only billerId may clear it.
+    const asProxy = exp({ promptPayId: "010753600037406", billerId: null, receiverNames: ["akkanay"] });
+    expect(evaluateSlip(billSlip(), asProxy).status).toBe("mismatch");
   });
 
   test("never verifies when the receiver name is not configured", () => {

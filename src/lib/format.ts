@@ -24,6 +24,7 @@ export const formatDayParts = (day: string) => ({
   date: Number(day.slice(8, 10)),
   month: monthFmt.format(dayDate(day)),
 });
+export const formatDayShort = (day: string) => dateFmt.format(dayDate(day));
 export const formatDayLong = (day: string) => dayLongFmt.format(dayDate(day));
 export const formatTime = (iso: string) => timeFmt.format(new Date(iso));
 export const formatBaht = (amount: number) =>

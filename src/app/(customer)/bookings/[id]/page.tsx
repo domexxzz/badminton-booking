@@ -107,7 +107,13 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
 
   const allBookings = groupBookings && groupBookings.length > 0 ? groupBookings : [booking];
   const isMultiCourt = allBookings.length > 1;
-  const courtNames = allBookings.map((b) => b.courts?.name ?? "สนาม").join(", ");
+  const courtNames = Array.from(new Set(allBookings.map((b) => b.courts?.name ?? "สนาม"))).join(", ");
+  const sameSlot = allBookings.every(
+    (b) => b.starts_at === booking.starts_at && b.ends_at === booking.ends_at,
+  );
+  const slotSummary = sameSlot
+    ? formatSlot(booking.starts_at, booking.ends_at)
+    : `${formatDate(booking.starts_at)} · หลายช่วงเวลา (${allBookings.length} รายการ)`;
   const totalAmount = allBookings.reduce((sum, b) => sum + Number(b.amount), 0);
 
   const [{ data: requests }, { data: courts }] = await Promise.all([
@@ -160,8 +166,8 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         status={booking.status}
         reviewNote={booking.review_note}
         summary={{
-          court: isMultiCourt ? `${allBookings.length} สนาม (${courtNames})` : (booking.courts?.name ?? "สนาม"),
-          slot: formatSlot(booking.starts_at, booking.ends_at),
+          court: isMultiCourt ? `${allBookings.length} รายการ (${courtNames})` : (booking.courts?.name ?? "สนาม"),
+          slot: slotSummary,
           amount: formatBaht(totalAmount),
         }}
       />
@@ -175,10 +181,10 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         <div className="meta">
           <strong>
             {isMultiCourt
-              ? `จอง ${allBookings.length} สนาม (${courtNames})`
+              ? `จอง ${allBookings.length} รายการ (${courtNames})`
               : (booking.courts?.name ?? "สนาม")}
           </strong>
-          <span className="muted">{formatSlot(booking.starts_at, booking.ends_at)}</span>
+          <span className="muted">{slotSummary}</span>
         </div>
         <span className={`badge ${booking.status}`}>{STATUS_LABEL[booking.status]}</span>
       </section>

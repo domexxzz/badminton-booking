@@ -1,4 +1,5 @@
 import "server-only";
+import { formatTime } from "@/lib/format";
 import { getServiceClient } from "@/lib/supabase/service";
 import {
   bookingConfirmedText,
@@ -85,10 +86,25 @@ async function loadBookingSummary(bookingId: string): Promise<BookingSummary | n
   if (b.group_id) {
     const { data: groupList } = await supabase
       .from("bookings")
-      .select("amount, courts(name)")
-      .eq("group_id", b.group_id);
+      .select("starts_at, ends_at, amount, courts(name)")
+      .eq("group_id", b.group_id)
+      .order("court_id");
     if (groupList && groupList.length > 1) {
-      courtName = groupList.map((item) => (item.courts as { name?: string } | null)?.name ?? "สนาม").join(", ");
+      const allSameSlot = groupList.every(
+        (item) => item.starts_at === b.starts_at && item.ends_at === b.ends_at,
+      );
+      if (allSameSlot) {
+        courtName = groupList
+          .map((item) => (item.courts as { name?: string } | null)?.name ?? "สนาม")
+          .join(", ");
+      } else {
+        courtName = groupList
+          .map((item) => {
+            const cname = (item.courts as { name?: string } | null)?.name ?? "สนาม";
+            return `${cname} (${formatTime(item.starts_at)}–${formatTime(item.ends_at)})`;
+          })
+          .join(", ");
+      }
       totalAmount = groupList.reduce((sum, item) => sum + Number(item.amount), 0);
     }
   }
@@ -188,4 +204,3 @@ export async function notifyRequestResolvedToCustomer(
   if (!summary) return;
   await notifyCustomer(summary.userId, customerRequestResolvedText(summary, kind, approve, note));
 }
-

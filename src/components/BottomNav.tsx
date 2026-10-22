@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarIcon, CourtIcon, HomeIcon, UserIcon } from "./icons";
+import { CalendarIcon, CourtIcon, HomeIcon, QueueIcon, UserIcon } from "./icons";
 
 const TABS = [
   { href: "/", label: "หน้าแรก", Icon: HomeIcon },
   { href: "/schedule", label: "ตารางคิว", Icon: CalendarIcon },
   { href: "/book", label: "จองสนาม", Icon: CourtIcon },
+  { href: "/queue", label: "คิวก๊วน", Icon: QueueIcon },
   { href: "/me", label: "ของฉัน", Icon: UserIcon },
 ];
 

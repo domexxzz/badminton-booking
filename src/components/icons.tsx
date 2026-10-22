@@ -141,3 +141,12 @@ export const MoonIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const QueueIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="8" cy="7" r="3" />
+    <path d="M2.5 20v-1.5A4.5 4.5 0 0 1 7 14h2a4.5 4.5 0 0 1 4.5 4.5V20" />
+    <circle cx="17" cy="8.5" r="2.4" />
+    <path d="M16 14h1.5a4 4 0 0 1 4 4v2" />
+  </Svg>
+);
+

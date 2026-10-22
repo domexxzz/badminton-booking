@@ -28,6 +28,7 @@ export function BookingChangePanel({
   canCancel,
   cancelDeadlineText,
   unpaidPayLater = false,
+  allowReschedule = true,
 }: {
   bookingId: string;
   userId: string;
@@ -40,6 +41,8 @@ export function BookingChangePanel({
   cancelDeadlineText: string;
   /** Nothing was paid yet, so cancelling needs no refund QR. */
   unpaidPayLater?: boolean;
+  /** A lesson keeps the time the coach agreed to, so only cancelling is offered. */
+  allowReschedule?: boolean;
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<"menu" | "reschedule" | "cancel">("menu");
@@ -84,9 +87,11 @@ export function BookingChangePanel({
       <h2>ต้องการเปลี่ยนแปลง?</h2>
       {mode === "menu" && (
         <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" className="btn btn-ghost btn-block" onClick={() => setMode("reschedule")}>
-            ขอเลื่อนเวลา
-          </button>
+          {allowReschedule && (
+            <button type="button" className="btn btn-ghost btn-block" onClick={() => setMode("reschedule")}>
+              ขอเลื่อนเวลา
+            </button>
+          )}
           {canCancel && (
             <button
               type="button"

@@ -22,6 +22,8 @@ const MIGRATIONS = [
   "0015_shop_contact.sql",
   "0016_refund_bank_account.sql",
   "0017_multi_slot_bookings.sql",
+  "0018_play_queue.sql",
+  "0019_coach_lessons.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -627,6 +629,231 @@ const { rows: [bothRequest] } = await db.query(`select * from request_cancel('${
 check("refund accepts QR and account together", Boolean(bothRequest.refund_qr_path) && bothRequest.refund_account === '0000000000');
 check("anonymous users cannot call account refund RPC",
   !(await db.query(`select has_function_privilege('anon', 'public.request_cancel(uuid,text,text,text)', 'execute') as allowed`)).rows[0].allowed);
+
+// ---- Play queue (0018) ----
+const boardFor = async (court) =>
+  (await db.query(`select name, status from queue_board where court_id = ${court} order by queued_at`)).rows;
+const entryRow = async (id) => (await db.query(`select * from queue_entries where id = '${id}'`)).rows[0];
+// What an admin looking at the court would send back with "next game".
+const seenCalledAt = async (court) =>
+  (await db.query(
+    `select max(called_at) as t from queue_entries where court_id = ${court} and status = 'playing'`)).rows[0].t;
+const nextGame = async (court) =>
+  (await db.query(`select queue_next_game($1::smallint, $2) as n`, [court, await seenCalledAt(court)])).rows[0].n;
+
+await as(U1);
+await expectError("cannot join a closed queue", `select join_queue(1::smallint, 'เอ')`, "QUEUE_CLOSED");
+await expectError("customers cannot open a queue", `select set_court_queue(1::smallint, true, 4::smallint)`, "FORBIDDEN");
+await as(ADMIN);
+await expectError("players per game is 2 to 4", `select set_court_queue(1::smallint, true, 5::smallint)`, "INVALID_PLAYERS_PER_GAME");
+await db.query(`select set_court_queue(1::smallint, true, 2::smallint)`);
+await db.query(`select set_court_queue(2::smallint, true, 4::smallint)`);
+
+await as(U1);
+await expectError("a nickname is required", `select join_queue(1::smallint, '   ')`, "INVALID_NAME");
+const { rows: [qe1] } = await db.query(`select * from join_queue(1::smallint, '  เอ   ตัวจริง  ')`);
+check("join tidies the nickname and waits", qe1.status === "waiting" && qe1.name === "เอ ตัวจริง" && qe1.user_id === U1);
+await expectError("one place per person across courts", `select join_queue(2::smallint, 'เอ')`, "ALREADY_IN_QUEUE");
+await as(U2);
+const { rows: [qe2] } = await db.query(`select * from join_queue(1::smallint, 'บี')`);
+await as(ADMIN);
+const { rows: [qe3] } = await db.query(`select * from admin_add_to_queue(1::smallint, 'ซี walk-in')`);
+check("admin adds a walk-in without an account", qe3.user_id === null && qe3.created_by === ADMIN);
+
+await as(U1);
+await expectError("customers cannot call the next game", `select queue_next_game(1::smallint, null)`, "FORBIDDEN");
+await expectError("customers cannot move others", `select queue_entry_action('${qe2.id}', 'remove')`, "FORBIDDEN");
+const boardCols = (await db.query(
+  `select string_agg(column_name, ',' order by column_name) as c from information_schema.columns
+   where table_schema = 'public' and table_name = 'queue_board'`)).rows[0].c;
+check("the public board carries no user id", !boardCols.includes("user"), boardCols);
+check("board shows the line in order", (await boardFor(1)).map((r) => r.name).join("|") === "เอ ตัวจริง|บี|ซี walk-in");
+
+await as(ADMIN);
+const called = await nextGame(1);
+check("next game calls players_per_game from the front", called === 2
+  && (await entryRow(qe1.id)).status === "playing" && (await entryRow(qe2.id)).status === "playing"
+  && (await entryRow(qe3.id)).status === "waiting");
+// A second tap for the same game must not send the players who just went on off again.
+const staleSeen = await seenCalledAt(1);
+await expectError("a second next-game tap for the same game is refused",
+  `select queue_next_game(1::smallint, null)`, "QUEUE_CHANGED");
+await db.query(`select queue_entry_action('${qe1.id}', 'back')`);
+check("send to back puts a player behind the line", (await entryRow(qe1.id)).status === "waiting"
+  && (await boardFor(1)).filter((r) => r.status === "waiting").map((r) => r.name).join("|") === "ซี walk-in|เอ ตัวจริง");
+await expectError("next game from a stale screen is refused",
+  `select queue_next_game(1::smallint, '${new Date(Date.parse(staleSeen) - 60000).toISOString()}')`, "QUEUE_CHANGED");
+await nextGame(1);
+check("next game finishes the players on court", (await entryRow(qe2.id)).status === "done"
+  && (await entryRow(qe3.id)).status === "playing" && (await entryRow(qe1.id)).status === "playing");
+check("finished players leave the public board", !(await boardFor(1)).some((r) => r.name === "บี"));
+await expectError("cannot play someone already playing", `select queue_entry_action('${qe1.id}', 'play')`, "INVALID_QUEUE_ACTION");
+
+await as(U2);
+const { rows: [qe2b] } = await db.query(`select * from join_queue(1::smallint, 'บี')`);
+check("a finished player can join again", qe2b.status === "waiting");
+await db.query(`select leave_queue('${qe2b.id}')`);
+check("a player can leave", (await entryRow(qe2b.id)).status === "left");
+await as(U1);
+await expectError("cannot leave someone else's place", `select leave_queue('${qe3.id}')`, "QUEUE_ENTRY_NOT_FOUND");
+
+// A place left over from yesterday ends by itself.
+await as(U2);
+const { rows: [stale] } = await db.query(`select * from join_queue(2::smallint, 'บี')`);
+await db.exec(`update queue_entries set queued_at = now() - interval '2 days' where id = '${stale.id}'`);
+await as(U5);
+await db.query(`select join_queue(2::smallint, 'อี')`);
+check("yesterday's places end on the next use", (await entryRow(stale.id)).status === "left");
+
+await as(ADMIN);
+await db.query(`select set_court_queue(1::smallint, false, 2::smallint)`);
+check("closing a queue ends every place in it", (await boardFor(1)).length === 0
+  && (await entryRow(qe1.id)).status === "done");
+check("anonymous users cannot join", !(await db.query(
+  `select has_function_privilege('anon', 'public.join_queue(smallint,text)', 'execute') as p`)).rows[0].p);
+
+// ---- Lessons with a coach (0019) ----
+const COACH2 = "88888888-8888-8888-8888-000000000002";
+const STUDENT = "88888888-8888-8888-8888-000000000003";
+await db.exec(`insert into auth.users (id, email) values ('${COACH2}','coach2@x.com'),('${STUDENT}','student@x.com')`);
+const lessonRow = async (id) => (await db.query(`select * from bookings where id = '${id}'`)).rows[0];
+// A weekday far enough ahead to stay inside the 14-day window, at 19:00 Bangkok.
+const { rows: [{ d, dow }] } = await db.query(
+  `select ((now() at time zone 'Asia/Bangkok')::date + 3) as d,
+          extract(dow from (now() at time zone 'Asia/Bangkok')::date + 3)::int as dow`);
+const lessonDay = new Date(d).toISOString().slice(0, 10);
+const lessonAt = (h) => `${lessonDay}T${String(h).padStart(2, "0")}:00:00+07:00`;
+
+await as(COACH2);
+await expectError("someone who is not a coach yet cannot list themselves",
+  `select save_coach_profile('${COACH2}', 'โค้ชบี', null, 300, true)`, "NOT_COACH");
+await as(ADMIN);
+await db.query(`select set_coach('${COACH2}', true)`);
+await as(U1);
+await expectError("nobody can edit someone else's coach profile",
+  `select save_coach_profile('${COACH2}', 'โค้ชปลอม', null, 1, true)`, "FORBIDDEN");
+await as(COACH2);
+await expectError("lesson price has a ceiling",
+  `select save_coach_profile('${COACH2}', 'โค้ชบี', null, 99999, true)`, "INVALID_LESSON_PRICE");
+await expectError("a coach profile needs a name",
+  `select save_coach_profile('${COACH2}', '   ', null, 300, true)`, "INVALID_NAME");
+const { rows: [cp] } = await db.query(`select * from save_coach_profile('${COACH2}', '  โค้ช   บี ', 'สอนพื้นฐาน', 300, true)`);
+check("coach saves their own profile", cp.display_name === "โค้ช บี" && cp.lesson_price_per_hour === 300 && cp.is_listed);
+
+await expectError("hours must be whole half hours inside a day",
+  `select set_coach_availability('${COACH2}', '[{"weekday":1,"start_minute":610,"end_minute":1200}]'::jsonb)`, "INVALID_AVAILABILITY");
+const slots = JSON.stringify([{ weekday: dow, start_minute: 17 * 60, end_minute: 21 * 60 }]);
+check("coach sets weekly hours",
+  (await db.query(`select set_coach_availability('${COACH2}', '${slots}'::jsonb) as n`)).rows[0].n === 1);
+check("saving hours again replaces the old ones",
+  (await db.query(`select set_coach_availability('${COACH2}', '${slots}'::jsonb) as n`)).rows[0].n === 1
+  && (await db.query(`select count(*)::int as n from coach_availability where coach_id = '${COACH2}'`)).rows[0].n === 1);
+
+await as(STUDENT);
+const openStarts = (await db.query(`select coach_open_starts('${COACH2}', '${lessonDay}'::date, 1.0) as s`)).rows.map((r) => r.s);
+check("open lesson times stay inside the coach's hours and the venue's",
+  openStarts.length > 0 && openStarts.every((s) => {
+    const h = Number(new Date(s).toLocaleString("en-GB", { timeZone: "Asia/Bangkok", hour: "2-digit", hourCycle: "h23" }));
+    return h >= 17 && h <= 20;
+  }), `${openStarts.length} starts`);
+await expectError("a lesson of 4 hours is too long",
+  `select create_lesson_booking('${COACH2}', '${lessonAt(19)}', 4.0)`, "INVALID_DURATION");
+await expectError("a lesson outside the coach's hours is refused",
+  `select create_lesson_booking('${COACH2}', '${lessonAt(10)}', 1.0)`, "COACH_UNAVAILABLE");
+await expectError("a bill that differs from the price shown is refused",
+  `select create_lesson_booking('${COACH2}', '${lessonAt(19)}', 1.0, 999)`, "PRICE_CHANGED");
+check("a refused price books nothing",
+  (await db.query(`select count(*)::int as n from bookings where coach_id = '${COACH2}'`)).rows[0].n === 0);
+const { rows: [lesson] } = await db.query(`select * from create_lesson_booking('${COACH2}', '${lessonAt(19)}', 1.0, 450)`);
+check("the bill is court price plus lesson fee, waiting for payment",
+  lesson.status === "pending_payment" && Number(lesson.lesson_fee) === 300
+  && Number(lesson.amount) === 150 + 300 && lesson.coach_id === COACH2, JSON.stringify({ amount: lesson.amount }));
+check("a lesson holds a real court on the live board",
+  (await db.query(`select state from court_occupancy where booking_id = '${lesson.id}'`)).rows[0]?.state === "held");
+await expectError("the same coach cannot be booked twice at once",
+  `select create_lesson_booking('${COACH2}', '${lessonAt(19)}', 1.0, 450)`, "COACH_BUSY");
+check("that time is gone from the open list",
+  !(await db.query(`select coach_open_starts('${COACH2}', '${lessonDay}'::date, 1.0) as s`)).rows
+    .some((r) => Date.parse(r.s) === Date.parse(lessonAt(19))));
+await as(COACH2);
+await expectError("a coach cannot book a lesson with themself",
+  `select create_lesson_booking('${COACH2}', '${lessonAt(20)}', 1.0, 450)`, "CANNOT_BOOK_SELF");
+// A coach cannot book a court to play on while they are teaching.
+await expectError("a coach cannot book a court over their own lesson",
+  `select create_booking(2::smallint, '${lessonAt(19)}', 1)`, "COACH_HAS_LESSON");
+// And a court the coach booked to play on makes them busy for new lessons.
+const coachOwn = await paidBooking(COACH2, 1, lessonAt(20), 1);
+await as(STUDENT);
+await expectError("a coach playing their own booking is busy",
+  `select create_lesson_booking('${COACH2}', '${lessonAt(20)}', 1.0, 450)`, "COACH_BUSY");
+// A walk-in the admin entered belongs to the admin's account, so an admin who also
+// coaches is not busy because of it.
+await as(ADMIN);
+await db.query(`select admin_create_booking(3::smallint, '${lessonAt(21)}', 1, 'walk_in', 'คุณวอล์กอิน')`);
+await as(STUDENT);
+check("an admin-entered walk-in does not block that admin's own teaching",
+  (await db.query(`select coach_busy('${ADMIN}', '${lessonAt(21)}', '${lessonAt(22)}') as busy`)).rows[0].busy === false);
+
+// Paying for a lesson is an ordinary slip, and the lesson time cannot be moved.
+await as(STUDENT);
+await db.exec(`insert into storage.objects (bucket_id, name) values ('slips', '${STUDENT}/${lesson.id}-1.jpg')`);
+await db.query(`select submit_slip('${lesson.id}', '${STUDENT}/${lesson.id}-1.jpg')`);
+const lessonPay = (await db.query(`select amount from payments where booking_id = '${lesson.id}'`)).rows[0];
+check("the slip is for the whole bill including the lesson fee", Number(lessonPay.amount) === 450);
+await as(ADMIN);
+await db.query(`select review_payment('${lesson.id}', true)`);
+check("an approved lesson is confirmed", (await lessonRow(lesson.id)).status === "confirmed");
+await as(STUDENT);
+await expectError("a lesson cannot be moved to another time",
+  `select request_reschedule('${lesson.id}', 2::smallint, '${lessonAt(18)}')`, "LESSON_FIXED_TIME");
+
+// The coach sees their lessons with the student's name; nobody else's.
+await as(COACH2);
+const myLessons = (await db.query(`select * from coach_lessons()`)).rows;
+check("coach sees their own lesson with the student's name",
+  myLessons.length === 1 && myLessons[0].booking_id === lesson.id && myLessons[0].student_phone !== undefined);
+await as(U1);
+check("another user's coach_lessons() is empty", (await db.query(`select * from coach_lessons()`)).rows.length === 0);
+
+// The shop pays the coach only for lessons already played, and only the ones it listed.
+await as(COACH2);
+await expectError("a coach cannot mark themselves paid",
+  `select mark_coach_paid('${COACH2}', array['${lesson.id}']::uuid[])`, "FORBIDDEN");
+check("only an admin sees what the shop owes a coach",
+  (await db.query(`select count(*)::int as n from coach_unpaid_lessons('${COACH2}')`)).rows[0].n === 0);
+await as(ADMIN);
+check("a lesson in the future is not owed yet",
+  (await db.query(`select count(*)::int as n from coach_unpaid_lessons('${COACH2}')`)).rows[0].n === 0);
+const futurePay = (await db.query(
+  `select * from mark_coach_paid('${COACH2}', array['${lesson.id}']::uuid[])`)).rows[0];
+check("paying for a lesson that has not happened stamps nothing", futurePay.paid_count === 0
+  && (await lessonRow(lesson.id)).coach_paid_at === null);
+await db.exec(`update bookings set starts_at = starts_at - interval '30 days', ends_at = ends_at - interval '30 days'
+  where id = '${lesson.id}'`);
+const owedNow = (await db.query(`select * from coach_unpaid_lessons('${COACH2}')`)).rows;
+check("a finished lesson shows as owed with its fee",
+  owedNow.length === 1 && owedNow[0].booking_id === lesson.id && Number(owedNow[0].lesson_fee) === 300);
+const paid = (await db.query(
+  `select * from mark_coach_paid('${COACH2}', array['${lesson.id}']::uuid[])`)).rows[0];
+check("the shop records paying the coach, with the total",
+  paid.paid_count === 1 && Number(paid.paid_total) === 300 && (await lessonRow(lesson.id)).coach_paid_at !== null);
+check("a lesson already paid is not owed again",
+  (await db.query(`select count(*)::int as n from coach_unpaid_lessons('${COACH2}')`)).rows[0].n === 0);
+await expectError("paying needs at least one lesson",
+  `select * from mark_coach_paid('${COACH2}', null)`, "NOTHING_TO_PAY");
+
+// Taking coach rights away also takes the coach off the public list.
+await db.query(`select set_coach('${COACH2}', false)`);
+check("an unlisted coach disappears from the public list",
+  (await db.query(`select is_listed from coach_profiles where user_id = '${COACH2}'`)).rows[0].is_listed === false);
+await as(STUDENT);
+await expectError("an unlisted coach cannot be booked",
+  `select create_lesson_booking('${COACH2}', '${lessonAt(22)}', 1.0, 450)`, "COACH_NOT_FOUND");
+check("anonymous users cannot book a lesson", !(await db.query(
+  `select has_function_privilege('anon', 'public.create_lesson_booking(uuid,timestamptz,numeric,numeric)', 'execute') as p`)).rows[0].p);
+check("anonymous users can read the open lesson times", (await db.query(
+  `select has_function_privilege('anon', 'public.coach_open_starts(uuid,date,numeric)', 'execute') as p`)).rows[0].p === true);
+check("setup: the coach's own booking is untouched", (await lessonRow(coachOwn.id)).status === "confirmed");
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

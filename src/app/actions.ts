@@ -7,6 +7,7 @@ import { slotStart } from "@/lib/slots";
 import { friendlyError } from "@/lib/errors";
 import { notifyAfterSlip, notifyNewBooking, notifyPaymentReviewed } from "@/lib/line/notify-shop";
 import { safeNext } from "@/lib/safe-next";
+import { planAdminSlipUpload } from "@/lib/admin-slip";
 import { isSlipVerificationEnabled, verifyLatestSlip } from "@/lib/slip/verify-booking";
 import { createClient, getSessionUser } from "@/lib/supabase/server";
 import { getServiceClient } from "@/lib/supabase/service";
@@ -478,20 +479,16 @@ export async function adminUploadSlipFile(formData: FormData): Promise<ActionRes
   // Fetch booking details (including group_id so multi-court bills sum together)
   const { data: booking, error: bookingErr } = await supabase
     .from("bookings")
-    .select("id, user_id, amount, group_id")
+    .select("id, user_id, amount, status, group_id")
     .eq("id", bookingId)
-    .single<{ id: string; user_id: string; amount: number; group_id?: string }>();
+    .single<{ id: string; user_id: string; amount: number; status: string; group_id?: string }>();
 
   if (bookingErr || !booking) {
     return { ok: false, error: "ไม่พบข้อมูลการจอง" };
   }
-  const isConfirmed = booking.status === "confirmed";
-  if (!isConfirmed && booking.status !== "pending_payment") {
-    return {
-      ok: false,
-      error: booking.status === "awaiting_review" ? "การจองนี้มีสลิปรอตรวจอยู่แล้ว" : "แนบสลิปไม่ได้ การจองนี้ถูกยกเลิกหรือหมดเวลาแล้ว",
-    };
-  }
+  const plan = planAdminSlipUpload(booking.status);
+  if (!plan.allowed) return { ok: false, error: plan.error };
+  const isConfirmed = plan.keepConfirmed;
 
   let groupAmount = Number(booking.amount);
   const groupId = booking.group_id ?? booking.id;
@@ -503,7 +500,6 @@ export async function adminUploadSlipFile(formData: FormData): Promise<ActionRes
     groupAmount = groupRows.reduce((sum, r) => sum + Number(r.amount), 0);
   }
 
-  const ext = SLIP_EXTENSIONS[file.type] ?? "jpg";
   const path = `${booking.user_id}/${bookingId}-${Date.now()}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -528,6 +524,14 @@ export async function adminUploadSlipFile(formData: FormData): Promise<ActionRes
   if (paymentError) {
     console.error("Admin payment insert failed:", paymentError);
     return { ok: false, error: "บันทึกข้อมูลการชำระเงินไม่สำเร็จ" };
+  }
+
+  // An already-confirmed booking keeps its status: the slip is a receipt, not a
+  // request to review, so a later "reject" cannot cancel a booking already paid for.
+  if (isConfirmed) {
+    revalidatePath("/admin");
+    revalidatePath(`/bookings/${bookingId}`);
+    return { ok: true, data: { path } };
   }
 
   // Update all bookings in the group to awaiting_review so they appear together on the review page

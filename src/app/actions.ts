@@ -15,31 +15,50 @@ export type ActionResult<T = null> = { ok: true; data: T } | { ok: false; error:
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export type BookingCartItemInput = {
+  courtId: number;
+  startsAt: string;
+  hours: number;
+};
+
 export async function createBooking(input: {
   courtId?: number;
   courtIds?: number[];
-  startsAt: string;
-  hours: number;
+  startsAt?: string;
+  hours?: number;
+  items?: BookingCartItemInput[];
   /** Coach accounts only (the database checks): pay later and/or an agreed bill total. */
   coach?: { payLater: boolean; total: number | null };
 }): Promise<ActionResult<{ id: string }>> {
-  const { courtId, courtIds, startsAt, hours, coach } = input;
-  const ids = Array.isArray(courtIds) && courtIds.length > 0
-    ? courtIds
-    : Number.isInteger(courtId)
-      ? [courtId!]
-      : [];
+  const { courtId, courtIds, startsAt, hours, items, coach } = input;
 
-  const validHours =
-    typeof hours === "number" &&
-    hours >= 0.5 &&
-    hours <= BOOKING_RULES.maxHours &&
-    Math.round(hours * 2) === hours * 2;
+  const normalizedItems: BookingCartItemInput[] =
+    Array.isArray(items) && items.length > 0
+      ? items
+      : (() => {
+          const ids =
+            Array.isArray(courtIds) && courtIds.length > 0
+              ? courtIds
+              : Number.isInteger(courtId)
+                ? [courtId!]
+                : [];
+          if (!startsAt || typeof hours !== "number") return [];
+          return ids.map((id) => ({ courtId: id, startsAt, hours }));
+        })();
+
+  const isValidItem = (it: BookingCartItemInput) =>
+    Number.isInteger(it.courtId) &&
+    typeof it.hours === "number" &&
+    it.hours >= 0.5 &&
+    it.hours <= BOOKING_RULES.maxHours &&
+    Math.round(it.hours * 2) === it.hours * 2 &&
+    typeof it.startsAt === "string" &&
+    !Number.isNaN(Date.parse(it.startsAt));
+
   if (
-    ids.length === 0 ||
-    ids.some((id) => !Number.isInteger(id)) ||
-    !validHours ||
-    Number.isNaN(Date.parse(startsAt)) ||
+    normalizedItems.length === 0 ||
+    normalizedItems.length > 8 ||
+    normalizedItems.some((it) => !isValidItem(it)) ||
     (coach !== undefined &&
       (typeof coach.payLater !== "boolean" ||
         (coach.total !== null && (!Number.isInteger(coach.total) || coach.total <= 0))))
@@ -48,24 +67,115 @@ export async function createBooking(input: {
   }
 
   const supabase = await createClient();
-  const { data, error } = coach
-    ? await supabase
-        .rpc("create_coach_booking", {
-          p_court_ids: ids,
-          p_starts_at: startsAt,
-          p_hours: hours,
-          p_pay_later: coach.payLater,
-          p_total: coach.total,
-        })
-        .single<{ id: string }>()
-    : await supabase
-        .rpc("create_multi_booking", { p_court_ids: ids, p_starts_at: startsAt, p_hours: hours })
-        .single<{ id: string }>();
 
-  if (error || !data) return { ok: false, error: friendlyError(error) };
+  // Check if all items share the exact same startsAt and hours with distinct courts
+  const firstStart = normalizedItems[0].startsAt;
+  const firstHours = normalizedItems[0].hours;
+  const uniqueCourts = new Set(normalizedItems.map((it) => it.courtId));
+  const allSameSlot =
+    uniqueCourts.size === normalizedItems.length &&
+    normalizedItems.every((it) => it.startsAt === firstStart && it.hours === firstHours);
+
+  if (allSameSlot) {
+    const ids = normalizedItems.map((it) => it.courtId);
+    const { data, error } = coach
+      ? await supabase
+          .rpc("create_coach_booking", {
+            p_court_ids: ids,
+            p_starts_at: firstStart,
+            p_hours: firstHours,
+            p_pay_later: coach.payLater,
+            p_total: coach.total,
+          })
+          .single<{ id: string }>()
+      : await supabase
+          .rpc("create_multi_booking", {
+            p_court_ids: ids,
+            p_starts_at: firstStart,
+            p_hours: firstHours,
+          })
+          .single<{ id: string }>();
+
+    if (error || !data) return { ok: false, error: friendlyError(error) };
+    revalidatePath("/me");
+    await notifyNewBooking(data.id);
+    return { ok: true, data: { id: data.id } };
+  }
+
+  // Different start times or durations per court: try atomic create_cart_booking RPC first
+  const rpcPayload = normalizedItems.map((it) => ({
+    court_id: it.courtId,
+    starts_at: it.startsAt,
+    hours: it.hours,
+  }));
+  const cartRpc = await supabase
+    .rpc("create_cart_booking", {
+      p_items: rpcPayload,
+      p_pay_later: coach?.payLater ?? false,
+      p_total: coach?.total ?? null,
+    })
+    .single<{ id: string; group_id?: string }>();
+
+  if (!cartRpc.error && cartRpc.data) {
+    revalidatePath("/me");
+    await notifyNewBooking(cartRpc.data.id);
+    return { ok: true, data: { id: cartRpc.data.id } };
+  }
+
+  // Fallback if 0017_multi_slot_bookings.sql is not yet migrated on the database:
+  // Create each item and link them under the first booking's group_id.
+  const isMissingRpc =
+    cartRpc.error?.code === "PGRST202" ||
+    cartRpc.error?.message?.includes("create_cart_booking");
+  if (!isMissingRpc) {
+    return { ok: false, error: friendlyError(cartRpc.error) };
+  }
+
+  const createdIds: string[] = [];
+  let leadGroupId: string | null = null;
+
+  for (const it of normalizedItems) {
+    const res = coach
+      ? await supabase
+          .rpc("create_coach_booking", {
+            p_court_ids: [it.courtId],
+            p_starts_at: it.startsAt,
+            p_hours: it.hours,
+            p_pay_later: coach.payLater,
+            p_total: null,
+          })
+          .single<{ id: string; group_id?: string }>()
+      : await supabase
+          .rpc("create_multi_booking", {
+            p_court_ids: [it.courtId],
+            p_starts_at: it.startsAt,
+            p_hours: it.hours,
+          })
+          .single<{ id: string; group_id?: string }>();
+
+    if (res.error || !res.data) {
+      for (const cid of createdIds) {
+        await supabase.rpc("cancel_booking", { p_booking_id: cid });
+      }
+      return { ok: false, error: friendlyError(res.error) };
+    }
+    createdIds.push(res.data.id);
+    if (!leadGroupId) {
+      leadGroupId = res.data.group_id ?? res.data.id;
+    }
+  }
+
+  const service = getServiceClient();
+  if (service && leadGroupId && createdIds.length > 1) {
+    await service
+      .from("bookings")
+      .update({ group_id: leadGroupId })
+      .in("id", createdIds);
+  }
+
   revalidatePath("/me");
-  await notifyNewBooking(data.id);
-  return { ok: true, data: { id: data.id } };
+  await notifyNewBooking(createdIds[0]);
+  return { ok: true, data: { id: createdIds[0] } };
 }
 
 export async function submitSlip(bookingId: string, slipPath: string): Promise<ActionResult> {
@@ -154,11 +264,19 @@ export async function reviewPayment(
   return { ok: true, data: null };
 }
 
+export type AdminBookingItemInput = {
+  courtId: number;
+  date: string; // YYYY-MM-DD, Bangkok
+  hour: number;
+  hours: number;
+};
+
 export type AdminBookingInput = {
   courtId: number;
   date: string; // YYYY-MM-DD, Bangkok
   hour: number;
   hours: number;
+  items?: AdminBookingItemInput[];
   channel: "phone" | "line" | "walk_in";
   name: string;
   phone: string;
@@ -168,22 +286,30 @@ export type AdminBookingInput = {
 const CHANNELS = new Set(["phone", "line", "walk_in"]);
 
 export async function adminCreateBooking(input: AdminBookingInput): Promise<ActionResult<{ id: string }>> {
-  const { courtId, date, hour, hours, channel, name, phone, note } = input;
-  const validHour =
-    typeof hour === "number" &&
-    hour >= BOOKING_RULES.openHour &&
-    hour < BOOKING_RULES.closeHour &&
-    Math.round(hour * 2) === hour * 2;
-  const validHours =
-    typeof hours === "number" &&
-    hours >= 0.5 &&
-    hours <= 14 &&
-    Math.round(hours * 2) === hours * 2;
+  const { courtId, date, hour, hours, items, channel, name, phone, note } = input;
+  const normalizedItems: AdminBookingItemInput[] =
+    Array.isArray(items) && items.length > 0
+      ? items
+      : [{ courtId, date, hour, hours }];
+
+  const isValidAdminItem = (it: AdminBookingItemInput) => {
+    const validHour =
+      typeof it.hour === "number" &&
+      it.hour >= BOOKING_RULES.openHour &&
+      it.hour < BOOKING_RULES.closeHour &&
+      Math.round(it.hour * 2) === it.hour * 2;
+    const validHours =
+      typeof it.hours === "number" &&
+      it.hours >= 0.5 &&
+      it.hours <= 14 &&
+      Math.round(it.hours * 2) === it.hours * 2;
+    return Number.isInteger(it.courtId) && /^\d{4}-\d{2}-\d{2}$/.test(it.date) && validHour && validHours;
+  };
+
   if (
-    !Number.isInteger(courtId) ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
-    !validHour ||
-    !validHours ||
+    normalizedItems.length === 0 ||
+    normalizedItems.length > 12 ||
+    normalizedItems.some((it) => !isValidAdminItem(it)) ||
     !CHANNELS.has(channel) ||
     typeof name !== "string" ||
     name.trim().length === 0 ||
@@ -195,21 +321,92 @@ export async function adminCreateBooking(input: AdminBookingInput): Promise<Acti
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .rpc("admin_create_booking", {
-      p_court_id: courtId,
-      p_starts_at: slotStart(date, hour),
-      p_hours: hours,
+
+  if (normalizedItems.length === 1) {
+    const it = normalizedItems[0];
+    const { data, error } = await supabase
+      .rpc("admin_create_booking", {
+        p_court_id: it.courtId,
+        p_starts_at: slotStart(it.date, it.hour),
+        p_hours: it.hours,
+        p_channel: channel,
+        p_customer_name: name,
+        p_customer_phone: phone || null,
+        p_note: note || null,
+      })
+      .single<{ id: string }>();
+    if (error || !data) return { ok: false, error: friendlyError(error) };
+
+    revalidatePath("/admin");
+    return { ok: true, data: { id: data.id } };
+  }
+
+  // Multi-item admin booking: try atomic admin_create_cart_booking first
+  const rpcPayload = normalizedItems.map((it) => ({
+    court_id: it.courtId,
+    starts_at: slotStart(it.date, it.hour),
+    hours: it.hours,
+  }));
+  const cartRpc = await supabase
+    .rpc("admin_create_cart_booking", {
+      p_items: rpcPayload,
       p_channel: channel,
       p_customer_name: name,
       p_customer_phone: phone || null,
       p_note: note || null,
     })
     .single<{ id: string }>();
-  if (error || !data) return { ok: false, error: friendlyError(error) };
+
+  if (!cartRpc.error && cartRpc.data) {
+    revalidatePath("/admin");
+    return { ok: true, data: { id: cartRpc.data.id } };
+  }
+
+  const isMissingRpc =
+    cartRpc.error?.code === "PGRST202" ||
+    cartRpc.error?.message?.includes("admin_create_cart_booking");
+  if (!isMissingRpc) {
+    return { ok: false, error: friendlyError(cartRpc.error) };
+  }
+
+  // Fallback if 0017 is not yet migrated: create each booking and link group_id
+  const createdIds: string[] = [];
+  let leadGroupId: string | null = null;
+  for (const it of normalizedItems) {
+    const res = await supabase
+      .rpc("admin_create_booking", {
+        p_court_id: it.courtId,
+        p_starts_at: slotStart(it.date, it.hour),
+        p_hours: it.hours,
+        p_channel: channel,
+        p_customer_name: name,
+        p_customer_phone: phone || null,
+        p_note: note || null,
+      })
+      .single<{ id: string; group_id?: string }>();
+
+    if (res.error || !res.data) {
+      for (const cid of createdIds) {
+        await supabase.rpc("cancel_booking", { p_booking_id: cid });
+      }
+      return { ok: false, error: friendlyError(res.error) };
+    }
+    createdIds.push(res.data.id);
+    if (!leadGroupId) {
+      leadGroupId = res.data.group_id ?? res.data.id;
+    }
+  }
+
+  const service = getServiceClient();
+  if (service && leadGroupId && createdIds.length > 1) {
+    await service
+      .from("bookings")
+      .update({ group_id: leadGroupId })
+      .in("id", createdIds);
+  }
 
   revalidatePath("/admin");
-  return { ok: true, data: { id: data.id } };
+  return { ok: true, data: { id: createdIds[0] } };
 }
 
 export async function markBankNotificationHandled(id: string): Promise<ActionResult> {
@@ -262,15 +459,25 @@ export async function adminUploadSlipFile(formData: FormData): Promise<ActionRes
   const supabase = getServiceClient();
   if (!supabase) return { ok: false, error: "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ (ยังไม่ได้ตั้งค่า Service Role Key)" };
 
-  // Fetch booking details
+  // Fetch booking details (including group_id so multi-court bills sum together)
   const { data: booking, error: bookingErr } = await supabase
     .from("bookings")
-    .select("id, user_id, amount")
+    .select("id, user_id, amount, group_id")
     .eq("id", bookingId)
-    .single();
+    .single<{ id: string; user_id: string; amount: number; group_id?: string }>();
 
   if (bookingErr || !booking) {
     return { ok: false, error: "ไม่พบข้อมูลการจอง" };
+  }
+
+  let groupAmount = Number(booking.amount);
+  const groupId = booking.group_id ?? booking.id;
+  const { data: groupRows } = await supabase
+    .from("bookings")
+    .select("amount")
+    .eq("group_id", groupId);
+  if (groupRows && groupRows.length > 0) {
+    groupAmount = groupRows.reduce((sum, r) => sum + Number(r.amount), 0);
   }
 
   const ext = SLIP_EXTENSIONS[file.type] ?? "jpg";
@@ -285,11 +492,11 @@ export async function adminUploadSlipFile(formData: FormData): Promise<ActionRes
     return { ok: false, error: "อัปโหลดไม่สำเร็จ กรุณาลองใหม่" };
   }
 
-  // Insert payment record
+  // Insert payment record with full group amount
   const { error: paymentError } = await supabase.from("payments").insert({
     booking_id: bookingId,
     user_id: booking.user_id,
-    amount: booking.amount,
+    amount: groupAmount,
     slip_path: path,
     status: "submitted",
   });
@@ -298,7 +505,7 @@ export async function adminUploadSlipFile(formData: FormData): Promise<ActionRes
     return { ok: false, error: "บันทึกข้อมูลการชำระเงินไม่สำเร็จ" };
   }
 
-  // Update booking status to awaiting_review so it appears on the review page
+  // Update all bookings in the group to awaiting_review so they appear together on the review page
   const { error: updateError } = await supabase
     .from("bookings")
     .update({
@@ -306,7 +513,7 @@ export async function adminUploadSlipFile(formData: FormData): Promise<ActionRes
       hold_expires_at: null,
       review_note: null,
     })
-    .eq("id", bookingId);
+    .eq("group_id", groupId);
   if (updateError) {
     console.error("Admin booking update failed:", updateError);
     return { ok: false, error: "อัปเดตสถานะการจองไม่สำเร็จ" };

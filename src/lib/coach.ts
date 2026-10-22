@@ -68,6 +68,25 @@ export function lessonTotal(courtPricePerHour: number, pricePerHour: number, hou
   return Math.round(courtPricePerHour * hours) + lessonFee(pricePerHour, hours);
 }
 
+/**
+ * The open start times from `coach_open_starts`, which returns a set of timestamps.
+ * PostgREST may hand back bare strings or one-key rows depending on the version, so
+ * accept both rather than risk an empty page.
+ */
+export function toStartTimes(data: unknown): string[] {
+  if (!Array.isArray(data)) return [];
+  return data
+    .map((row) => {
+      if (typeof row === "string") return row;
+      if (row && typeof row === "object") {
+        const first = Object.values(row).find((v) => typeof v === "string");
+        return typeof first === "string" ? first : null;
+      }
+      return null;
+    })
+    .filter((value): value is string => value !== null && !Number.isNaN(Date.parse(value)));
+}
+
 export function isLessonHours(hours: number): boolean {
   return (LESSON_HOUR_OPTIONS as readonly number[]).includes(hours);
 }

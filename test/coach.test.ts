@@ -8,6 +8,7 @@ import {
   parseMinute,
   slotsByWeekday,
   summariseAvailability,
+  toStartTimes,
 } from "../src/lib/coach";
 
 describe("formatMinute and parseMinute", () => {
@@ -56,6 +57,20 @@ describe("slotsByWeekday and summariseAvailability", () => {
   it("reads as a short line for a coach card", () => {
     expect(summariseAvailability(slots)).toBe("จ 17:00–19:00 · จ 20:00–21:00 · ส 09:00–12:00");
     expect(summariseAvailability([])).toBe("");
+  });
+});
+
+describe("toStartTimes", () => {
+  it("accepts bare timestamps or one-key rows from the RPC", () => {
+    const iso = "2026-10-25T12:00:00+00:00";
+    expect(toStartTimes([iso])).toEqual([iso]);
+    expect(toStartTimes([{ coach_open_starts: iso }])).toEqual([iso]);
+  });
+
+  it("drops anything that is not a timestamp", () => {
+    expect(toStartTimes(null)).toEqual([]);
+    expect(toStartTimes("not an array")).toEqual([]);
+    expect(toStartTimes(["later today", 5, null, {}])).toEqual([]);
   });
 });
 

@@ -7,6 +7,7 @@ import {
   LESSON_HOUR_OPTIONS,
   lessonTotal,
   summariseAvailability,
+  toStartTimes,
   type AvailabilitySlot,
 } from "@/lib/coach";
 import { formatBaht, formatDayParts, formatTime } from "@/lib/format";
@@ -56,7 +57,7 @@ export default async function CoachPage({
       .select("weekday, start_minute, end_minute")
       .eq("coach_id", id)
       .returns<AvailabilitySlot[]>(),
-    supabase.rpc("coach_open_starts", { p_coach_id: id, p_day: day, p_hours: hours }).returns<string[]>(),
+    supabase.rpc("coach_open_starts", { p_coach_id: id, p_day: day, p_hours: hours }),
   ]);
 
   if (!coach) notFound();
@@ -64,7 +65,7 @@ export default async function CoachPage({
 
   const courtPrice = courts?.[0]?.price_per_hour ?? 0;
   const total = lessonTotal(courtPrice, coach.lesson_price_per_hour, hours);
-  const openStarts = Array.isArray(starts) ? starts : [];
+  const openStarts = toStartTimes(starts);
   const hoursLabel = (h: number) => (Number.isInteger(h) ? `${h} ชม.` : `${h} ชม.`);
 
   return (

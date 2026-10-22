@@ -412,8 +412,8 @@ export function BookingForm({
               className="booking-add-all-courts-btn"
               onClick={addAllFreeCourtsForCurrentWindow}
             >
-              ⚡ มาเยอะ? เพิ่มเวลานี้ ({formatHour(hour)}–{formatHour(hour + hours)}) ทั้ง{" "}
-              {freeCourtsForCurrentWindow.length} สนามที่ว่างในคลิกเดียว
+              ⚡ เลือกเวลาเดียวกัน ({formatHour(hour)}–{formatHour(hour + hours)}) ทั้ง{" "}
+              {freeCourtsForCurrentWindow.length} 
             </button>
           )}
         </div>

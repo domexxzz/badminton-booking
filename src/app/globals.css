@@ -2425,7 +2425,7 @@ details summary { cursor: pointer; }
   border-radius: 14px;
   border: 1.5px dashed #15803d;
   background: color-mix(in srgb, var(--brand-soft) 55%, var(--surface));
-  color: #14532d;
+  color: #ffffff;
   font-size: 15px;
   font-weight: 800;
   cursor: pointer;

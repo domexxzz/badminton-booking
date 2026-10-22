@@ -21,6 +21,7 @@ const MIGRATIONS = [
   "0014_coach_terms.sql",
   "0015_shop_contact.sql",
   "0016_refund_bank_account.sql",
+  "0017_multi_slot_bookings.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 

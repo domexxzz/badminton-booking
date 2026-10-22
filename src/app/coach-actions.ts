@@ -60,11 +60,16 @@ export async function setCoachAvailability(userId: string, slots: AvailabilitySl
   return { ok: true, data: null };
 }
 
-/** Holds a court and the coach, then the customer pays the usual way. */
+/**
+ * Holds a court and the coach, then the customer pays the usual way.
+ * `expectedTotal` is the bill the page showed them; the database refuses the booking if
+ * the real total differs, so nobody is charged a price they did not see.
+ */
 export async function createLessonBooking(
   coachId: string,
   startsAt: string,
   hours: number,
+  expectedTotal: number,
 ): Promise<ActionResult<{ id: string }>> {
   if (
     !UUID_RE.test(coachId) ||
@@ -73,14 +78,21 @@ export async function createLessonBooking(
     typeof hours !== "number" ||
     hours < 1 ||
     hours > 3 ||
-    Math.round(hours * 2) !== hours * 2
+    Math.round(hours * 2) !== hours * 2 ||
+    !Number.isInteger(expectedTotal) ||
+    expectedTotal <= 0
   ) {
     return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
   }
 
   const supabase = await createClient();
   const { data, error } = await supabase
-    .rpc("create_lesson_booking", { p_coach_id: coachId, p_starts_at: startsAt, p_hours: hours })
+    .rpc("create_lesson_booking", {
+      p_coach_id: coachId,
+      p_starts_at: startsAt,
+      p_hours: hours,
+      p_expected_total: expectedTotal,
+    })
     .single<{ id: string }>();
   if (error || !data) return { ok: false, error: friendlyError(error) };
 
@@ -89,12 +101,30 @@ export async function createLessonBooking(
   return { ok: true, data: { id: data.id } };
 }
 
-/** Admin: the shop handed the lesson fees for finished lessons to the coach. */
-export async function markCoachPaid(coachId: string): Promise<ActionResult<{ count: number }>> {
-  if (!UUID_RE.test(coachId)) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
+/**
+ * Admin: the shop handed the lesson fees to the coach. `bookingIds` are the lessons the
+ * admin had on screen, so one that finished since the page loaded is not stamped unseen.
+ */
+export async function markCoachPaid(
+  coachId: string,
+  bookingIds: string[],
+): Promise<ActionResult<{ count: number; total: number }>> {
+  if (
+    !UUID_RE.test(coachId) ||
+    !Array.isArray(bookingIds) ||
+    bookingIds.length === 0 ||
+    bookingIds.length > 500 ||
+    !bookingIds.every((id) => UUID_RE.test(id))
+  ) {
+    return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
+  }
+
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("mark_coach_paid", { p_coach_id: coachId });
+  const { data, error } = await supabase
+    .rpc("mark_coach_paid", { p_coach_id: coachId, p_booking_ids: bookingIds })
+    .single<{ paid_count: number; paid_total: number }>();
   if (error) return { ok: false, error: friendlyError(error) };
   revalidatePath("/admin/coaches");
-  return { ok: true, data: { count: Number(data ?? 0) } };
+  revalidatePath("/coach");
+  return { ok: true, data: { count: Number(data?.paid_count ?? 0), total: Number(data?.paid_total ?? 0) } };
 }

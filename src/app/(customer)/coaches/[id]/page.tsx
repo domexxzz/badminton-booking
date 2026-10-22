@@ -63,8 +63,11 @@ export default async function CoachPage({
   if (!coach) notFound();
   if (startsError) console.error("Failed to load the coach's open times:", startsError);
 
-  const courtPrice = courts?.[0]?.price_per_hour ?? 0;
-  const total = lessonTotal(courtPrice, coach.lesson_price_per_hour, hours);
+  // The booking takes the cheapest free court, so quote that price.
+  const courtPrice = Math.min(...(courts ?? []).map((c) => c.price_per_hour), Infinity);
+  const total = Number.isFinite(courtPrice)
+    ? lessonTotal(courtPrice, coach.lesson_price_per_hour, hours)
+    : 0;
   const openStarts = toStartTimes(starts);
   const hoursLabel = (h: number) => (Number.isInteger(h) ? `${h} ชม.` : `${h} ชม.`);
 
@@ -158,7 +161,14 @@ export default async function CoachPage({
             ) : (
               <div className="chip-grid">
                 {openStarts.map((s) => (
-                  <BookLessonButton key={s} coachId={id} startsAt={s} hours={hours} label={formatTime(s)} />
+                  <BookLessonButton
+                    key={s}
+                    coachId={id}
+                    startsAt={s}
+                    hours={hours}
+                    expectedTotal={total}
+                    label={formatTime(s)}
+                  />
                 ))}
               </div>
             )}

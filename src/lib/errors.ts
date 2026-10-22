@@ -53,6 +53,9 @@ const MESSAGES: Record<string, string> = {
   INVALID_AVAILABILITY: "ช่วงเวลาสอนไม่ถูกต้อง ต้องเป็นช่วงครึ่งชั่วโมงและเวลาเริ่มต้องมาก่อนเวลาจบ",
   COACH_PROFILE_REQUIRED: "กรุณาบันทึกข้อมูลโค้ชก่อน แล้วค่อยตั้งเวลาสอน",
   LESSON_FIXED_TIME: "การจองเรียนกับโค้ชเลื่อนเวลาเองไม่ได้ ถ้าต้องการเปลี่ยนเวลา กรุณายกเลิกแล้วจองใหม่ หรือติดต่อร้าน",
+  COACH_HAS_LESSON: "ช่วงเวลานี้คุณมีคลาสสอนอยู่ จองสนามเล่นเองทับเวลาสอนไม่ได้",
+  PRICE_CHANGED: "ราคาเพิ่งเปลี่ยน กรุณารีเฟรชหน้านี้แล้วเลือกเวลาอีกครั้ง",
+  NOTHING_TO_PAY: "ไม่มีค่าสอนที่ค้างจ่ายให้บันทึก",
 };
 
 export function friendlyError(error: { message?: string } | null | undefined): string {

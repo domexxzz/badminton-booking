@@ -36,6 +36,7 @@ alter table public.bookings
   add column if not exists coach_paid_at timestamptz; -- the shop paid the lesson fee on to the coach
 
 -- The real guarantee that a coach is never booked twice, including concurrent requests.
+alter table public.bookings drop constraint if exists no_double_coach;
 alter table public.bookings add constraint no_double_coach exclude using gist (
   coach_id with =,
   tstzrange(starts_at, ends_at, '[)') with &&
@@ -84,17 +85,51 @@ revoke execute on function public.reject_lesson_reschedule() from public, anon, 
 -- Helpers
 -- ---------------------------------------------------------------------------
 
--- Busy = a lesson with this coach, or a court the coach booked for themself.
+-- Busy = a lesson with this coach, or a court the coach booked to play on themself.
+-- Only their own online bookings count: a phone or walk-in booking an admin entered is
+-- owned by the admin's account, and an admin who also coaches is not busy because of it.
 create or replace function public.coach_busy(p_coach_id uuid, p_starts_at timestamptz, p_ends_at timestamptz)
 returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (
     select 1 from bookings b
-    where (b.coach_id = p_coach_id or b.user_id = p_coach_id)
+    where (b.coach_id = p_coach_id or (b.user_id = p_coach_id and b.channel = 'online'))
       and b.status in ('pending_payment', 'awaiting_review', 'confirmed')
       and tstzrange(b.starts_at, b.ends_at, '[)') && tstzrange(p_starts_at, p_ends_at, '[)')
   )
 $$;
+
+-- The constraint above only sees lessons. A coach booking a court to play on themself
+-- goes through the ordinary booking path, where nothing knows about their lessons, so
+-- the check belongs here: a coach cannot teach and play at the same time.
+create or replace function public.reject_booking_over_own_lesson() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.coach_id is null and new.user_id is not null and new.channel = 'online'
+     and new.status in ('pending_payment', 'awaiting_review', 'confirmed') then
+    -- The same lock create_lesson_booking() takes, so a lesson being booked right now
+    -- is either already inserted or still waiting behind us.
+    perform pg_advisory_xact_lock(hashtextextended('coach:' || new.user_id::text, 0));
+  end if;
+
+  if new.coach_id is null and new.user_id is not null and new.channel = 'online'
+     and new.status in ('pending_payment', 'awaiting_review', 'confirmed')
+     and exists (
+       select 1 from bookings b
+       where b.coach_id = new.user_id
+         and b.status in ('pending_payment', 'awaiting_review', 'confirmed')
+         and tstzrange(b.starts_at, b.ends_at, '[)') && tstzrange(new.starts_at, new.ends_at, '[)')
+     ) then
+    -- Not errcode 23P01: create_booking() turns any exclusion_violation into SLOT_TAKEN,
+    -- which would hide the real reason from the coach.
+    raise exception 'COACH_HAS_LESSON' using errcode = '22023';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists bookings_reject_over_own_lesson on public.bookings;
+create trigger bookings_reject_over_own_lesson before insert on public.bookings
+  for each row execute function public.reject_booking_over_own_lesson();
 
 create or replace function public.coach_hours_ok(p_coach_id uuid, p_starts_at timestamptz, p_hours numeric)
 returns boolean
@@ -255,7 +290,15 @@ $$;
 
 -- Holds the first free court through create_cart_booking() (same limits and 5-minute
 -- hold as any booking), then adds the coach and the lesson fee to the bill.
-create or replace function public.create_lesson_booking(p_coach_id uuid, p_starts_at timestamptz, p_hours numeric)
+-- p_expected_total is the bill the customer was shown (court time plus the lesson fee).
+-- If the real total differs — the coach changed their price, or the only free court costs
+-- something else — nothing is booked and the page asks them to look again.
+create or replace function public.create_lesson_booking(
+  p_coach_id      uuid,
+  p_starts_at     timestamptz,
+  p_hours         numeric,
+  p_expected_total numeric default null
+)
 returns public.bookings
 language plpgsql security definer set search_path = public as $$
 declare
@@ -300,7 +343,8 @@ begin
     raise exception 'COACH_BUSY' using errcode = '23P01';
   end if;
 
-  for v_court_id in select id from courts where is_active order by id loop
+  -- Cheapest free court first, so the price the page quoted is the price charged.
+  for v_court_id in select id from courts where is_active order by price_per_hour, id loop
     begin
       v_row := create_cart_booking(jsonb_build_array(jsonb_build_object(
         'court_id', v_court_id, 'starts_at', p_starts_at, 'hours', p_hours)));
@@ -322,6 +366,10 @@ begin
   exception when exclusion_violation then
     raise exception 'COACH_BUSY' using errcode = '23P01';
   end;
+
+  if p_expected_total is not null and round(p_expected_total) <> round(v_row.amount) then
+    raise exception 'PRICE_CHANGED' using errcode = '22023';
+  end if;
   return v_row;
 end $$;
 
@@ -329,7 +377,8 @@ end $$;
 -- Coach and shop views
 -- ---------------------------------------------------------------------------
 
--- The calling coach's lessons with the student's name and phone (profiles are private).
+-- The calling coach's lessons with the student's name, and their phone once the student
+-- has actually paid (a hold that lapses should not hand out a phone number).
 create or replace function public.coach_lessons()
 returns table (
   booking_id    uuid,
@@ -344,7 +393,8 @@ returns table (
 )
 language sql stable security definer set search_path = public as $$
   select b.id, b.starts_at, b.ends_at, c.name, b.status, b.lesson_fee, b.coach_paid_at,
-         p.display_name, p.phone
+         p.display_name,
+         case when b.status in ('awaiting_review', 'confirmed') then p.phone end
   from bookings b
   join courts c on c.id = b.court_id
   left join profiles p on p.id = b.user_id
@@ -355,40 +405,70 @@ language sql stable security definer set search_path = public as $$
   limit 200
 $$;
 
--- Admin: the shop paid the coach for every finished, confirmed lesson not paid yet.
-create or replace function public.mark_coach_paid(p_coach_id uuid) returns integer
+-- Admin: the shop handed the lesson fees to the coach. Only the lessons the admin had in
+-- front of them are stamped, so a lesson that finished meanwhile is not silently marked
+-- paid. Returns how many were stamped and their total.
+create or replace function public.mark_coach_paid(p_coach_id uuid, p_booking_ids uuid[])
+returns table (paid_count integer, paid_total numeric)
 language plpgsql security definer set search_path = public as $$
-declare
-  v_n int;
 begin
   if not is_admin() then
     raise exception 'FORBIDDEN' using errcode = '42501';
   end if;
-  update bookings set coach_paid_at = now()
-  where coach_id = p_coach_id and status = 'confirmed' and coach_paid_at is null and ends_at <= now();
-  get diagnostics v_n = row_count;
-  return v_n;
+  if p_booking_ids is null or array_length(p_booking_ids, 1) is null then
+    raise exception 'NOTHING_TO_PAY' using errcode = '22023';
+  end if;
+
+  return query
+  with stamped as (
+    update bookings set coach_paid_at = now()
+    where id = any (p_booking_ids)
+      and coach_id = p_coach_id
+      and status = 'confirmed'
+      and coach_paid_at is null
+      and ends_at <= now()
+    returning lesson_fee
+  )
+  select count(*)::int, coalesce(sum(lesson_fee), 0)::numeric from stamped;
 end $$;
+
+-- Every finished, confirmed lesson the shop has not paid the coach for yet. The admin
+-- page shows exactly these rows and sends their ids back to mark_coach_paid().
+create or replace function public.coach_unpaid_lessons(p_coach_id uuid)
+returns table (booking_id uuid, starts_at timestamptz, ends_at timestamptz, lesson_fee numeric)
+language sql stable security definer set search_path = public as $$
+  select b.id, b.starts_at, b.ends_at, b.lesson_fee
+  from bookings b
+  where is_admin()
+    and b.coach_id = p_coach_id
+    and b.status = 'confirmed'
+    and b.coach_paid_at is null
+    and b.ends_at <= now()
+  order by b.starts_at
+$$;
 
 -- ---------------------------------------------------------------------------
 -- Privileges & RLS
 -- ---------------------------------------------------------------------------
 
 revoke execute on function public.lock_lesson_time() from public, anon, authenticated;
+revoke execute on function public.reject_booking_over_own_lesson() from public, anon, authenticated;
 revoke execute on function public.coach_busy(uuid, timestamptz, timestamptz) from public, anon, authenticated;
 revoke execute on function public.coach_hours_ok(uuid, timestamptz, numeric) from public, anon, authenticated;
 revoke execute on function public.can_edit_coach(uuid) from public, anon, authenticated;
 revoke execute on function public.save_coach_profile(uuid, text, text, integer, boolean) from public, anon;
 revoke execute on function public.set_coach_availability(uuid, jsonb) from public, anon;
-revoke execute on function public.create_lesson_booking(uuid, timestamptz, numeric) from public, anon;
+revoke execute on function public.create_lesson_booking(uuid, timestamptz, numeric, numeric) from public, anon;
 revoke execute on function public.coach_lessons() from public, anon;
-revoke execute on function public.mark_coach_paid(uuid) from public, anon;
+revoke execute on function public.mark_coach_paid(uuid, uuid[]) from public, anon;
+revoke execute on function public.coach_unpaid_lessons(uuid) from public, anon;
 revoke execute on function public.coach_open_starts(uuid, date, numeric) from public;
 grant execute on function public.save_coach_profile(uuid, text, text, integer, boolean) to authenticated;
 grant execute on function public.set_coach_availability(uuid, jsonb) to authenticated;
-grant execute on function public.create_lesson_booking(uuid, timestamptz, numeric) to authenticated;
+grant execute on function public.create_lesson_booking(uuid, timestamptz, numeric, numeric) to authenticated;
 grant execute on function public.coach_lessons() to authenticated;
-grant execute on function public.mark_coach_paid(uuid) to authenticated;
+grant execute on function public.mark_coach_paid(uuid, uuid[]) to authenticated;
+grant execute on function public.coach_unpaid_lessons(uuid) to authenticated;
 grant execute on function public.coach_open_starts(uuid, date, numeric) to anon, authenticated;
 
 alter table public.coach_profiles     enable row level security;

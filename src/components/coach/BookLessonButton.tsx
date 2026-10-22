@@ -10,11 +10,14 @@ export function BookLessonButton({
   startsAt,
   hours,
   label,
+  expectedTotal,
 }: {
   coachId: string;
   startsAt: string;
   hours: number;
   label: string;
+  /** The bill shown on this page; the database refuses the booking if it has changed. */
+  expectedTotal: number;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +26,7 @@ export function BookLessonButton({
   function book() {
     setError(null);
     startTransition(async () => {
-      const result = await createLessonBooking(coachId, startsAt, hours);
+      const result = await createLessonBooking(coachId, startsAt, hours, expectedTotal);
       if (!result.ok) return setError(result.error);
       router.push(`/bookings/${result.data.id}`);
     });

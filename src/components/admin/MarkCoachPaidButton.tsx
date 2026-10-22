@@ -10,13 +10,15 @@ export function MarkCoachPaidButton({
   coachId,
   coachName,
   owed,
-  lessons,
+  /** The lessons shown on this page; only these are marked paid. */
+  bookingIds,
 }: {
   coachId: string;
   coachName: string;
   owed: number;
-  lessons: number;
+  bookingIds: string[];
 }) {
+  const lessons = bookingIds.length;
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -25,8 +27,11 @@ export function MarkCoachPaidButton({
     if (!confirm(`บันทึกว่าจ่ายค่าสอน ${formatBaht(owed)} ให้ ${coachName} แล้ว? (${lessons} คลาส)`)) return;
     setError(null);
     startTransition(async () => {
-      const result = await markCoachPaid(coachId);
+      const result = await markCoachPaid(coachId, bookingIds);
       if (!result.ok) return setError(result.error);
+      if (result.data.count < lessons) {
+        setError(`บันทึกได้ ${result.data.count} จาก ${lessons} คลาส (บางคลาสถูกบันทึกไปแล้วหรือถูกยกเลิก)`);
+      }
       router.refresh();
     });
   }

@@ -32,6 +32,14 @@ with `coach_paid_at`. The site never pays a coach and never splits a transfer.
 A lesson fee is whole baht, 0–5000 per hour, set by the coach. `lesson_fee` is stored on the
 booking so a later change to the coach's price does not change an existing bill.
 
+The booking takes the cheapest free court, and the page sends back the total it showed; if
+the real bill differs the booking is refused rather than charging a price nobody saw. The
+shop's "paid" button stamps only the lessons it listed on screen, so a lesson that finishes
+between opening the page and the tap is not marked paid unseen.
+
+Not handled: if the shop cancels a lesson after recording the pay-out, the pay-out is not
+reversed. That is a conversation with the coach, not a button.
+
 ## Not in scope
 
 - No per-lesson prices or packages, no recurring weekly lessons, no group classes with

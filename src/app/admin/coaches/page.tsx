@@ -24,6 +24,8 @@ type LessonRow = {
   customer_name: string | null;
 };
 
+type UnpaidRow = { booking_id: string; starts_at: string; ends_at: string; lesson_fee: number | null };
+
 /** Back office: who coaches, and what the shop still owes each of them. */
 export default async function AdminCoachesPage() {
   const { supabase } = await getSessionUser();
@@ -37,7 +39,9 @@ export default async function AdminCoachesPage() {
       .from("bookings")
       .select("id, coach_id, starts_at, ends_at, status, lesson_fee, coach_paid_at, customer_name")
       .not("coach_id", "is", null)
-      .order("starts_at", { ascending: false })
+      .eq("status", "confirmed")
+      .gt("ends_at", new Date().toISOString())
+      .order("starts_at")
       .limit(200)
       .returns<LessonRow[]>(),
     supabase
@@ -51,10 +55,16 @@ export default async function AdminCoachesPage() {
     return <p className="error">โหลดข้อมูลโค้ชไม่สำเร็จ</p>;
   }
 
-  const all = lessons ?? [];
-  const upcoming = all
-    .filter((l) => l.status === "confirmed" && Date.parse(l.ends_at) > Date.now())
-    .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  const upcoming = lessons ?? [];
+  // What is owed is read per coach, not sliced off a capped list, so the button pays for
+  // exactly the lessons shown here.
+  const unpaidByCoach = new Map<string, UnpaidRow[]>();
+  await Promise.all(
+    coaches.map(async (coach) => {
+      const { data } = await supabase.rpc("coach_unpaid_lessons", { p_coach_id: coach.user_id });
+      unpaidByCoach.set(coach.user_id, (data ?? []) as UnpaidRow[]);
+    }),
+  );
 
   return (
     <section className="stack" style={{ gap: 12 }}>
@@ -70,10 +80,7 @@ export default async function AdminCoachesPage() {
       {coaches.length === 0 && <div className="card muted">ยังไม่มีโค้ชที่บันทึกข้อมูลไว้</div>}
 
       {coaches.map((coach) => {
-        const mine = all.filter((l) => l.coach_id === coach.user_id);
-        const owedLessons = mine.filter(
-          (l) => l.status === "confirmed" && !l.coach_paid_at && Date.parse(l.ends_at) <= Date.now(),
-        );
+        const owedLessons = unpaidByCoach.get(coach.user_id) ?? [];
         const owed = owedLessons.reduce((sum, l) => sum + Number(l.lesson_fee ?? 0), 0);
         const hours = summariseAvailability((slots ?? []).filter((s) => s.coach_id === coach.user_id));
         return (
@@ -97,7 +104,7 @@ export default async function AdminCoachesPage() {
               coachId={coach.user_id}
               coachName={coach.display_name}
               owed={owed}
-              lessons={owedLessons.length}
+              bookingIds={owedLessons.map((l) => l.booking_id)}
             />
           </div>
         );

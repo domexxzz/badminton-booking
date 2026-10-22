@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { BOOKING_RULES } from "@/lib/config";
+import { BOOKING_RULES, SLIP_MAX_BYTES } from "@/lib/config";
 import { slotStart } from "@/lib/slots";
 import { friendlyError } from "@/lib/errors";
 import { notifyAfterSlip, notifyNewBooking, notifyPaymentReviewed } from "@/lib/line/notify-shop";
@@ -238,14 +238,22 @@ export async function reviewPayment(
   });
   if (error) return { ok: false, error: friendlyError(error) };
 
-  // If amount was edited by admin, record it in the payment record
-  if (typeof editedAmount === "number" && !isNaN(editedAmount) && editedAmount > 0) {
+  // An amount the admin corrected applies to the slip just approved, not to older rejected ones.
+  if (approve && typeof editedAmount === "number" && Number.isFinite(editedAmount) && editedAmount > 0) {
     const service = getServiceClient();
-    if (service) {
-      await service
-        .from("payments")
-        .update({ slip_amount: editedAmount })
-        .eq("booking_id", bookingId);
+    const { data: latest } = service
+      ? await service
+          .from("payments")
+          .select("id")
+          .eq("booking_id", bookingId)
+          .eq("status", "approved")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle<{ id: string }>()
+      : { data: null };
+    if (service && latest) {
+      const { error: amountError } = await service.from("payments").update({ slip_amount: editedAmount }).eq("id", latest.id);
+      if (amountError) console.error("Failed to record edited slip amount:", amountError);
     }
   }
 
@@ -445,16 +453,24 @@ const SLIP_EXTENSIONS: Record<string, string> = { "image/jpeg": "jpg", "image/pn
  * Admin-only: upload a slip image for any booking (bypasses Storage RLS).
  * Used when the admin creates a booking on behalf of a customer and wants to
  * attach the payment slip right away.
+ *
+ * A booking the admin already confirmed (phone / LINE / walk-in) stays confirmed:
+ * the slip is kept as an approved receipt and never enters the review queue, so a
+ * later "reject" cannot cancel it. An unpaid booking goes to review as usual.
  */
 export async function adminUploadSlipFile(formData: FormData): Promise<ActionResult<{ path: string }>> {
   const bookingId = String(formData.get("bookingId") ?? "");
-  const file = formData.get("file") as File | null;
+  const file = formData.get("file");
 
-  if (!UUID_RE.test(bookingId) || !file || file.size === 0) {
+  if (!UUID_RE.test(bookingId) || !(file instanceof File) || file.size === 0) {
     return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
   }
-  const { isAdmin } = await getSessionUser();
-  if (!isAdmin) return { ok: false, error: friendlyError({ message: "FORBIDDEN" }) };
+  const ext = SLIP_EXTENSIONS[file.type];
+  if (!ext) return { ok: false, error: "รองรับเฉพาะรูป JPG, PNG หรือ WEBP" };
+  if (file.size > SLIP_MAX_BYTES) return { ok: false, error: "ไฟล์ใหญ่เกิน 4MB" };
+
+  const { isAdmin, user } = await getSessionUser();
+  if (!isAdmin || !user) return { ok: false, error: friendlyError({ message: "FORBIDDEN" }) };
 
   const supabase = getServiceClient();
   if (!supabase) return { ok: false, error: "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ (ยังไม่ได้ตั้งค่า Service Role Key)" };
@@ -468,6 +484,13 @@ export async function adminUploadSlipFile(formData: FormData): Promise<ActionRes
 
   if (bookingErr || !booking) {
     return { ok: false, error: "ไม่พบข้อมูลการจอง" };
+  }
+  const isConfirmed = booking.status === "confirmed";
+  if (!isConfirmed && booking.status !== "pending_payment") {
+    return {
+      ok: false,
+      error: booking.status === "awaiting_review" ? "การจองนี้มีสลิปรอตรวจอยู่แล้ว" : "แนบสลิปไม่ได้ การจองนี้ถูกยกเลิกหรือหมดเวลาแล้ว",
+    };
   }
 
   let groupAmount = Number(booking.amount);
@@ -498,7 +521,9 @@ export async function adminUploadSlipFile(formData: FormData): Promise<ActionRes
     user_id: booking.user_id,
     amount: groupAmount,
     slip_path: path,
-    status: "submitted",
+    ...(isConfirmed
+      ? { status: "approved", reviewed_by: user.id, reviewed_at: new Date().toISOString() }
+      : { status: "submitted" }),
   });
   if (paymentError) {
     console.error("Admin payment insert failed:", paymentError);

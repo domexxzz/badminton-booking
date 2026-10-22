@@ -316,7 +316,7 @@ export function AdminBookingForm({
         <div className="stack" style={{ gap: 10, borderTop: "1px dashed var(--border)", paddingTop: 12 }}>
           <h3 style={{ margin: 0, fontSize: 15 }}>💳 ลูกค้าจ่ายเงินด้วย? แนบสลิปได้เลย</h3>
           <span className="muted" style={{ fontSize: 13 }}>
-            แนบสลิปแล้วจะไปรอที่หน้า "ตรวจสลิป" เพื่อตรวจสอบ (ไม่บังคับ ข้ามได้ถ้ายังไม่ได้รับเงิน)
+            การจองนี้ยืนยันแล้ว สลิปจะเก็บไว้เป็นหลักฐานการชำระ (ไม่บังคับ ข้ามได้ถ้ายังไม่ได้รับเงิน)
           </span>
           <AdminSlipUploader bookingId={createdBookingId} />
         </div>

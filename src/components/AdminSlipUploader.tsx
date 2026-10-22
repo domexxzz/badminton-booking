@@ -55,7 +55,7 @@ export function AdminSlipUploader({ bookingId }: { bookingId: string }) {
       <div className="stack" style={{ gap: 8, textAlign: "center", padding: "12px 0" }}>
         <span style={{ fontSize: 28 }}>✅</span>
         <strong>แนบสลิปเรียบร้อย</strong>
-        <span className="muted">สลิปจะแสดงในหน้า &quot;ตรวจสลิป&quot; เพื่อรอตรวจสอบ</span>
+        <span className="muted">เก็บสลิปไว้เป็นหลักฐานการชำระของการจองนี้แล้ว</span>
       </div>
     );
   }

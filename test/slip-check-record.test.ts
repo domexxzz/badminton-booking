@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { BBL_MERCHANT_INFO } from "../src/lib/promptpay";
 import { buildCheckRecord, receiverFromEnv } from "../src/lib/slip/check-record";
 import type { Expectation } from "../src/lib/slip/evaluate";
 import type { ProviderResult, SlipFacts } from "../src/lib/slip/types";
@@ -28,6 +29,7 @@ const exp = (overrides: Partial<Expectation> = {}): Expectation => ({
   now: new Date("2026-10-20T18:06:00+07:00"),
   promptPayId: "0812345678",
   bankAccount: null,
+  billerId: null,
   receiverNames: ["สมชาย ใจดี"],
   ...overrides,
 });
@@ -73,21 +75,33 @@ describe("buildCheckRecord", () => {
 });
 
 describe("receiverFromEnv", () => {
-  test("reads the PromptPay ID, bank account and comma-separated names", () => {
+  test("reads the PromptPay ID, bank account, biller ID and comma-separated names", () => {
     expect(
       receiverFromEnv({
         PROMPTPAY_ID: "0812345678",
         SLIP_RECEIVER_BANK_ACCOUNT: "123-4-56789-0",
+        SLIP_RECEIVER_BILLER_ID: "010753600037406",
         SLIP_RECEIVER_NAME: " สมชาย ใจดี , Somchai Jaidee ,",
       }),
     ).toEqual({
       promptPayId: "0812345678",
       bankAccount: "123-4-56789-0",
+      billerId: "010753600037406",
       receiverNames: ["สมชาย ใจดี", "Somchai Jaidee"],
     });
   });
 
   test("treats missing or empty values as not configured", () => {
-    expect(receiverFromEnv({ PROMPTPAY_ID: "" })).toEqual({ promptPayId: null, bankAccount: null, receiverNames: [] });
+    const { promptPayId, bankAccount, receiverNames } = receiverFromEnv({ PROMPTPAY_ID: "" });
+    expect({ promptPayId, bankAccount, receiverNames }).toEqual({
+      promptPayId: null,
+      bankAccount: null,
+      receiverNames: [],
+    });
+  });
+
+  test("falls back to the biller ID of the shop's own merchant QR", () => {
+    expect(receiverFromEnv({}).billerId).toBe(BBL_MERCHANT_INFO.billerId);
+    expect(receiverFromEnv({ SLIP_RECEIVER_BILLER_ID: "999" }).billerId).toBe("999");
   });
 });

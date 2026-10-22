@@ -10,6 +10,8 @@ export type Expectation = {
   now: Date;
   promptPayId: string | null;
   bankAccount: string | null;
+  /** Bill-payment receiver (Bangkok Bank Merchant Pro and friends). */
+  billerId: string | null;
   receiverNames: string[];
 };
 
@@ -50,8 +52,14 @@ export function nameMatches(slipName: string, configured: string): boolean {
   return c.startsWith(s) || s.startsWith(c);
 }
 
+/** Paying a merchant QR names a biller, not an account: "BILLERID" + a masked biller ID. */
+const BILLER_ID_TYPE = "BILLERID";
+
 function accountMatches(slip: SlipFacts, exp: Expectation): boolean {
   const { proxyType, proxyAccount, bankAccount } = slip.receiver;
+  if (proxyAccount && proxyType === BILLER_ID_TYPE && exp.billerId) {
+    if (maskedMatches(proxyAccount, exp.billerId)) return true;
+  }
   if (proxyAccount && proxyType && exp.promptPayId) {
     const expected = promptPayVariants(exp.promptPayId);
     if (proxyType === expected.type && expected.values.some((v) => maskedMatches(proxyAccount, v))) return true;
@@ -60,7 +68,8 @@ function accountMatches(slip: SlipFacts, exp: Expectation): boolean {
 }
 
 function receiverReasons(slip: SlipFacts, exp: Expectation): string[] {
-  if (exp.receiverNames.length === 0 || (exp.promptPayId === null && exp.bankAccount === null)) {
+  const hasAccount = exp.promptPayId !== null || exp.bankAccount !== null || exp.billerId !== null;
+  if (exp.receiverNames.length === 0 || !hasAccount) {
     return ["ยังไม่ได้ตั้งค่าชื่อ/บัญชีผู้รับ (SLIP_RECEIVER_NAME, PROMPTPAY_ID) จึงตรวจผู้รับอัตโนมัติไม่ได้"];
   }
   const shownAccount = slip.receiver.proxyAccount ?? slip.receiver.bankAccount ?? "ไม่ระบุบัญชี";

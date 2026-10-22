@@ -1,3 +1,4 @@
+import { BBL_MERCHANT_INFO } from "../promptpay";
 import { evaluateSlip, type Expectation } from "./evaluate";
 import type { ProviderResult, VerifyStatus } from "./types";
 
@@ -10,13 +11,18 @@ export type CheckRecord = {
   raw?: unknown;
 };
 
-type ReceiverConfig = Pick<Expectation, "promptPayId" | "bankAccount" | "receiverNames">;
+type ReceiverConfig = Pick<Expectation, "promptPayId" | "bankAccount" | "billerId" | "receiverNames">;
 
-/** Who the shop's money goes to, from PROMPTPAY_ID, SLIP_RECEIVER_BANK_ACCOUNT and SLIP_RECEIVER_NAME. */
+/**
+ * Who the shop's money goes to, from PROMPTPAY_ID, SLIP_RECEIVER_BANK_ACCOUNT,
+ * SLIP_RECEIVER_BILLER_ID and SLIP_RECEIVER_NAME. The biller ID falls back to the
+ * one in the shop's default merchant QR, so a slip of a bill payment still checks out.
+ */
 export function receiverFromEnv(env: Record<string, string | undefined>): ReceiverConfig {
   return {
     promptPayId: env.PROMPTPAY_ID || null,
     bankAccount: env.SLIP_RECEIVER_BANK_ACCOUNT || null,
+    billerId: env.SLIP_RECEIVER_BILLER_ID || BBL_MERCHANT_INFO.billerId,
     receiverNames: (env.SLIP_RECEIVER_NAME ?? "")
       .split(",")
       .map((n) => n.trim())

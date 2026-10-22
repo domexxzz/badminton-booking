@@ -34,6 +34,9 @@ services:
         sync: false
       - key: SLIP_RECEIVER_BANK_ACCOUNT
         sync: false
+      # Only when the shop's merchant QR changes; otherwise the built-in one is used.
+      - key: SLIP_RECEIVER_BILLER_ID
+        sync: false
       - key: LINE_LOGIN_CHANNEL_ID
         sync: false
       - key: LINE_LOGIN_CHANNEL_SECRET

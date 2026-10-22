@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { buildCourtQueues, chunkIntoGames, cleanQueueName, gamesAhead, waitingPosition, type QueueBoardRow } from "../src/lib/queue";
+import {
+  buildCourtQueues,
+  chunkIntoGames,
+  cleanQueueName,
+  gamesAhead,
+  lastCalledAt,
+  waitingPosition,
+  type QueueBoardRow,
+} from "../src/lib/queue";
 
 const row = (id: string, court: number, status: "waiting" | "playing", queued: string, called: string | null = null): QueueBoardRow => ({
   entry_id: id,
@@ -58,6 +66,22 @@ describe("waitingPosition and gamesAhead", () => {
   });
 });
 
+describe("lastCalledAt", () => {
+  it("returns the newest called_at on court, or null when nobody is playing", () => {
+    const [withPlayers] = buildCourtQueues(courts, [{ court_id: 1, is_open: true, players_per_game: 2 }], [
+      row("a", 1, "playing", "18:00", "19:00"),
+      row("b", 1, "playing", "18:01", "19:05"),
+      row("w", 1, "waiting", "19:10"),
+    ]);
+    expect(lastCalledAt(withPlayers)).toBe("2026-10-22T19:05:00+07:00");
+
+    const [empty] = buildCourtQueues(courts, [{ court_id: 1, is_open: true, players_per_game: 2 }], [
+      row("w", 1, "waiting", "19:10"),
+    ]);
+    expect(lastCalledAt(empty)).toBeNull();
+  });
+});
+
 describe("chunkIntoGames", () => {
   it("groups the line by players per game, last game may be short", () => {
     const rows = ["a", "b", "c", "d", "e"].map((id, i) => row(id, 1, "waiting", `19:0${i}`));
@@ -71,5 +95,12 @@ describe("cleanQueueName", () => {
     expect(cleanQueueName("  เอ   ตัวจริง ")).toBe("เอ ตัวจริง");
     expect(cleanQueueName("x".repeat(40))).toHaveLength(30);
     expect(cleanQueueName("   ")).toBeNull();
+  });
+
+  it("counts characters, so cutting never splits an emoji", () => {
+    // The database counts characters too, and a lone surrogate would be rejected.
+    const cut = cleanQueueName(`${"x".repeat(29)}🏸x`);
+    expect(cut).toBe(`${"x".repeat(29)}🏸`);
+    expect(Array.from(cut!)).toHaveLength(30);
   });
 });

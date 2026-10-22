@@ -43,6 +43,7 @@ const MESSAGES: Record<string, string> = {
   QUEUE_ENTRY_NOT_FOUND: "ไม่พบคิวนี้ อาจถูกเรียกลงสนามหรือออกจากคิวไปแล้ว",
   INVALID_PLAYERS_PER_GAME: "จำนวนคนต่อเกมต้องเป็น 2–4 คน",
   INVALID_QUEUE_ACTION: "ทำรายการนี้กับคิวนี้ไม่ได้",
+  QUEUE_CHANGED: "คิวเพิ่งถูกเปลี่ยนโดยคนอื่น หน้าจอกำลังอัปเดต กรุณาดูคิวล่าสุดแล้วลองใหม่",
 };
 
 export function friendlyError(error: { message?: string } | null | undefined): string {

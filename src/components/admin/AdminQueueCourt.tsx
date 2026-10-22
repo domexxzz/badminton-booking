@@ -10,7 +10,7 @@ import {
   type QueueEntryAction,
 } from "@/app/queue-actions";
 import type { ActionResult } from "@/app/actions";
-import { QUEUE_NAME_MAX, type CourtQueueView } from "@/lib/queue";
+import { lastCalledAt, QUEUE_NAME_MAX, type CourtQueueView } from "@/lib/queue";
 
 const PLAYER_OPTIONS = [
   { value: 2, label: "เดี่ยว (2 คน)" },
@@ -77,7 +77,7 @@ export function AdminQueueCourt({ view }: { view: CourtQueueView }) {
           <button
             type="button"
             className="btn btn-block queue-next-btn"
-            onClick={() => run(() => queueNextGame(view.courtId))}
+            onClick={() => run(() => queueNextGame(view.courtId, lastCalledAt(view)))}
             disabled={pending || (view.playing.length === 0 && view.waiting.length === 0)}
           >
             {nextCount > 0 ? `▶ เกมถัดไป · เรียก ${nextCount} คน` : "▶ จบเกมนี้ (ไม่มีคนรอ)"}

@@ -58,6 +58,18 @@ export function gamesAhead(position: number, playersPerGame: number): number {
   return Math.floor((position - 1) / Math.max(1, playersPerGame));
 }
 
+/**
+ * The latest called_at among the players on court, or null when the court is empty.
+ * "Next game" sends this back so the database can tell that the admin is acting on
+ * the game they are looking at, not on one a colleague already called.
+ */
+export function lastCalledAt(view: CourtQueueView): string | null {
+  return view.playing.reduce<string | null>(
+    (latest, r) => (r.called_at && (latest === null || r.called_at > latest) ? r.called_at : latest),
+    null,
+  );
+}
+
 /** Splits the waiting line into the games it will play, so each player sees their game. */
 export function chunkIntoGames(rows: readonly QueueBoardRow[], playersPerGame: number): QueueBoardRow[][] {
   const size = Math.max(1, playersPerGame);
@@ -66,8 +78,14 @@ export function chunkIntoGames(rows: readonly QueueBoardRow[], playersPerGame: n
   return games;
 }
 
-/** Tidies a nickname the same way the database does; null when nothing is left. */
+/**
+ * Tidies a nickname the same way the database does; null when nothing is left.
+ * Counts characters, not UTF-16 units, so cutting never splits an emoji in half
+ * (a lone surrogate would make the database reject the name).
+ */
 export function cleanQueueName(name: string): string | null {
-  const cleaned = name.trim().replace(/\s+/g, " ").slice(0, QUEUE_NAME_MAX);
+  const cleaned = Array.from(name.trim().replace(/\s+/g, " "))
+    .slice(0, QUEUE_NAME_MAX)
+    .join("");
   return cleaned === "" ? null : cleaned;
 }

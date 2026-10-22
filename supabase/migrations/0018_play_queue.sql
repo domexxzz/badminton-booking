@@ -155,6 +155,7 @@ begin
   if not exists (select 1 from courts where id = p_court_id) then
     raise exception 'COURT_NOT_FOUND' using errcode = 'P0002';
   end if;
+  perform end_stale_queue_entries(); -- opening tonight's queue never shows last night's line
 
   insert into court_queues (court_id, is_open, players_per_game, updated_at)
   values (p_court_id, coalesce(p_is_open, false), p_players_per_game, now())
@@ -193,7 +194,10 @@ begin
 end $$;
 
 -- Current players finish; the next players_per_game waiting go on. Returns how many went on.
-create or replace function public.queue_next_game(p_court_id smallint)
+-- p_seen_called_at is the latest called_at of the players the admin saw on court (null when
+-- the court looked empty). If the court changed since, nothing happens: two staff tapping
+-- "next game" for the same game must not send the just-called players off again.
+create or replace function public.queue_next_game(p_court_id smallint, p_seen_called_at timestamptz)
 returns integer
 language plpgsql security definer set search_path = public as $$
 declare
@@ -204,12 +208,15 @@ begin
     raise exception 'FORBIDDEN' using errcode = '42501';
   end if;
   perform end_stale_queue_entries();
-  -- Two admins pressing at once must not call two games.
   perform pg_advisory_xact_lock(hashtextextended('queue:' || p_court_id::text, 0));
 
   select players_per_game into v_per_game from court_queues where court_id = p_court_id and is_open;
   if not found then
     raise exception 'QUEUE_CLOSED' using errcode = '22023';
+  end if;
+  if (select max(called_at) from queue_entries where court_id = p_court_id and status = 'playing')
+     is distinct from p_seen_called_at then
+    raise exception 'QUEUE_CHANGED' using errcode = '40001';
   end if;
 
   update queue_entries set status = 'done', finished_at = now()
@@ -274,13 +281,13 @@ revoke execute on function public.join_queue(smallint, text) from public, anon;
 revoke execute on function public.leave_queue(uuid) from public, anon;
 revoke execute on function public.set_court_queue(smallint, boolean, smallint) from public, anon;
 revoke execute on function public.admin_add_to_queue(smallint, text) from public, anon;
-revoke execute on function public.queue_next_game(smallint) from public, anon;
+revoke execute on function public.queue_next_game(smallint, timestamptz) from public, anon;
 revoke execute on function public.queue_entry_action(uuid, text) from public, anon;
 grant execute on function public.join_queue(smallint, text) to authenticated;
 grant execute on function public.leave_queue(uuid) to authenticated;
 grant execute on function public.set_court_queue(smallint, boolean, smallint) to authenticated;
 grant execute on function public.admin_add_to_queue(smallint, text) to authenticated;
-grant execute on function public.queue_next_game(smallint) to authenticated;
+grant execute on function public.queue_next_game(smallint, timestamptz) to authenticated;
 grant execute on function public.queue_entry_action(uuid, text) to authenticated;
 
 alter table public.court_queues  enable row level security;

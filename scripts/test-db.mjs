@@ -633,6 +633,12 @@ check("anonymous users cannot call account refund RPC",
 const boardFor = async (court) =>
   (await db.query(`select name, status from queue_board where court_id = ${court} order by queued_at`)).rows;
 const entryRow = async (id) => (await db.query(`select * from queue_entries where id = '${id}'`)).rows[0];
+// What an admin looking at the court would send back with "next game".
+const seenCalledAt = async (court) =>
+  (await db.query(
+    `select max(called_at) as t from queue_entries where court_id = ${court} and status = 'playing'`)).rows[0].t;
+const nextGame = async (court) =>
+  (await db.query(`select queue_next_game($1::smallint, $2) as n`, [court, await seenCalledAt(court)])).rows[0].n;
 
 await as(U1);
 await expectError("cannot join a closed queue", `select join_queue(1::smallint, 'เอ')`, "QUEUE_CLOSED");
@@ -654,7 +660,7 @@ const { rows: [qe3] } = await db.query(`select * from admin_add_to_queue(1::smal
 check("admin adds a walk-in without an account", qe3.user_id === null && qe3.created_by === ADMIN);
 
 await as(U1);
-await expectError("customers cannot call the next game", `select queue_next_game(1::smallint)`, "FORBIDDEN");
+await expectError("customers cannot call the next game", `select queue_next_game(1::smallint, null)`, "FORBIDDEN");
 await expectError("customers cannot move others", `select queue_entry_action('${qe2.id}', 'remove')`, "FORBIDDEN");
 const boardCols = (await db.query(
   `select string_agg(column_name, ',' order by column_name) as c from information_schema.columns
@@ -663,14 +669,20 @@ check("the public board carries no user id", !boardCols.includes("user"), boardC
 check("board shows the line in order", (await boardFor(1)).map((r) => r.name).join("|") === "เอ ตัวจริง|บี|ซี walk-in");
 
 await as(ADMIN);
-const called = (await db.query(`select queue_next_game(1::smallint) as n`)).rows[0].n;
+const called = await nextGame(1);
 check("next game calls players_per_game from the front", called === 2
   && (await entryRow(qe1.id)).status === "playing" && (await entryRow(qe2.id)).status === "playing"
   && (await entryRow(qe3.id)).status === "waiting");
+// A second tap for the same game must not send the players who just went on off again.
+const staleSeen = await seenCalledAt(1);
+await expectError("a second next-game tap for the same game is refused",
+  `select queue_next_game(1::smallint, null)`, "QUEUE_CHANGED");
 await db.query(`select queue_entry_action('${qe1.id}', 'back')`);
 check("send to back puts a player behind the line", (await entryRow(qe1.id)).status === "waiting"
   && (await boardFor(1)).filter((r) => r.status === "waiting").map((r) => r.name).join("|") === "ซี walk-in|เอ ตัวจริง");
-await db.query(`select queue_next_game(1::smallint)`);
+await expectError("next game from a stale screen is refused",
+  `select queue_next_game(1::smallint, '${new Date(Date.parse(staleSeen) - 60000).toISOString()}')`, "QUEUE_CHANGED");
+await nextGame(1);
 check("next game finishes the players on court", (await entryRow(qe2.id)).status === "done"
   && (await entryRow(qe3.id)).status === "playing" && (await entryRow(qe1.id)).status === "playing");
 check("finished players leave the public board", !(await boardFor(1)).some((r) => r.name === "บี"));

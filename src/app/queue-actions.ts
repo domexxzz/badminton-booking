@@ -53,9 +53,15 @@ export async function adminAddToQueue(courtId: number, name: string): Promise<Ac
   return callRpc("admin_add_to_queue", { p_court_id: courtId, p_name: cleaned });
 }
 
-export async function queueNextGame(courtId: number): Promise<ActionResult> {
-  if (!isCourtId(courtId)) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
-  return callRpc("queue_next_game", { p_court_id: courtId });
+/**
+ * `seenCalledAt` is the called_at of the game the admin has on screen (null for an
+ * empty court). The database refuses the call if the court changed meanwhile, so two
+ * staff tapping at once cannot send one group of players off twice.
+ */
+export async function queueNextGame(courtId: number, seenCalledAt: string | null): Promise<ActionResult> {
+  const validSeen = seenCalledAt === null || (typeof seenCalledAt === "string" && !Number.isNaN(Date.parse(seenCalledAt)));
+  if (!isCourtId(courtId) || !validSeen) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
+  return callRpc("queue_next_game", { p_court_id: courtId, p_seen_called_at: seenCalledAt });
 }
 
 export async function queueEntryAction(entryId: string, action: QueueEntryAction): Promise<ActionResult> {

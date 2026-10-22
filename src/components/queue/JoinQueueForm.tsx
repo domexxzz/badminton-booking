@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import { joinQueue } from "@/app/queue-actions";
-import { QUEUE_NAME_MAX } from "@/lib/queue";
+import { cleanQueueName, QUEUE_NAME_MAX } from "@/lib/queue";
 
 export function JoinQueueForm({
   courts,
@@ -14,7 +14,7 @@ export function JoinQueueForm({
 }) {
   const router = useRouter();
   const [courtId, setCourtId] = useState(courts[0]?.id);
-  const [name, setName] = useState(defaultName.slice(0, QUEUE_NAME_MAX));
+  const [name, setName] = useState(cleanQueueName(defaultName) ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const court = courts.find((c) => c.id === courtId) ?? courts[0];

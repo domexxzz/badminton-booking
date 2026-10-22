@@ -1,6 +1,6 @@
 # System status: badminton-booking (แบดมินตัน@สินธานี)
 
-As of **2026-10-22**, `main` at `48eea9b`. This file is the current source of truth.
+As of **2026-10-22**, `main` at `075e485`. This file is the current source of truth.
 `PROJECT_HANDOFF.md` is older and partly out of date (it still says Vercel, ฿150, and older test counts).
 
 Read `AGENTS.md` before changing anything. It lists which files need the owner's (โดม) approval.
@@ -65,8 +65,8 @@ Email login was completely broken and is now working end to end:
 - The **Magic link** and **Confirm sign up** templates now use
   `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email`, so a link opens in any browser or
   in the Gmail/LINE in-app browser. The default link only worked in the browser that asked for it.
-- `TYPHOON_API_KEY` was removed from Render, so slip checks go through EasySlip (real bank
-  data) instead of an LLM reading the image.
+- `TYPHOON_API_KEY` was removed from Render and must never be added back: slip checks must
+  go through EasySlip (real bank data) instead of an LLM reading the image.
 
 ### Not finished
 1. **Multi-time cart booking is not proven end to end.** A test booking of 4 courts went
@@ -159,7 +159,7 @@ and any `.env*` file.
 | `LINE_LOGIN_CHANNEL_ID`, `LINE_LOGIN_CHANNEL_SECRET` | LINE Login | LINE login button off |
 | `LINE_MESSAGING_TOKEN`, `LINE_NOTIFY_EVENTS` | LINE alerts | no LINE alerts |
 | `BANK_WEBHOOK_SECRET`, `BANK_APP_PACKAGES` | money-in inbox from the shop phone | webhook returns 503 |
-| `TYPHOON_API_KEY` | AI OCR fallback | keep **unset**: it overrides EasySlip and an edited image can fool it |
+| `TYPHOON_API_KEY` | AI OCR fallback | removed from Render and must never be added back (keep unset): it overrides EasySlip and an edited image can fool it |
 
 - **Supabase Auth → URL Configuration** must use the Render domain, and the Magic link and
   Confirm sign up templates must keep the `token_hash` link.

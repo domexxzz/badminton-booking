@@ -35,6 +35,8 @@ type Booking = {
   pay_later?: boolean;
   paid_at?: string | null;
   list_amount?: number | null;
+  coach_id?: string | null;
+  lesson_fee?: number | null;
   status: string;
   hold_expires_at: string | null;
   review_note: string | null;
@@ -140,8 +142,20 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
   const refundSlipUrl = lastResolved?.refund_slip_path
     ? (await supabase.storage.from("refunds").createSignedUrl(lastResolved.refund_slip_path, 600)).data?.signedUrl ?? null
     : null;
+  // A lesson keeps the time the coach agreed to, so it cannot be moved (0019); the
+  // customer cancels and books again instead.
+  const isLesson = Boolean(booking.coach_id);
   const changeable =
-    booking.status === "confirmed" && booking.channel === "online" && Date.parse(booking.starts_at) > Date.now();
+    booking.status === "confirmed" &&
+    booking.channel === "online" &&
+    Date.parse(booking.starts_at) > Date.now();
+  const { data: lessonCoach } = isLesson
+    ? await supabase
+        .from("coach_profiles")
+        .select("display_name")
+        .eq("user_id", booking.coach_id!)
+        .maybeSingle<{ display_name: string }>()
+    : { data: null };
   const cancelDeadline = selfCancelDeadline(booking.starts_at);
   const cancelDeadlineText = `${formatDate(cancelDeadline.toISOString())} ${formatTime(cancelDeadline.toISOString())} น.`;
 
@@ -188,6 +202,20 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
         </div>
         <span className={`badge ${booking.status}`}>{STATUS_LABEL[booking.status]}</span>
       </section>
+
+      {isLesson && (
+        <section className="card stack" style={{ gap: 6 }}>
+          <h2>🎓 เรียนกับโค้ช {lessonCoach?.display_name ?? ""}</h2>
+          <div className="row">
+            <span className="muted">ค่าสอนในบิลนี้</span>
+            <strong>{formatBaht(Number(booking.lesson_fee ?? 0))}</strong>
+          </div>
+          <span className="muted" style={{ fontSize: 13 }}>
+            ยอดรวมคือค่าสนามบวกค่าสอนแล้ว · เวลาเรียนเลื่อนเองไม่ได้
+            {canSelfCancel(booking.starts_at) ? " แต่ยกเลิกได้ตามกำหนด" : " กรุณาติดต่อร้านถ้าต้องการเปลี่ยน"}
+          </span>
+        </section>
+      )}
 
       {isMultiCourt && (
         <section className="card stack" style={{ gap: 8 }}>
@@ -354,6 +382,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
           pending={pending}
           canCancel={canSelfCancel(booking.starts_at)}
           unpaidPayLater={unpaidPayLater}
+          allowReschedule={!isLesson}
           cancelDeadlineText={cancelDeadlineText}
         />
       )}

@@ -11,6 +11,7 @@ const TABS = [
   { href: "/admin/requests", label: "คำขอ" },
   { href: "/admin/new", label: "เพิ่มการจอง" },
   { href: "/admin/queue", label: "🏸 คิวก๊วน" },
+  { href: "/admin/coaches", label: "🎓 โค้ช" },
   { href: "/admin/team", label: "แอดมิน" },
   { href: "/admin/settings", label: "ตั้งค่าร้าน" },
 ];

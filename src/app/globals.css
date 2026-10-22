@@ -2606,3 +2606,17 @@ details summary { cursor: pointer; }
 .queue-next-btn { min-height: 52px; font-size: 16px; }
 .queue-add { display: flex; gap: 8px; }
 .queue-add input { flex: 1; min-width: 0; }
+
+/* ---------- Lessons with a coach ---------- */
+.coach-card { display: flex; align-items: center; gap: 12px; }
+.coach-card-main { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.coach-card-name { font-size: 16px; }
+.coach-card-bio {
+  font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.coach-card-hours { font-size: 12px; }
+.coach-card-price { display: flex; align-items: baseline; gap: 2px; flex: none; color: var(--primary-strong); }
+.coach-card-price .muted { font-size: 12px; }
+.coach-hours-day { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--border); }
+.coach-hours-row { display: flex; align-items: center; gap: 8px; }
+.coach-hours-row input[type="time"] { flex: 1; min-width: 0; }

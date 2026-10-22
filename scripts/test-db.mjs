@@ -23,6 +23,7 @@ const MIGRATIONS = [
   "0016_refund_bank_account.sql",
   "0017_multi_slot_bookings.sql",
   "0018_play_queue.sql",
+  "0019_coach_lessons.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -710,6 +711,120 @@ check("closing a queue ends every place in it", (await boardFor(1)).length === 0
   && (await entryRow(qe1.id)).status === "done");
 check("anonymous users cannot join", !(await db.query(
   `select has_function_privilege('anon', 'public.join_queue(smallint,text)', 'execute') as p`)).rows[0].p);
+
+// ---- Lessons with a coach (0019) ----
+const COACH2 = "88888888-8888-8888-8888-000000000002";
+const STUDENT = "88888888-8888-8888-8888-000000000003";
+await db.exec(`insert into auth.users (id, email) values ('${COACH2}','coach2@x.com'),('${STUDENT}','student@x.com')`);
+const lessonRow = async (id) => (await db.query(`select * from bookings where id = '${id}'`)).rows[0];
+// A weekday far enough ahead to stay inside the 14-day window, at 19:00 Bangkok.
+const { rows: [{ d, dow }] } = await db.query(
+  `select ((now() at time zone 'Asia/Bangkok')::date + 3) as d,
+          extract(dow from (now() at time zone 'Asia/Bangkok')::date + 3)::int as dow`);
+const lessonDay = new Date(d).toISOString().slice(0, 10);
+const lessonAt = (h) => `${lessonDay}T${String(h).padStart(2, "0")}:00:00+07:00`;
+
+await as(COACH2);
+await expectError("someone who is not a coach yet cannot list themselves",
+  `select save_coach_profile('${COACH2}', 'โค้ชบี', null, 300, true)`, "NOT_COACH");
+await as(ADMIN);
+await db.query(`select set_coach('${COACH2}', true)`);
+await as(U1);
+await expectError("nobody can edit someone else's coach profile",
+  `select save_coach_profile('${COACH2}', 'โค้ชปลอม', null, 1, true)`, "FORBIDDEN");
+await as(COACH2);
+await expectError("lesson price has a ceiling",
+  `select save_coach_profile('${COACH2}', 'โค้ชบี', null, 99999, true)`, "INVALID_LESSON_PRICE");
+await expectError("a coach profile needs a name",
+  `select save_coach_profile('${COACH2}', '   ', null, 300, true)`, "INVALID_NAME");
+const { rows: [cp] } = await db.query(`select * from save_coach_profile('${COACH2}', '  โค้ช   บี ', 'สอนพื้นฐาน', 300, true)`);
+check("coach saves their own profile", cp.display_name === "โค้ช บี" && cp.lesson_price_per_hour === 300 && cp.is_listed);
+
+await expectError("hours must be whole half hours inside a day",
+  `select set_coach_availability('${COACH2}', '[{"weekday":1,"start_minute":610,"end_minute":1200}]'::jsonb)`, "INVALID_AVAILABILITY");
+const slots = JSON.stringify([{ weekday: dow, start_minute: 17 * 60, end_minute: 21 * 60 }]);
+check("coach sets weekly hours",
+  (await db.query(`select set_coach_availability('${COACH2}', '${slots}'::jsonb) as n`)).rows[0].n === 1);
+check("saving hours again replaces the old ones",
+  (await db.query(`select set_coach_availability('${COACH2}', '${slots}'::jsonb) as n`)).rows[0].n === 1
+  && (await db.query(`select count(*)::int as n from coach_availability where coach_id = '${COACH2}'`)).rows[0].n === 1);
+
+await as(STUDENT);
+const openStarts = (await db.query(`select coach_open_starts('${COACH2}', '${lessonDay}'::date, 1.0) as s`)).rows.map((r) => r.s);
+check("open lesson times stay inside the coach's hours and the venue's",
+  openStarts.length > 0 && openStarts.every((s) => {
+    const h = Number(new Date(s).toLocaleString("en-GB", { timeZone: "Asia/Bangkok", hour: "2-digit", hourCycle: "h23" }));
+    return h >= 17 && h <= 20;
+  }), `${openStarts.length} starts`);
+await expectError("a lesson of 4 hours is too long",
+  `select create_lesson_booking('${COACH2}', '${lessonAt(19)}', 4.0)`, "INVALID_DURATION");
+await expectError("a lesson outside the coach's hours is refused",
+  `select create_lesson_booking('${COACH2}', '${lessonAt(10)}', 1.0)`, "COACH_UNAVAILABLE");
+const { rows: [lesson] } = await db.query(`select * from create_lesson_booking('${COACH2}', '${lessonAt(19)}', 1.0)`);
+check("the bill is court price plus lesson fee, waiting for payment",
+  lesson.status === "pending_payment" && Number(lesson.lesson_fee) === 300
+  && Number(lesson.amount) === 150 + 300 && lesson.coach_id === COACH2, JSON.stringify({ amount: lesson.amount }));
+check("a lesson holds a real court on the live board",
+  (await db.query(`select state from court_occupancy where booking_id = '${lesson.id}'`)).rows[0]?.state === "held");
+await expectError("the same coach cannot be booked twice at once",
+  `select create_lesson_booking('${COACH2}', '${lessonAt(19)}', 1.0)`, "COACH_BUSY");
+check("that time is gone from the open list",
+  !(await db.query(`select coach_open_starts('${COACH2}', '${lessonDay}'::date, 1.0) as s`)).rows
+    .some((r) => Date.parse(r.s) === Date.parse(lessonAt(19))));
+await as(COACH2);
+await expectError("a coach cannot book a lesson with themself",
+  `select create_lesson_booking('${COACH2}', '${lessonAt(20)}', 1.0)`, "CANNOT_BOOK_SELF");
+// A court the coach booked for themself also makes them busy.
+const coachOwn = await paidBooking(COACH2, 1, lessonAt(20), 1);
+await as(STUDENT);
+await expectError("a coach playing their own booking is busy",
+  `select create_lesson_booking('${COACH2}', '${lessonAt(20)}', 1.0)`, "COACH_BUSY");
+
+// Paying for a lesson is an ordinary slip, and the lesson time cannot be moved.
+await as(STUDENT);
+await db.exec(`insert into storage.objects (bucket_id, name) values ('slips', '${STUDENT}/${lesson.id}-1.jpg')`);
+await db.query(`select submit_slip('${lesson.id}', '${STUDENT}/${lesson.id}-1.jpg')`);
+const lessonPay = (await db.query(`select amount from payments where booking_id = '${lesson.id}'`)).rows[0];
+check("the slip is for the whole bill including the lesson fee", Number(lessonPay.amount) === 450);
+await as(ADMIN);
+await db.query(`select review_payment('${lesson.id}', true)`);
+check("an approved lesson is confirmed", (await lessonRow(lesson.id)).status === "confirmed");
+await as(STUDENT);
+await expectError("a lesson cannot be moved to another time",
+  `select request_reschedule('${lesson.id}', 2::smallint, '${lessonAt(18)}')`, "LESSON_FIXED_TIME");
+
+// The coach sees their lessons with the student's name; nobody else's.
+await as(COACH2);
+const myLessons = (await db.query(`select * from coach_lessons()`)).rows;
+check("coach sees their own lesson with the student's name",
+  myLessons.length === 1 && myLessons[0].booking_id === lesson.id && myLessons[0].student_phone !== undefined);
+await as(U1);
+check("another user's coach_lessons() is empty", (await db.query(`select * from coach_lessons()`)).rows.length === 0);
+
+// The shop pays the coach only for lessons already played.
+await as(COACH2);
+await expectError("a coach cannot mark themselves paid", `select mark_coach_paid('${COACH2}')`, "FORBIDDEN");
+await as(ADMIN);
+check("a lesson in the future is not paid out yet",
+  (await db.query(`select mark_coach_paid('${COACH2}') as n`)).rows[0].n === 0);
+await db.exec(`update bookings set starts_at = starts_at - interval '30 days', ends_at = ends_at - interval '30 days'
+  where id = '${lesson.id}'`);
+check("after the lesson the shop can record paying the coach",
+  (await db.query(`select mark_coach_paid('${COACH2}') as n`)).rows[0].n === 1
+  && (await lessonRow(lesson.id)).coach_paid_at !== null);
+
+// Taking coach rights away also takes the coach off the public list.
+await db.query(`select set_coach('${COACH2}', false)`);
+check("an unlisted coach disappears from the public list",
+  (await db.query(`select is_listed from coach_profiles where user_id = '${COACH2}'`)).rows[0].is_listed === false);
+await as(STUDENT);
+await expectError("an unlisted coach cannot be booked",
+  `select create_lesson_booking('${COACH2}', '${lessonAt(21)}', 1.0)`, "COACH_NOT_FOUND");
+check("anonymous users cannot book a lesson", !(await db.query(
+  `select has_function_privilege('anon', 'public.create_lesson_booking(uuid,timestamptz,numeric)', 'execute') as p`)).rows[0].p);
+check("anonymous users can read the open lesson times", (await db.query(
+  `select has_function_privilege('anon', 'public.coach_open_starts(uuid,date,numeric)', 'execute') as p`)).rows[0].p === true);
+check("setup: the coach's own booking is untouched", (await lessonRow(coachOwn.id)).status === "confirmed");
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

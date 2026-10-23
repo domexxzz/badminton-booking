@@ -49,6 +49,16 @@ export async function setCoach(userId: string, isCoach: boolean): Promise<Action
   return { ok: true, data: null };
 }
 
+export async function setPartyHost(userId: string, isPartyHost: boolean): Promise<ActionResult> {
+  if (!UUID_RE.test(userId) || typeof isPartyHost !== "boolean") return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_party_host", { p_user_id: userId, p_is_party_host: isPartyHost });
+  if (error) return { ok: false, error: friendlyError(error) };
+  revalidatePath("/admin/team");
+  revalidatePath("/queue");
+  return { ok: true, data: null };
+}
+
 /** The shop received the money for a pay-later bill. */
 export async function markBookingPaid(bookingId: string): Promise<ActionResult> {
   if (!UUID_RE.test(bookingId)) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };

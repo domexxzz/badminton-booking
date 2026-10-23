@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { LINE_OAUTH_COOKIE, lineLoginConfig } from "@/lib/line/config";
 import { buildAuthorizeUrl } from "@/lib/line/login";
 import { safeNext } from "@/lib/safe-next";
+import { publicOrigin } from "@/lib/site-url";
 
 export const runtime = "nodejs";
 
@@ -11,7 +12,10 @@ const STATE_TTL_SECONDS = 10 * 60;
 
 // Starts LINE Login: remember state/nonce in a short-lived httpOnly cookie, then go to LINE.
 export async function GET(request: NextRequest) {
-  const { origin, searchParams } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
+  // Behind the Render proxy the request can look like https://localhost:3000, so the
+  // error redirect uses the configured public address, as /auth/callback does.
+  const origin = publicOrigin(request.url);
   const config = lineLoginConfig();
   if (!config) return NextResponse.redirect(`${origin}/login?error=line_unavailable`);
 

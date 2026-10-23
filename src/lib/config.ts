@@ -8,6 +8,10 @@ export const BOOKING_RULES = {
   maxHours: 4,
   maxDaysAhead: 14,
   holdMinutes: 5,
+  // NOT the price anyone is charged. Every bill is computed from courts.price_per_hour in
+  // the database (live: ฿130/hour), by create_booking() and friends, and every page shows
+  // that column too — nothing reads the two numbers below. They are kept only as the value
+  // migration 0008 set, so changing them changes no price. Change the court rows instead.
   pricePerHalfHour: 75,
   pricePerHour: 150,
 } as const;

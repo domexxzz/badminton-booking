@@ -51,6 +51,9 @@ const MESSAGES: Record<string, string> = {
   ALREADY_IN_PARTY: "คุณอยู่ในห้องนี้แล้ว",
   PARTY_SLOT_TAKEN: "ช่องนี้มีคนเลือกแล้ว กรุณาเลือกช่องอื่น",
   PARTY_MEMBER_NOT_FOUND: "ไม่พบสมาชิก หรือไม่มีสิทธิ์ทำรายการนี้",
+  INVALID_PARTY_WINNER: "กรุณาเลือกทีมชนะจากคู่ที่กำลังแข่งขัน",
+  NO_ACTIVE_PARTY_MATCH: "ยังไม่มีคู่ที่กำลังแข่งขัน",
+  NOT_ENOUGH_READY_TEAMS: "ต้องมีทีมที่สมาชิกครบอย่างน้อย 2 ทีม",
   COACH_NOT_FOUND: "ไม่พบโค้ชคนนี้ หรือโค้ชปิดรับสอนอยู่",
   COACH_UNAVAILABLE: "โค้ชไม่ว่างในช่วงเวลานี้ กรุณาเลือกเวลาที่โค้ชเปิดสอน",
   COACH_BUSY: "เวลานี้มีคนจองโค้ชไปแล้ว กรุณาเลือกเวลาอื่น",
@@ -68,6 +71,9 @@ const MESSAGES: Record<string, string> = {
 export function friendlyError(error: { message?: string } | null | undefined): string {
   const code = error?.message?.trim() ?? "";
   if (MESSAGES[code]) return MESSAGES[code];
+  for (const [key, msg] of Object.entries(MESSAGES)) {
+    if (code.includes(key)) return msg;
+  }
   console.error("Unexpected booking error:", error);
-  return "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง";
+  return code ? `เกิดข้อผิดพลาด: ${code}` : "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง";
 }

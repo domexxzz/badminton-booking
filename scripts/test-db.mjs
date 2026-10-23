@@ -29,6 +29,7 @@ const MIGRATIONS = [
   "0022_party_six_teams.sql",
   "0023_party_slot_null_check.sql",
   "0024_profile_avatar.sql",
+  "0025_party_winner_stays.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -914,6 +915,61 @@ await db.query(`update profiles set avatar_url = 'https://profile.line-scdn.net/
 check("a user can save their avatar_url", (await db.query(`select avatar_url from profiles where id='${U1}'`)).rows[0].avatar_url === "https://profile.line-scdn.net/abc");
 const joined = (await db.query(`select * from join_party('${party.party_id}', 'ผู้เล่นหนึ่ง', 5::smallint, 'C'::party_team)`)).rows[0];
 check("party_member_board includes user avatar", (await db.query(`select avatar_url from party_member_board where entry_id='${joined.id}'`)).rows[0]?.avatar_url === "https://profile.line-scdn.net/abc");
+
+// ---- Party Winner Stays On Matching (0025) ----
+const P_GUEST1 = "dddddddd-dddd-dddd-dddd-dddddddddddd";
+const P_GUEST2 = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+const P_GUEST3 = "ffffffff-ffff-ffff-ffff-ffffffffffff";
+const P_GUEST4 = "11111111-2222-3333-4444-555555555555";
+const P_GUEST5 = "22222222-3333-4444-5555-666666666666";
+await db.exec(`insert into auth.users (id, email, raw_user_meta_data) values
+  ('${P_GUEST1}', 'pg1@x.com', '{"display_name":"ผู้เล่น 1"}'),
+  ('${P_GUEST2}', 'pg2@x.com', '{"display_name":"ผู้เล่น 2"}'),
+  ('${P_GUEST3}', 'pg3@x.com', '{"display_name":"ผู้เล่น 3"}'),
+  ('${P_GUEST4}', 'pg4@x.com', '{"display_name":"ผู้เล่น 4"}'),
+  ('${P_GUEST5}', 'pg5@x.com', '{"display_name":"ผู้เล่น 5"}')`);
+
+// Party host is in slot 1 (Team A). Add P_GUEST1 to slot 2 (Team A) -> Team A complete!
+await as(P_GUEST1);
+await db.query(`select join_party('${party.party_id}', 'ผู้เล่น 1', 2::smallint, 'A'::party_team)`);
+check("team A is complete and enters queue",
+  (await db.query(`select count(*)::int n from party_team_queue where party_id='${party.party_id}' and team='A'`)).rows[0].n === 1);
+
+// Add P_GUEST2 and P_GUEST3 to slots 3 and 4 (Team B) -> Team B complete!
+await as(P_GUEST2);
+await db.query(`select join_party('${party.party_id}', 'ผู้เล่น 2', 3::smallint, 'B'::party_team)`);
+await as(P_GUEST3);
+await db.query(`select join_party('${party.party_id}', 'ผู้เล่น 3', 4::smallint, 'B'::party_team)`);
+check("team B is complete and enters queue",
+  (await db.query(`select count(*)::int n from party_team_queue where party_id='${party.party_id}' and team='B'`)).rows[0].n === 1);
+
+// Add P_GUEST4 and P_GUEST5 to slots 5 and 6 (Team C) -> Team C complete!
+await as(P_GUEST4);
+await db.query(`select join_party('${party.party_id}', 'ผู้เล่น 4', 5::smallint, 'C'::party_team)`);
+await as(P_GUEST5);
+await db.query(`select join_party('${party.party_id}', 'ผู้เล่น 5', 6::smallint, 'C'::party_team)`);
+check("team C is complete and enters queue",
+  (await db.query(`select count(*)::int n from party_team_queue where party_id='${party.party_id}' and team='C'`)).rows[0].n === 1);
+
+// Guest cannot advance match
+await as(P_GUEST1);
+await expectError("guest cannot advance match", `select advance_party_match('${party.party_id}', null)`, "FORBIDDEN");
+
+// Host starts round 1: Team A vs Team B
+await as(PARTY_HOST);
+await db.query(`select advance_party_match('${party.party_id}', null)`);
+const r1 = (await db.query(`select * from party_match_board where party_id='${party.party_id}' and status='playing'`)).rows[0];
+check("round 1 is started with team A vs team B", r1.round_no === 1 && r1.team_a === "A" && r1.team_b === "B");
+
+// Host selects winner: Team A wins
+// Winner (Team A) stays, loser (Team B) goes to back of queue, next waiting team (Team C) enters as challenger!
+await db.query(`select advance_party_match('${party.party_id}', 'A'::party_team)`);
+const r2 = (await db.query(`select * from party_match_board where party_id='${party.party_id}' and status='playing'`)).rows[0];
+check("round 2 is team A (winner) vs team C (challenger)", r2.round_no === 2 && r2.team_a === "A" && r2.team_b === "C");
+
+// Check queue order: Team B should now be waiting in queue behind Team C
+const queueWaiting = (await db.query(`select team from party_team_queue where party_id='${party.party_id}' and state='waiting' order by queued_at`)).rows;
+check("loser (team B) goes to the back of the queue", queueWaiting.length === 1 && queueWaiting[0].team === "B");
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

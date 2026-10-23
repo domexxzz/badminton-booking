@@ -67,3 +67,11 @@ export async function kickPartyMember(partyId: string, entryId: string): Promise
   if (error) return { ok: false, error: friendlyError(error) };
   refreshParty(partyId); return { ok: true, data: null };
 }
+
+export async function advancePartyMatch(partyId: string, winner: PartyTeam | null): Promise<ActionResult> {
+  if (!UUID_RE.test(partyId) || (winner !== null && !["A", "B", "C", "D", "E", "F"].includes(winner))) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("advance_party_match", { p_party_id: partyId, p_winner: winner });
+  if (error) return { ok: false, error: friendlyError(error) };
+  refreshParty(partyId); return { ok: true, data: null };
+}

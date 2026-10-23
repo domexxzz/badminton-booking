@@ -7,18 +7,25 @@ import { getSessionUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 type MyParty = { entry_id: string; party_id: string; slot_no: number; is_host: boolean };
+type PartyMemberRow = { entry_id: string; party_id: string; name: string; slot_no: number; joined_at: string };
 
 export default async function QueuePage({ searchParams }: { searchParams: Promise<{ view?: string; q?: string }> }) {
   const { view: rawView, q = "" } = await searchParams;
   const view = rawView === "create" ? "create" : "join";
   const [{ supabase, user, displayName }, courts, hours] = await Promise.all([getSessionUser(), getPublicCourts(), getPublicVenueHours()]);
   if (!courts) return <p className="error">โหลดข้อมูลสนามไม่สำเร็จ กรุณารีเฟรช</p>;
-  const [{ data: rooms, error: roomError }, { data: memberRows }, mine] = await Promise.all([
+  const [{ data: rooms, error: roomError }, mine] = await Promise.all([
     supabase.from("party_room_board").select("party_id, host_name, title, mode, capacity, court_id, starts_at, ends_at").gt("ends_at", new Date().toISOString()).order("starts_at"),
-    supabase.from("party_member_board").select("entry_id, party_id, name, slot_no, joined_at").order("slot_no"),
     user ? supabase.rpc("my_party_entries") : Promise.resolve({ data: [] }),
   ]);
   if (roomError) return <p className="error">ระบบห้องก๊วนยังไม่พร้อมใช้งาน กรุณาติดต่อร้าน</p>;
+  // Read members only for the rooms on screen. party_member_board keeps a row for every
+  // member of every room that has ever run, and PostgREST caps a reply at 1000 rows, so
+  // reading it whole quietly drops members of live rooms once enough rooms have finished.
+  const roomIds = (rooms ?? []).map((room) => room.party_id);
+  const { data: memberRows } = roomIds.length
+    ? await supabase.from("party_member_board").select("entry_id, party_id, name, slot_no, joined_at").in("party_id", roomIds).order("slot_no").returns<PartyMemberRow[]>()
+    : { data: [] as PartyMemberRow[] };
   const courtNames = new Map(courts.map((c) => [c.id, c.name]));
   const myEntries = (mine.data ?? []) as MyParty[];
   const normalizedQuery = q.trim().toLocaleLowerCase("th");

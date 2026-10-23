@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { advancePartyMatch, advanceSinglesMatch, joinParty, kickPartyMember, leaveParty, movePartySlot, setPartyMatchRules } from "@/app/party-actions";
 import { formatSlot, formatTime } from "@/lib/format";
-import { PARTY_NAME_MAX, PARTY_TEAMS, type PartyMember, type PartyMode, type PartyTeam } from "@/lib/party";
+import { PARTY_NAME_MAX, PARTY_TEAMS, eloDelta, type PartyMember, type PartyMode, type PartyTeam } from "@/lib/party";
 
 export type PartyRoomView = { party_id: string; host_name: string; title: string; mode: PartyMode; capacity: number; court_id: number; court_name: string; starts_at: string; ends_at: string };
 
-type TeamQueueRow = { team: PartyTeam; ready_at: string; queued_at: string; state: "waiting" | "playing" };
+type TeamQueueRow = { team: PartyTeam; ready_at: string; queued_at: string; state: "waiting" | "playing"; played?: number; wins?: number; streak?: number; rating?: number };
 type MatchRow = { id: string; round_no: number; team_a: PartyTeam; team_b: PartyTeam; winner: PartyTeam | null; status: "playing" | "finished"; started_at: string; ended_at: string | null };
 type SinglesQueueRow = { entry_id: string; name: string; queued_at: string; state: "waiting" | "playing" };
 /** One player's night: the ladder rating they carry, and what this room did to it. */
@@ -31,7 +31,11 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
   const occupied = new Map(members.map((m) => [m.slot_no, m]));
   const currentMatch = matchRows.find((match) => match.status === "playing") ?? null;
   const playingTeam = teamQueue.find((row) => row.state === "playing")?.team ?? null;
-  const waitingTeams = teamQueue.filter((row) => row.state === "waiting").sort((a, b) => a.queued_at.localeCompare(b.queued_at));
+  const teamRow = (t: PartyTeam) => teamQueue.find((row) => row.team === t);
+  // Same order the database calls teams on in (0029): fewest games, then longest waiting.
+  const waitingTeams = teamQueue
+    .filter((row) => row.state === "waiting")
+    .sort((a, b) => (a.played ?? 0) - (b.played ?? 0) || a.queued_at.localeCompare(b.queued_at));
   const nextTeam = waitingTeams[0]?.team ?? null;
   const statOf = (entryId: string) => stats.find((s) => s.entry_id === entryId);
   const currentSinglesMatch = singlesMatchRows.find((match) => match.status === "playing") ?? null;
@@ -72,6 +76,11 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
   function matchAction(winner: PartyTeam | null) { run(() => advancePartyMatch(room.party_id, winner)); }
   function singlesMatchAction(winnerEntry: string | null) { run(() => advanceSinglesMatch(room.party_id, winnerEntry)); }
   function changeCap(cap: number) { run(() => setPartyMatchRules(room.party_id, cap)); }
+  /** "+12 / -8" — what each side stands to gain or lose, shown before the host decides. */
+  const stake = (ratingA?: number | null, ratingB?: number | null) => {
+    if (!ratingA || !ratingB) return null;
+    return { a: eloDelta(ratingA, ratingB), b: eloDelta(ratingB, ratingA) };
+  };
   return <section className="stack party-room-detail">
     <Link href="/queue?view=join" className="party-back">‹ <span>เข้าห้อง</span></Link>
     <header className="card party-room-profile"><div className="party-list-icon">🏸</div><div><h1>{room.title}</h1><span>โดย {room.host_name} {isHost && <b>เจ้าของห้อง</b>}</span></div><div className="party-room-facts"><span>▣ {room.court_name}</span><span>◷ {formatSlot(room.starts_at, room.ends_at)}</span><span>♟ {members.length}/{room.capacity}</span></div></header>
@@ -90,7 +99,7 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
       <div className="party-matching-title">
         <div>
           <h2>▣ Matching ห้องคู่</h2>
-          <p>ชนะอยู่ต่อ · แพ้ไปต่อท้ายคิว (ทีมเต็มก่อน ได้คิวก่อน)</p>
+          <p>ชนะอยู่ต่อ · ชนะครบ {winStreakCap} เกมติดต้องพัก · เลือกทีมจากทีมที่ลงสนามน้อยที่สุดก่อน แล้วจึงดูฝีมือใกล้เคียง</p>
         </div>
         <span>{teamQueue.length} ทีมพร้อม</span>
       </div>
@@ -99,6 +108,7 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
         {currentMatch ? (
           <div>
             <strong>ทีม <b>{currentMatch.team_a}</b><em>VS</em>ทีม <b>{currentMatch.team_b}</b></strong>
+            {teamRow(currentMatch.team_a)?.rating && <small className="party-match-ratings">{teamRow(currentMatch.team_a)?.rating} · {teamRow(currentMatch.team_b)?.rating} แต้ม (เฉลี่ยของทีม)</small>}
             <div className="party-match-avatars-row">
               <div className="party-match-team-group">
                 {teamMembers(currentMatch.team_a).map((m) => {
@@ -150,7 +160,7 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
         </strong>
       </div>
       <div className="party-queue-strip">
-        <span>ลำดับทีมพร้อม ({waitingTeams.length} ทีม)</span>
+        <span>ลำดับทีมพร้อม ({waitingTeams.length} ทีม) · ทีมที่ลงสนามน้อยที่สุดได้ก่อน</span>
         <div>
           {waitingTeams.map((row, index) => {
             const tMembers = teamMembers(row.team);
@@ -168,6 +178,7 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
                   })}
                 </span>
                 <small>{teamMemberNames(row.team)}</small>
+                {row.rating ? <span className="party-rating-badge">{row.rating}{(row.played ?? 0) > 0 && <i>{row.wins ?? 0}-{(row.played ?? 0) - (row.wins ?? 0)}</i>}{(row.streak ?? 0) > 1 && <b title={`ชนะติดกัน ${row.streak} เกม`}>🔥{row.streak}</b>}</span> : null}
               </span>
             );
           })}
@@ -193,6 +204,7 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
                   <span style={{ display: "block", fontSize: 11, fontWeight: "normal", opacity: 0.85 }}>
                     ({teamMemberNames(currentMatch.team_a)})
                   </span>
+                  {(() => { const bet = stake(teamRow(currentMatch.team_a)?.rating, teamRow(currentMatch.team_b)?.rating); return bet ? <small className="party-stake">+{bet.a} แต้ม</small> : null; })()}
                 </button>
                 <button type="button" className="btn" disabled={pending} onClick={() => matchAction(currentMatch.team_b)}>
                   <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
@@ -207,6 +219,7 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
                   <span style={{ display: "block", fontSize: 11, fontWeight: "normal", opacity: 0.85 }}>
                     ({teamMemberNames(currentMatch.team_b)})
                   </span>
+                  {(() => { const bet = stake(teamRow(currentMatch.team_b)?.rating, teamRow(currentMatch.team_a)?.rating); return bet ? <small className="party-stake">+{bet.a} แต้ม</small> : null; })()}
                 </button>
               </div>
             </>
@@ -282,10 +295,13 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
         <div>{waitingPlayers.map((row, index) => <b key={row.entry_id}>{index + 1}. {row.name}{ratingBadge(row.entry_id)}</b>)}{waitingPlayers.length === 0 && <small>ยังไม่มีผู้เล่นรอคิว</small>}</div>
       </div>
       {isHost && <div className="party-host-match-actions">
-        {currentSinglesMatch ? <><p>หัวห้องเลือกผู้ชนะ (ผู้ชนะอยู่ต่อ · ผู้แพ้ไปต่อท้ายคิว)</p><div>
-          <button type="button" className="btn" disabled={pending} onClick={() => singlesMatchAction(currentSinglesMatch.player_a_entry)}>🏆 {currentSinglesMatch.player_a_name} ชนะ</button>
-          <button type="button" className="btn" disabled={pending} onClick={() => singlesMatchAction(currentSinglesMatch.player_b_entry)}>🏆 {currentSinglesMatch.player_b_name} ชนะ</button>
-        </div></> : <button type="button" className="btn btn-block" disabled={pending || (playingPlayer ? waitingPlayers.length < 1 : waitingPlayers.length < 2)} onClick={() => singlesMatchAction(null)}>
+        {currentSinglesMatch ? (() => {
+          const bet = stake(statOf(currentSinglesMatch.player_a_entry)?.rating, statOf(currentSinglesMatch.player_b_entry)?.rating);
+          return <><p>หัวห้องเลือกผู้ชนะ (ผู้ชนะอยู่ต่อ · ผู้แพ้ไปต่อท้ายคิว)</p><div>
+            <button type="button" className="btn" disabled={pending} onClick={() => singlesMatchAction(currentSinglesMatch.player_a_entry)}>🏆 {currentSinglesMatch.player_a_name} ชนะ{bet && <small>+{bet.a} แต้ม</small>}</button>
+            <button type="button" className="btn" disabled={pending} onClick={() => singlesMatchAction(currentSinglesMatch.player_b_entry)}>🏆 {currentSinglesMatch.player_b_name} ชนะ{bet && <small>+{bet.b} แต้ม</small>}</button>
+          </div></>;
+        })() : <button type="button" className="btn btn-block" disabled={pending || (playingPlayer ? waitingPlayers.length < 1 : waitingPlayers.length < 2)} onClick={() => singlesMatchAction(null)}>
           {playingPlayer ? (waitingPlayers[0] ? `เริ่มคู่ถัดไป (${playingPlayer.name} พบ ${waitingPlayers[0].name})` : "รอผู้ท้าชิง") : waitingPlayers.length >= 2 ? `เริ่มคู่แรก (${waitingPlayers[0].name} พบ ${waitingPlayers[1].name})` : "รออย่างน้อย 2 คน"}
         </button>}
       </div>}

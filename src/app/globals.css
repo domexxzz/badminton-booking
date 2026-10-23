@@ -272,6 +272,17 @@
 .party-rating-badge b { font-weight: 700; color: var(--primary-strong); }
 .party-match-ratings { display: block; margin-top: 3px; font-size: 12px; opacity: .85; }
 
+/* The doubles buttons carry team names and the points at stake, so they need more than
+   one line. The nowrap set further up is for the short singles labels only. */
+.party-host-match-actions .btn { white-space: normal; flex-direction: column; justify-content: center; gap: 1px; padding-block: 9px; line-height: 1.3; }
+.party-host-match-actions .btn > span { display: block; width: 100%; }
+/* The chevron belongs to the full-width singles rows, not to a team chip. */
+.party-queue-chip b::after { content: none; }
+.party-rating-badge i { font-style: normal; font-weight: 600; opacity: .8; }
+/* What the game on court is worth, under each winner button. */
+.party-stake { display: block; margin-top: 2px; font-size: 11px; font-weight: 700; opacity: .9; }
+.party-host-match-actions .btn small { display: block; margin-top: 2px; font-size: 11px; font-weight: 700; opacity: .9; }
+
 .party-standings { padding: 16px; }
 .party-standings-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .party-standings-head h2 { margin: 0; font-size: 19px; }

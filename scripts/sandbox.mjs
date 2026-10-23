@@ -7,6 +7,7 @@
 //
 // Usage: npm run sandbox
 import { createSandboxDb, actAs, MIGRATIONS } from "./lib/sandbox-db.mjs";
+import { ELO_GRID } from "./lib/elo-grid.mjs";
 
 const HOST = "aaaaaaaa-0000-0000-0000-00000000aaaa";
 const ADMIN = "bbbbbbbb-0000-0000-0000-00000000bbbb";
@@ -291,7 +292,16 @@ const rematches = gaps.filter((m, i) => {
 expect(`ไม่มีการเจอคู่เดิมซ้ำติดกันเลย (${gaps.length} เกม)`, rematches.length === 0);
 
 // ---------------------------------------------------------------------------
-head("7. หัวห้องปรับกติกาได้");
+head("7. แต้มที่หน้าเว็บบอกไว้ ตรงกับที่ฐานข้อมูลคิดจริง");
+// The room shows "+12 / -12" on the winner buttons before the host taps one. That number
+// comes from TypeScript; this one comes from the database. They have to agree.
+for (const [winner, loser, points] of ELO_GRID) {
+  const sql = await one(`select party_elo_delta(${winner}, ${loser}, true) as d`);
+  expect(`${winner} ชนะ ${loser} ได้ ${points} แต้ม`, sql.d === points);
+}
+
+// ---------------------------------------------------------------------------
+head("8. หัวห้องปรับกติกาได้");
 await as(NIGHT_HOST);
 await db.query(`select set_party_match_rules('${night.party_id}', 5::smallint)`);
 const changed = await one(`select win_streak_cap from party_rooms where id = '${night.party_id}'`);

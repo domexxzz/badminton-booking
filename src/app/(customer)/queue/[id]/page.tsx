@@ -15,7 +15,7 @@ export default async function PartyRoomPage({ params }: { params: Promise<{ id: 
   const [{ data: room }, { data: members }, { data: teamQueue }, { data: matches }, { data: singlesQueue }, { data: singlesMatches }, { data: stats }, mine] = await Promise.all([
     supabase.from("party_room_board").select("party_id, host_name, title, mode, capacity, court_id, starts_at, ends_at, win_streak_cap").eq("party_id", id).maybeSingle(),
     supabase.from("party_member_board").select("entry_id, name, slot_no, team, avatar_url").eq("party_id", id).order("slot_no"),
-    supabase.from("party_team_queue").select("team, ready_at, queued_at, state").eq("party_id", id).order("queued_at"),
+    supabase.from("party_team_queue").select("team, ready_at, queued_at, state, played, wins, streak, rating").eq("party_id", id).order("queued_at"),
     supabase.from("party_match_board").select("id, round_no, team_a, team_b, winner, status, started_at, ended_at").eq("party_id", id).order("round_no", { ascending: false }).limit(20),
     supabase.from("party_singles_queue").select("entry_id, name, queued_at, state").eq("party_id", id).order("queued_at"),
     supabase.from("party_singles_match_board").select("id, round_no, player_a_entry, player_a_name, player_b_entry, player_b_name, winner_entry, winner_name, status, started_at, ended_at").eq("party_id", id).order("round_no", { ascending: false }).limit(20),

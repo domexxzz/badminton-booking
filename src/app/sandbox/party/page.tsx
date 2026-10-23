@@ -113,7 +113,7 @@ const singlesStats = [
   stat(mix, 960, -40, 3, 1, 0),
 ];
 
-const doublesMembers: PartyMember[] = [
+const doublesMembersSeed: PartyMember[] = [
   member(1, "โดม", "A"),
   member(2, "ส้ม", "A"),
   member(3, "เบนซ์", "B"),
@@ -123,9 +123,18 @@ const doublesMembers: PartyMember[] = [
 ];
 
 const teamQueue = [
-  { team: "A" as const, ready_at: at(0), queued_at: at(0), state: "playing" as const },
-  { team: "B" as const, ready_at: at(1), queued_at: at(1), state: "playing" as const },
-  { team: "C" as const, ready_at: at(2), queued_at: at(2), state: "waiting" as const },
+  { team: "A" as const, ready_at: at(0), queued_at: at(0), state: "playing" as const, played: 3, wins: 2, streak: 2, rating: 1018 },
+  { team: "B" as const, ready_at: at(1), queued_at: at(1), state: "playing" as const, played: 2, wins: 1, streak: 0, rating: 1004 },
+  { team: "C" as const, ready_at: at(2), queued_at: at(2), state: "waiting" as const, played: 1, wins: 0, streak: 0, rating: 978 },
+];
+
+const doublesStats = [
+  stat(doublesMembersSeed[0], 1024, 24, 3, 2, 2),
+  stat(doublesMembersSeed[1], 1012, 12, 3, 2, 2),
+  stat(doublesMembersSeed[2], 1006, 6, 2, 1, 0),
+  stat(doublesMembersSeed[3], 1002, 2, 2, 1, 0),
+  stat(doublesMembersSeed[4], 980, -20, 1, 0, 0),
+  stat(doublesMembersSeed[5], 976, -24, 1, 0, 0),
 ];
 
 const matchRows = [
@@ -216,14 +225,16 @@ export default function PartySandboxPage() {
         <h2 style={{ margin: "18px 0 0" }}>ห้องคู่ · หัวห้อง (ของเดิม ไว้เทียบ)</h2>
         <PartyRoomCard
           room={doublesRoom}
-          members={doublesMembers}
+          members={doublesMembersSeed}
           teamQueue={teamQueue}
           matchRows={matchRows}
           singlesQueue={[]}
           singlesMatchRows={[]}
+          stats={doublesStats}
+          winStreakCap={3}
           loggedIn
           defaultName="โดม"
-          myEntry={doublesMembers[0].entry_id}
+          myEntry={doublesMembersSeed[0].entry_id}
           isHost
         />
       </main>

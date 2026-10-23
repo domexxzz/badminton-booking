@@ -10,6 +10,19 @@ export type PartyMatch = { index: number; startsAt: string; sideA: string[]; sid
 export type PartyTeamMatch = { index: number; startsAt: string; teamA: PartyTeam; teamB: PartyTeam };
 export const PARTY_TEAMS: PartyTeam[] = ["A", "B", "C", "D", "E", "F"];
 
+/** Matches K in party_elo_delta() (migration 0029). */
+export const ELO_K = 24;
+
+/**
+ * How many points the winner takes from the loser, so the room can show what a game is
+ * worth before it is played. This has to agree with party_elo_delta() in the database,
+ * which is the value that actually gets written; scripts/sandbox.mjs compares the two.
+ */
+export function eloDelta(winnerRating: number, loserRating: number): number {
+  const expected = 1 / (1 + 10 ** ((loserRating - winnerRating) / 400));
+  return Math.max(1, Math.round(ELO_K * (1 - expected)));
+}
+
 const addMinutes = (iso: string, minutes: number) =>
   new Date(Date.parse(iso) + minutes * 60_000).toISOString();
 

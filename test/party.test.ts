@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { buildPartyMatches, buildPartyTeamSchedule, type PartyMember } from "../src/lib/party";
+import { describe, expect, it, test } from "vitest";
+import { ELO_K, buildPartyMatches, buildPartyTeamSchedule, eloDelta, type PartyMember } from "../src/lib/party";
+import { ELO_GRID } from "../scripts/lib/elo-grid.mjs";
 
 const start = "2026-10-24T10:00:00.000Z";
 const end = "2026-10-24T11:00:00.000Z";
@@ -32,5 +33,29 @@ describe("party match rotation", () => {
     const schedule = buildPartyTeamSchedule(start, end);
     expect(schedule).toHaveLength(4);
     expect(schedule[0]).toMatchObject({ teamA: "A", teamB: "F" });
+  });
+});
+
+describe("eloDelta", () => {
+  test("an even game is worth half of K", () => {
+    expect(eloDelta(1000, 1000)).toBe(ELO_K / 2);
+  });
+
+  test("beating a much stronger player is worth more", () => {
+    expect(eloDelta(1000, 1400)).toBeGreaterThan(eloDelta(1000, 1000));
+    expect(eloDelta(1000, 1400)).toBe(22);
+  });
+
+  test("beating a much weaker player is worth almost nothing, but never nothing", () => {
+    expect(eloDelta(1400, 1000)).toBe(2);
+    expect(eloDelta(3000, 100)).toBe(1);
+  });
+});
+
+describe("the points the room promises", () => {
+  // scripts/sandbox.mjs checks party_elo_delta() against this same table, so what the
+  // page shows before a game cannot drift from what the database writes after it.
+  test.each(ELO_GRID)("%i beating %i is worth %i", (winner: number, loser: number, points: number) => {
+    expect(eloDelta(winner, loser)).toBe(points);
   });
 });

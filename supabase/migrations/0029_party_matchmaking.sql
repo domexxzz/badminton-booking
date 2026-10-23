@@ -90,11 +90,20 @@ alter table public.party_room_board
 -- ---------------------------------------------------------------------------
 -- Elo. Pure arithmetic, so it can be read and checked on its own.
 -- K = 24: a win against an equal player moves the rating by 12 points.
+--
+-- A win is always worth at least one point and a loss always costs at least one, so a
+-- strong player never farms a weak one for free and a game is never worth literally
+-- nothing. That floor lives here, in the formula, rather than in the caller: the room
+-- shows this number before the game is played (eloDelta in src/lib/party.ts), and the
+-- two must agree. scripts/lib/elo-grid.mjs is the table both sides are checked against.
 -- ---------------------------------------------------------------------------
 create or replace function public.party_elo_delta(p_rating integer, p_opponent integer, p_won boolean)
 returns integer language sql immutable as $$
-  select round(24 * ((case when p_won then 1.0 else 0.0 end)
-                     - 1.0 / (1.0 + power(10.0, (p_opponent - p_rating) / 400.0))))::integer
+  select case when p_won then greatest(1, v) else least(-1, v) end
+  from (
+    select round(24 * ((case when p_won then 1.0 else 0.0 end)
+                       - 1.0 / (1.0 + power(10.0, (p_opponent - p_rating) / 400.0))))::integer as v
+  ) q
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -192,7 +201,7 @@ begin
   if v_win_rating is null or v_lose_rating is null then return; end if;
 
   -- One number moves both ways, so the ladder never invents or loses points.
-  v_delta := greatest(1, party_elo_delta(v_win_rating, v_lose_rating, true));
+  v_delta := party_elo_delta(v_win_rating, v_lose_rating, true);
 
   update party_player_stats
   set rating = rating + v_delta, rating_delta = rating_delta + v_delta,

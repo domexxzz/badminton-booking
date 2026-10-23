@@ -21,7 +21,7 @@ export async function createPartyBooking(input: {
 }): Promise<ActionResult<{ partyId: string; bookingId: string }>> {
   if (!Number.isInteger(input.courtId) || input.courtId < 1 || input.courtId > 99 ||
       !["singles", "doubles"].includes(input.mode) || !validText(input.title, PARTY_TITLE_MAX) ||
-      !validText(input.hostName, PARTY_NAME_MAX) || typeof input.hours !== "number" || input.hours < 1 ||
+      !validText(input.hostName, PARTY_NAME_MAX) || typeof input.hours !== "number" || input.hours < 0.5 ||
       input.hours > 4 || input.hours * 2 !== Math.round(input.hours * 2) || Number.isNaN(Date.parse(input.startsAt))) {
     return { ok: false, error: "ข้อมูลเปิดห้องไม่ถูกต้อง" };
   }

@@ -198,7 +198,7 @@
 .party-slot-grid.focused > button { min-height: 92px; }
 .party-schedule-table { overflow-x: auto; padding: 18px 16px; border: 0; box-shadow: 0 10px 30px rgba(23, 72, 59, .07); }
 .party-schedule-table h2 { position: sticky; left: 0; margin: 0 0 14px; font-size: 22px; }
-.party-schedule-table-head, .party-schedule-table-row { display: grid; grid-template-columns: 62px minmax(125px, 1.3fr) 58px 84px 76px; align-items: center; min-width: 485px; gap: 6px; }
+.party-schedule-table-head, .party-schedule-table-row { display: grid; grid-template-columns: 58px minmax(130px, 1fr) 58px 78px 62px; align-items: center; min-width: 0; gap: 6px; }
 .party-schedule-table-head { padding: 0 10px 10px; color: var(--muted); border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 700; }
 .party-schedule-table-row { min-height: 58px; padding: 9px 10px; border-bottom: 1px solid var(--border); font-size: 12px; }
 .party-schedule-table-row:last-child { border-bottom: 0; }

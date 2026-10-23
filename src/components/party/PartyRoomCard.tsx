@@ -170,9 +170,7 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
           <div className="party-schedule-table-row" key={match.id}>
             <span>รอบ {match.round_no}</span>
             <strong>
-              ทีม <b>{match.team_a}</b> <small style={{ fontWeight: 400, opacity: 0.85 }}>({teamMemberNames(match.team_a)})</small>{" "}
-              <em>พบ</em>{" "}
-              ทีม <b>{match.team_b}</b> <small style={{ fontWeight: 400, opacity: 0.85 }}>({teamMemberNames(match.team_b)})</small>
+              ทีม <b>{match.team_a}</b> <em>พบ</em> ทีม <b>{match.team_b}</b>
             </strong>
             <span>{formatTime(match.started_at)} น.</span>
             <span className={`match-status ${match.status === "playing" ? "playing" : ""}`}>

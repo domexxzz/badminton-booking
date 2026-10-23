@@ -1,6 +1,14 @@
 # System status: badminton-booking (แบดมินตัน@สินธานี)
 
-As of **2026-10-22**, `main` at `43f5077`. This file is the current source of truth.
+As of **2026-10-22**, `main` at `43f5077`. This file is the current source of truth
+for everything up to that point.
+
+> **Newer than this file:** the ก๊วน room rework (matchmaking and a ladder, public and
+> private rooms, roles, the community feed and a user guide) is written up in
+> [2026-10-23-party-release.md](2026-10-23-party-release.md), together with the order its
+> migrations have to be run in and what the owner still has to decide. Read that first if
+> you are about to deploy.
+
 `PROJECT_HANDOFF.md` is older and partly out of date (it still says Vercel, ฿150, and older test counts).
 
 Read `AGENTS.md` before changing anything. It lists which files need the owner's (โดม) approval.

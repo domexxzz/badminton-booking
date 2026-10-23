@@ -130,17 +130,19 @@
 .member-state.left { color: var(--muted); background: var(--surface); }
 .member-state.kicked { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .party-admin-note { display: grid; gap: 2px; margin-top: 4px; padding: 8px 10px; border-radius: 10px; color: var(--primary-strong); background: var(--primary-soft); font-size: 12px; }
-.party-room-search { display: grid; grid-template-columns: 1fr 42px; gap: 6px; padding: 6px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow-sm); }
-.party-room-search input { min-width: 0; border: 0; box-shadow: none; background: transparent; }
-.party-room-search button { border: 0; border-radius: 12px; color: white; background: var(--primary); font-size: 22px; }
-.party-list-card { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 13px; }
+.party-room-search { display: grid; grid-template-columns: minmax(0, 1fr) 42px; align-items: center; gap: 6px; width: 100%; padding: 6px; overflow: hidden; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow-sm); }
+.party-room-search input { width: 100%; min-width: 0; height: 42px; padding: 0 10px; border: 0; box-shadow: none; background: transparent; font-size: 14px; }
+.party-room-search button { display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border: 0; border-radius: 12px; color: white; background: var(--primary); }
+.party-room-search button svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.party-list-card { position: relative; display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 10px 11px; padding: 14px; overflow: hidden; }
 .party-list-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--primary-soft); font-size: 24px; }
 .party-list-copy { display: grid; gap: 2px; min-width: 0; }
-.party-list-copy > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.party-list-copy h3 { margin: 0; overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
-.party-list-copy > span, .party-list-copy small { color: var(--muted); font-size: 11px; }
+.party-list-copy > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.party-list-copy h3 { min-width: 0; margin: 0; overflow: hidden; font-size: 15px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.party-list-copy .party-count { display: inline-flex; align-items: center; justify-content: center; min-width: 54px; padding: 4px 7px; border-radius: 999px; color: var(--primary-strong); background: var(--primary-soft); font-size: 12px; font-weight: 800; white-space: nowrap; }
+.party-list-copy > span, .party-list-copy small { color: var(--muted); font-size: 11px; line-height: 1.35; text-align: left; overflow-wrap: anywhere; }
 .party-list-copy em { width: fit-content; padding: 2px 7px; border-radius: 999px; color: var(--primary-strong); background: var(--primary-soft); font-size: 10px; font-style: normal; }
-.party-list-card .btn { white-space: nowrap; }
+.party-list-card .btn { grid-column: 2; justify-self: end; min-width: 106px; margin-top: 1px; white-space: nowrap; }
 .party-room-detail { gap: 14px; }
 .party-back { display: flex; align-items: center; gap: 8px; width: fit-content; color: var(--text); text-decoration: none; font-size: 30px; }
 .party-back span { font-size: 18px; font-weight: 800; }

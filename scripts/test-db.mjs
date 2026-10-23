@@ -912,6 +912,8 @@ check("anonymous users cannot create or join a Party", !(await db.query(
 await as(U1);
 await db.query(`update profiles set avatar_url = 'https://profile.line-scdn.net/abc' where id = '${U1}'`);
 check("a user can save their avatar_url", (await db.query(`select avatar_url from profiles where id='${U1}'`)).rows[0].avatar_url === "https://profile.line-scdn.net/abc");
+const joined = (await db.query(`select * from join_party('${party.party_id}', 'ผู้เล่นหนึ่ง', 5::smallint, 'C'::party_team)`)).rows[0];
+check("party_member_board includes user avatar", (await db.query(`select avatar_url from party_member_board where entry_id='${joined.id}'`)).rows[0]?.avatar_url === "https://profile.line-scdn.net/abc");
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

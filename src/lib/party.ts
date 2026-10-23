@@ -5,7 +5,7 @@ export const PARTY_TITLE_MAX = 60;
 
 export type PartyMode = "singles" | "doubles";
 export type PartyTeam = "A" | "B" | "C" | "D" | "E" | "F";
-export type PartyMember = { entry_id: string; name: string; slot_no: number; team: PartyTeam };
+export type PartyMember = { entry_id: string; name: string; slot_no: number; team: PartyTeam; avatar_url?: string | null };
 export type PartyMatch = { index: number; startsAt: string; sideA: string[]; sideB: string[] };
 export type PartyTeamMatch = { index: number; startsAt: string; teamA: PartyTeam; teamB: PartyTeam };
 export const PARTY_TEAMS: PartyTeam[] = ["A", "B", "C", "D", "E", "F"];

@@ -12,7 +12,7 @@ export type PartyRoomView = { party_id: string; host_name: string; title: string
 type TeamQueueRow = { team: PartyTeam; ready_at: string; queued_at: string; state: "waiting" | "playing" };
 type MatchRow = { id: string; round_no: number; team_a: PartyTeam; team_b: PartyTeam; winner: PartyTeam | null; status: "playing" | "finished"; started_at: string; ended_at: string | null };
 
-export function PartyRoomCard({ room, members, teamQueue, matchRows, loggedIn, defaultName, myEntry, isHost }: { room: PartyRoomView; members: PartyMember[]; teamQueue: TeamQueueRow[]; matchRows: MatchRow[]; loggedIn: boolean; defaultName: string; myEntry: string | null; isHost: boolean }) {
+export function PartyRoomCard({ room, members, teamQueue, matchRows, loggedIn, defaultName, myEntry, isHost, userAvatar }: { room: PartyRoomView; members: PartyMember[]; teamQueue: TeamQueueRow[]; matchRows: MatchRow[]; loggedIn: boolean; defaultName: string; myEntry: string | null; isHost: boolean; userAvatar?: string | null }) {
   const router = useRouter();
   const mine = members.find((m) => m.entry_id === myEntry);
   const [name, setName] = useState(defaultName);

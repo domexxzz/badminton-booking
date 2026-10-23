@@ -28,7 +28,8 @@ const MIGRATIONS = [
   "0021_party_join_flow.sql",
   "0022_party_six_teams.sql",
   "0023_party_slot_null_check.sql",
-  "0024_party_winner_stays.sql",
+  "0024_profile_avatar.sql",
+  "0025_party_winner_stays.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -908,7 +909,14 @@ await expectError("the host cannot leave their own paid room", `select leave_par
 check("anonymous users cannot create or join a Party", !(await db.query(
   `select has_function_privilege('anon', 'public.create_party_booking(smallint,timestamptz,numeric,party_mode,text,text)', 'execute') as p`)).rows[0].p);
 
-// ---- Party Winner Stays On Matching (0023) ----
+// 0024 profile avatar
+await as(U1);
+await db.query(`update profiles set avatar_url = 'https://profile.line-scdn.net/abc' where id = '${U1}'`);
+check("a user can save their avatar_url", (await db.query(`select avatar_url from profiles where id='${U1}'`)).rows[0].avatar_url === "https://profile.line-scdn.net/abc");
+const joined = (await db.query(`select * from join_party('${party.party_id}', 'ผู้เล่นหนึ่ง', 5::smallint, 'C'::party_team)`)).rows[0];
+check("party_member_board includes user avatar", (await db.query(`select avatar_url from party_member_board where entry_id='${joined.id}'`)).rows[0]?.avatar_url === "https://profile.line-scdn.net/abc");
+
+// ---- Party Winner Stays On Matching (0025) ----
 const P_GUEST1 = "dddddddd-dddd-dddd-dddd-dddddddddddd";
 const P_GUEST2 = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
 const P_GUEST3 = "ffffffff-ffff-ffff-ffff-ffffffffffff";

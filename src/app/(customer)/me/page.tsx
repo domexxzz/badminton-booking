@@ -20,7 +20,7 @@ type Row = {
 };
 
 export default async function MyBookingsPage() {
-  const { supabase, user, isAdmin, isCoach, displayName, avatarUrl } = await getSessionUser();
+  const { supabase, user, isAdmin, isCoach, isPartyHost, displayName, avatarUrl } = await getSessionUser();
   if (!user) redirect("/login?next=/me");
 
   const isLineAccount = Boolean(user.app_metadata?.line_user_id);
@@ -84,6 +84,10 @@ export default async function MyBookingsPage() {
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               {isAdmin ? (
                 <span className="badge confirmed">แอดมิน</span>
+              ) : isPartyHost ? (
+                <span className="badge" style={{ background: "var(--primary-soft)", color: "var(--primary-strong)", fontWeight: 600 }}>
+                  🏸 หัวหน้าก๊วน
+                </span>
               ) : (
                 <span className="muted">สมาชิก</span>
               )}
@@ -129,6 +133,11 @@ export default async function MyBookingsPage() {
         {isCoach && (
           <Link href="/coach" className="btn btn-block btn-ghost" style={{ textAlign: "center" }}>
             🏅 ตารางสอนและคลาสของฉัน
+          </Link>
+        )}
+        {isPartyHost && (
+          <Link href="/queue?view=create" className="btn btn-block btn-ghost" style={{ textAlign: "center" }}>
+            🏸 สร้างห้องก๊วนตีแบด
           </Link>
         )}
         {isAdmin && (

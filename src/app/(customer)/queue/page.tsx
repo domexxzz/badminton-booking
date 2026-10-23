@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { PartyCreateForm } from "@/components/party/PartyCreateForm";
 import { PartyRoomListCard, type PartyRoomListView } from "@/components/party/PartyRoomListCard";
+import { ShopContactCard } from "@/components/ShopContactCard";
 import { getPublicCourts, getPublicVenueHours } from "@/lib/public-data";
 import { getSessionUser } from "@/lib/supabase/server";
 
@@ -12,7 +13,7 @@ type PartyMemberRow = { entry_id: string; party_id: string; name: string; slot_n
 export default async function QueuePage({ searchParams }: { searchParams: Promise<{ view?: string; q?: string }> }) {
   const { view: rawView, q = "" } = await searchParams;
   const view = rawView === "create" ? "create" : "join";
-  const [{ supabase, user, displayName }, courts, hours] = await Promise.all([getSessionUser(), getPublicCourts(), getPublicVenueHours()]);
+  const [{ supabase, user, displayName, isPartyHost }, courts, hours] = await Promise.all([getSessionUser(), getPublicCourts(), getPublicVenueHours()]);
   if (!courts) return <p className="error">โหลดข้อมูลสนามไม่สำเร็จ กรุณารีเฟรช</p>;
   const [{ data: rooms, error: roomError }, mine] = await Promise.all([
     supabase.from("party_room_board").select("party_id, host_name, title, mode, capacity, court_id, starts_at, ends_at").gt("ends_at", new Date().toISOString()).order("starts_at"),
@@ -37,7 +38,35 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
       <Link href="/queue?view=create" className={view === "create" ? "active" : ""}><span>＋</span><strong>สร้างห้อง</strong><small>จองสนามและชำระเงิน</small></Link>
       <Link href="/queue?view=join" className={view === "join" ? "active" : ""}><span>♟</span><strong>เข้าห้อง</strong><small>เลือกทีมและสล็อต</small></Link>
     </nav>
-    {view === "create" && (user ? <PartyCreateForm courts={courts} defaultName={displayName ?? ""} openHour={hours.openHour} closeHour={hours.closeHour} /> : <section className="card stack"><h2>เข้าสู่ระบบเพื่อสร้างห้อง</h2><p className="muted">หัวห้องต้องจองสนามและชำระค่าจองเต็มจำนวนก่อนห้องเปิด</p><Link href="/login?next=/queue%3Fview%3Dcreate" className="btn btn-block">เข้าสู่ระบบ</Link></section>)}
+    {view === "create" && (
+      !user ? (
+        <section className="card stack">
+          <h2>เข้าสู่ระบบเพื่อสร้างห้อง</h2>
+          <p className="muted">หัวห้องต้องจองสนามและชำระค่าจองเต็มจำนวนก่อนห้องเปิด</p>
+          <Link href="/login?next=/queue%3Fview%3Dcreate" className="btn btn-block">
+            เข้าสู่ระบบ
+          </Link>
+        </section>
+      ) : isPartyHost ? (
+        <PartyCreateForm
+          courts={courts}
+          defaultName={displayName ?? ""}
+          openHour={hours.openHour}
+          closeHour={hours.closeHour}
+        />
+      ) : (
+        <section className="card stack" style={{ textAlign: "center", gap: 14 }}>
+          <div style={{ fontSize: 44 }} aria-hidden="true">🏸</div>
+          <div>
+            <h2>ต้องการเปิดห้องก๊วนตีแบด?</h2>
+            <p className="muted" style={{ margin: "6px 0 0" }}>
+              การสร้างห้องก๊วนสงวนสิทธิ์เฉพาะผู้ใช้ที่ได้รับบทบาทหัวหน้าก๊วน หากต้องการเปิดห้องก๊วน กรุณาโทรติดต่อทางร้าน หรือทักแอดมินเพื่อขอเปิดสิทธิ์การใช้งาน
+            </p>
+          </div>
+          <ShopContactCard title="ติดต่อทางร้านเพื่อเปิดสิทธิ์หัวหน้าก๊วน" />
+        </section>
+      )
+    )}
     {view === "join" && <><form className="party-room-search"><input name="q" defaultValue={q} placeholder="ค้นหาชื่อห้อง เจ้าของห้อง หรือสนาม" /><input type="hidden" name="view" value="join" /><button type="submit" aria-label="ค้นหา"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg></button></form><div className="party-list-head"><h2>ห้องที่เปิดอยู่</h2><span>{visibleRooms.length} ห้อง</span></div>
     {!visibleRooms.length ? <section className="card party-empty"><strong>{q ? "ไม่พบห้องที่ค้นหา" : "ยังไม่มีห้องก๊วนเปิดอยู่"}</strong><span className="muted">{q ? "ลองค้นหาด้วยชื่ออื่น" : "สร้างห้องแรก เลือกสนามและชำระเงินเพื่อเปิด Party ได้เลย"}</span></section> : visibleRooms.map((row) => {
       const room = { ...row, court_name: courtNames.get(row.court_id) ?? "สนาม" } as PartyRoomListView;

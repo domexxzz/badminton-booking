@@ -1,5 +1,6 @@
 import { AdminToggle } from "@/components/admin/AdminToggle";
 import { CoachToggle } from "@/components/admin/CoachToggle";
+import { PartyHostToggle } from "@/components/admin/PartyHostToggle";
 import { formatDate } from "@/lib/format";
 import { getSessionUser } from "@/lib/supabase/server";
 
@@ -14,6 +15,7 @@ type Person = {
   line_user_id: string | null;
   is_admin: boolean;
   is_coach?: boolean;
+  is_party_host?: boolean;
   created_at: string;
 };
 
@@ -24,7 +26,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
 
   let query = supabase
     .from("profiles")
-    // "*" so the list still loads before the is_coach column is migrated.
+    // "*" so the list still loads before the is_coach / is_party_host column is migrated.
     .select("*")
     .order("is_admin", { ascending: false })
     .order("created_at", { ascending: false })
@@ -48,9 +50,19 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         <strong>
           {p.display_name ?? "ไม่มีชื่อ"}
           {p.id === user?.id && <span className="muted"> (คุณ)</span>}
+          {p.is_party_host && !p.is_admin && (
+            <span className="badge" style={{ marginLeft: 6, fontSize: 11, background: "var(--primary-soft)", color: "var(--primary-strong)" }}>
+              🏸 หัวหน้าก๊วน
+            </span>
+          )}
+          {p.is_coach && !p.is_admin && (
+            <span className="badge" style={{ marginLeft: 6, fontSize: 11, background: "#fff3d6", color: "#9a6a00" }}>
+              🏅 โค้ช
+            </span>
+          )}
         </strong>
         <span className="muted">
-          {p.line_user_id ? "💬 LINE" : "✉️ อีเมล"} · เข้าครั้งแรก {formatDate(p.created_at)}
+          {p.line_user_id ? "💬 LINE" : "✉️ อีเมล/Google"} · เข้าครั้งแรก {formatDate(p.created_at)}
           {p.phone && ` · ${p.phone}`}
         </span>
       </div>
@@ -61,18 +73,19 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
           <AdminToggle userId={p.id} name={p.display_name ?? "ผู้ใช้นี้"} isAdmin={p.is_admin} />
         )}
         {!p.is_admin && <CoachToggle userId={p.id} name={p.display_name ?? "ผู้ใช้นี้"} isCoach={p.is_coach === true} />}
+        {!p.is_admin && <PartyHostToggle userId={p.id} name={p.display_name ?? "ผู้ใช้นี้"} isPartyHost={p.is_party_host === true} />}
       </div>
     </div>
   );
 
   return (
     <section className="stack" style={{ gap: 10 }}>
-      <h2>จัดการแอดมิน / โค้ช</h2>
+      <h2>จัดการบทบาทผู้ใช้ (แอดมิน / โค้ช / หัวหน้าก๊วน)</h2>
       <p className="muted" style={{ margin: 0 }}>
-        คนที่จะเป็นแอดมินต้องเข้าเว็บแล้วกด “เข้าสู่ระบบด้วย LINE” 1 ครั้งก่อน ชื่อถึงจะขึ้นในรายการนี้
+        ค้นหาชื่อลูกค้าเพื่อเปิดสิทธิ์หัวหน้าก๊วน (สำหรับลูกค้าที่โทรหรือติดต่อทางร้านเพื่อขอเปิดห้องก๊วน) หรือตั้งเป็นโค้ช/แอดมินได้ที่นี่
       </p>
       <form className="row" style={{ gap: 8, flexWrap: "nowrap" }}>
-        <input type="text" name="q" defaultValue={search} placeholder="ค้นหาชื่อ LINE" style={{ flex: 1 }} />
+        <input type="text" name="q" defaultValue={search} placeholder="ค้นหาชื่อผู้ใช้" style={{ flex: 1 }} />
         <button className="btn btn-sm" type="submit">ค้นหา</button>
       </form>
 

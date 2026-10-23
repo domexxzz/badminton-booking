@@ -30,7 +30,9 @@ const MIGRATIONS = [
   "0023_party_slot_null_check.sql",
   "0024_profile_avatar.sql",
   "0025_party_winner_stays.sql",
-  "0026_party_singles_winner_stays.sql",
+  "0026_sync_party_member_avatars.sql",
+  "0027_party_host_role.sql",
+  "0028_party_singles_winner_stays.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -918,6 +920,11 @@ const joined = (await db.query(`select * from join_party('${party.party_id}', '�
 check("party_member_board includes user avatar", (await db.query(`select avatar_url from party_member_board where entry_id='${joined.id}'`)).rows[0]?.avatar_url === "https://profile.line-scdn.net/abc");
 await db.query(`select leave_party('${joined.id}')`);
 
+// 0026 profile avatar update propagates to party_member_board
+await db.query(`update profiles set avatar_url = 'https://profile.google.com/new' where id = '${U1}'`);
+check("updating profile avatar immediately updates party_member_board",
+  (await db.query(`select avatar_url from party_member_board where entry_id='${joined.id}'`)).rows[0]?.avatar_url === "https://profile.google.com/new");
+
 // ---- Party Winner Stays On Matching (0025) ----
 const P_GUEST1 = "dddddddd-dddd-dddd-dddd-dddddddddddd";
 const P_GUEST2 = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
@@ -973,7 +980,23 @@ check("round 2 is team A (winner) vs team C (challenger)", r2.round_no === 2 && 
 const queueWaiting = (await db.query(`select team from party_team_queue where party_id='${party.party_id}' and state='waiting' order by queued_at`)).rows;
 check("loser (team B) goes to the back of the queue", queueWaiting.length === 1 && queueWaiting[0].team === "B");
 
-// ---- Singles Winner Stays On Matching (0026) ----
+// ---- Party Host Role (0027) ----
+// Non-admin cannot set party host
+await as(U1);
+await expectError("non-admin cannot set party host", `select set_party_host('${U1}', true)`, "FORBIDDEN");
+
+// Admin can set party host
+await as(ADMIN);
+await db.query(`select set_party_host('${U1}', true)`);
+check("party host role is saved", (await db.query(`select is_party_host from profiles where id='${U1}'`)).rows[0].is_party_host === true);
+check("can_host_party returns true for designated host", (await db.query(`select can_host_party('${U1}') as p`)).rows[0].p === true);
+check("can_host_party returns true for admin", (await db.query(`select can_host_party('${ADMIN}') as p`)).rows[0].p === true);
+
+// Admin can revoke party host
+await db.query(`select set_party_host('${U1}', false)`);
+check("can_host_party returns false when revoked", (await db.query(`select can_host_party('${U1}') as p`)).rows[0].p === false);
+
+// ---- Singles Winner Stays On Matching (0028) ----
 await as(PARTY_HOST);
 const singlesAt = new Date(Date.parse(partyAt) + 24 * 60 * 60 * 1000).toISOString();
 const singles = (await db.query(`select * from create_party_booking(4::smallint, '${singlesAt}', 1, 'singles', 'เดี่ยวชนะอยู่ต่อ', 'หัวห้อง')`)).rows[0];

@@ -31,6 +31,7 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
   const currentSinglesMatch = singlesMatchRows.find((match) => match.status === "playing") ?? null;
   const playingPlayer = singlesQueue.find((row) => row.state === "playing" && !currentSinglesMatch) ?? null;
   const waitingPlayers = singlesQueue.filter((row) => row.state === "waiting").sort((a, b) => a.queued_at.localeCompare(b.queued_at));
+  const teamMembers = (t: PartyTeam) => members.filter((m) => m.team === t);
   const teamMemberNames = (t: PartyTeam) => {
     const names = members.filter((m) => m.team === t).map((m) => m.name);
     return names.length > 0 ? names.join(", ") : "ยังไม่มีสมาชิก";
@@ -75,9 +76,31 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
         {currentMatch ? (
           <div>
             <strong>ทีม <b>{currentMatch.team_a}</b><em>VS</em>ทีม <b>{currentMatch.team_b}</b></strong>
-            <small className="muted" style={{ display: "block", marginTop: 2, fontSize: 12 }}>
-              {teamMemberNames(currentMatch.team_a)} พบ {teamMemberNames(currentMatch.team_b)}
-            </small>
+            <div className="party-match-avatars-row">
+              <div className="party-match-team-group">
+                {teamMembers(currentMatch.team_a).map((m) => {
+                  const av = m.avatar_url || (m.entry_id === myEntry ? userAvatar : null);
+                  return (
+                    <span key={m.entry_id} className="party-player-pill" title={m.name}>
+                      {av ? <img src={av} alt="" className="party-player-avatar-xs" /> : <span className="party-player-initial-xs">{(m.name || "ผ").trim().charAt(0)}</span>}
+                      <span>{m.name}</span>
+                    </span>
+                  );
+                })}
+              </div>
+              <span className="party-match-vs-label">พบ</span>
+              <div className="party-match-team-group">
+                {teamMembers(currentMatch.team_b).map((m) => {
+                  const av = m.avatar_url || (m.entry_id === myEntry ? userAvatar : null);
+                  return (
+                    <span key={m.entry_id} className="party-player-pill" title={m.name}>
+                      {av ? <img src={av} alt="" className="party-player-avatar-xs" /> : <span className="party-player-initial-xs">{(m.name || "ผ").trim().charAt(0)}</span>}
+                      <span>{m.name}</span>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         ) : playingTeam ? (
           <div>
@@ -106,11 +129,25 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
       <div className="party-queue-strip">
         <span>ลำดับทีมพร้อม ({waitingTeams.length} ทีม)</span>
         <div>
-          {waitingTeams.map((row, index) => (
-            <b key={row.team} title={teamMemberNames(row.team)}>
-              {index + 1}. ทีม {row.team} ({teamMemberNames(row.team)})
-            </b>
-          ))}
+          {waitingTeams.map((row, index) => {
+            const tMembers = teamMembers(row.team);
+            return (
+              <span key={row.team} className="party-queue-chip" title={teamMemberNames(row.team)}>
+                <b>{index + 1}. ทีม {row.team}</b>
+                <span className="party-queue-avatars">
+                  {tMembers.map((m) => {
+                    const av = m.avatar_url || (m.entry_id === myEntry ? userAvatar : null);
+                    return av ? (
+                      <img key={m.entry_id} src={av} alt="" className="party-player-avatar-xxs" />
+                    ) : (
+                      <span key={m.entry_id} className="party-player-initial-xxs">{(m.name || "ผ").trim().charAt(0)}</span>
+                    );
+                  })}
+                </span>
+                <small>{teamMemberNames(row.team)}</small>
+              </span>
+            );
+          })}
           {waitingTeams.length === 0 && <small>ยังไม่มีทีมรอคิว</small>}
         </div>
       </div>
@@ -121,13 +158,29 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
               <p>หัวห้องเลือกทีมที่ชนะ (ทีมชนะอยู่ต่อ · ทีมแพ้ไปต่อท้ายคิว)</p>
               <div>
                 <button type="button" className="btn" disabled={pending} onClick={() => matchAction(currentMatch.team_a)}>
-                  🏆 ทีม {currentMatch.team_a} ชนะ
+                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                    🏆 ทีม {currentMatch.team_a} ชนะ
+                    <span className="party-btn-avatars">
+                      {teamMembers(currentMatch.team_a).map((m) => {
+                        const av = m.avatar_url || (m.entry_id === myEntry ? userAvatar : null);
+                        return av ? <img key={m.entry_id} src={av} alt="" className="party-player-avatar-xxs" /> : null;
+                      })}
+                    </span>
+                  </span>
                   <span style={{ display: "block", fontSize: 11, fontWeight: "normal", opacity: 0.85 }}>
                     ({teamMemberNames(currentMatch.team_a)})
                   </span>
                 </button>
                 <button type="button" className="btn" disabled={pending} onClick={() => matchAction(currentMatch.team_b)}>
-                  🏆 ทีม {currentMatch.team_b} ชนะ
+                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                    🏆 ทีม {currentMatch.team_b} ชนะ
+                    <span className="party-btn-avatars">
+                      {teamMembers(currentMatch.team_b).map((m) => {
+                        const av = m.avatar_url || (m.entry_id === myEntry ? userAvatar : null);
+                        return av ? <img key={m.entry_id} src={av} alt="" className="party-player-avatar-xxs" /> : null;
+                      })}
+                    </span>
+                  </span>
                   <span style={{ display: "block", fontSize: 11, fontWeight: "normal", opacity: 0.85 }}>
                     ({teamMemberNames(currentMatch.team_b)})
                   </span>
@@ -170,7 +223,21 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
           <div className="party-schedule-table-row" key={match.id}>
             <span>รอบ {match.round_no}</span>
             <strong>
-              ทีม <b>{match.team_a}</b> <em>พบ</em> ทีม <b>{match.team_b}</b>
+              ทีม <b>{match.team_a}</b>{" "}
+              <span className="party-queue-avatars">
+                {teamMembers(match.team_a).map((m) => {
+                  const av = m.avatar_url || (m.entry_id === myEntry ? userAvatar : null);
+                  return av ? <img key={m.entry_id} src={av} alt="" className="party-player-avatar-xxs" /> : null;
+                })}
+              </span>{" "}
+              <em>vs</em>{" "}
+              ทีม <b>{match.team_b}</b>{" "}
+              <span className="party-queue-avatars">
+                {teamMembers(match.team_b).map((m) => {
+                  const av = m.avatar_url || (m.entry_id === myEntry ? userAvatar : null);
+                  return av ? <img key={m.entry_id} src={av} alt="" className="party-player-avatar-xxs" /> : null;
+                })}
+              </span>
             </strong>
             <span>{formatTime(match.started_at)} น.</span>
             <span className={`match-status ${match.status === "playing" ? "playing" : ""}`}>

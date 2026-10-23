@@ -37,7 +37,7 @@ export async function createPartyBooking(input: {
 }
 
 export async function joinParty(partyId: string, name: string, slotNo: number, team: PartyTeam): Promise<ActionResult> {
-  if (!UUID_RE.test(partyId) || !validText(name, PARTY_NAME_MAX) || !validSlot(slotNo) || !["A", "B"].includes(team)) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
+  if (!UUID_RE.test(partyId) || !validText(name, PARTY_NAME_MAX) || !validSlot(slotNo) || !["A", "B", "C", "D", "E", "F"].includes(team)) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
   const supabase = await createClient();
   const { error } = await supabase.rpc("join_party", { p_party_id: partyId, p_name: name.trim(), p_slot_no: slotNo, p_team: team });
   if (error) return { ok: false, error: friendlyError(error) };
@@ -45,7 +45,7 @@ export async function joinParty(partyId: string, name: string, slotNo: number, t
 }
 
 export async function movePartySlot(entryId: string, partyId: string, slotNo: number, team: PartyTeam): Promise<ActionResult> {
-  if (!UUID_RE.test(entryId) || !UUID_RE.test(partyId) || !validSlot(slotNo) || !["A", "B"].includes(team)) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
+  if (!UUID_RE.test(entryId) || !UUID_RE.test(partyId) || !validSlot(slotNo) || !["A", "B", "C", "D", "E", "F"].includes(team)) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
   const supabase = await createClient();
   const { error } = await supabase.rpc("move_party_slot", { p_entry_id: entryId, p_slot_no: slotNo, p_team: team });
   if (error) return { ok: false, error: friendlyError(error) };

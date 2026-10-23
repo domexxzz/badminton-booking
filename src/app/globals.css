@@ -74,12 +74,41 @@
 .party-view-tabs a.active > span { color: var(--primary-strong); background: white; }
 .party-view-tabs a.active small { color: rgba(255,255,255,.8); }
 .party-create { overflow: hidden; }
+.party-detail-card { gap: 20px; padding: 22px 18px; border-radius: 26px; }
+.party-detail-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.party-detail-head > div { display: grid; gap: 0; }
+.party-detail-head > div > span { color: var(--muted); font-size: 13px; font-weight: 700; }
+.party-detail-head h2 { margin: 0; color: var(--text); font-size: clamp(25px, 7vw, 34px); line-height: 1.1; }
+.party-free-pill { flex: none; padding: 10px 14px; border-radius: 999px; color: var(--primary-strong); background: var(--primary-soft); font-weight: 800; }
 .party-create-guide { display: grid; grid-template-columns: 28px 1fr 12px 28px 1fr; align-items: center; gap: 7px; padding: 12px; border-radius: 15px; background: var(--primary-soft); }
 .party-create-guide > span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: white; background: var(--primary); font-weight: 800; }
 .party-create-guide p { display: grid; margin: 0; line-height: 1.25; }
 .party-create-guide p strong { font-size: 12px; }
 .party-create-guide p small { color: var(--muted); font-size: 10px; }
 .party-create-guide i { color: var(--muted); font-size: 22px; font-style: normal; }
+.party-detail-field { gap: 9px; }
+.party-detail-field > span { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 17px; font-weight: 800; }
+.party-detail-field > span b { width: 25px; color: var(--primary); font-size: 24px; text-align: center; }
+.party-input-wrap { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; min-height: 54px; padding: 0 13px; border: 1.5px solid color-mix(in srgb, var(--primary) 28%, var(--border)); border-radius: 16px; background: var(--surface); }
+.party-input-wrap:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent); }
+.party-input-wrap > b { color: var(--primary); font-size: 25px; }
+.party-input-wrap input { min-width: 0; padding: 0 8px; border: 0; outline: 0; box-shadow: none; background: transparent; font-size: 18px; }
+.party-input-wrap small { color: var(--muted); font-size: 11px; }
+.party-mode-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.party-mode-cards button { display: grid; grid-template-columns: 42px 1fr 24px; align-items: center; gap: 8px; min-height: 78px; padding: 12px; color: var(--text); border: 1.5px solid var(--border); border-radius: 17px; background: var(--surface); text-align: left; }
+.party-mode-cards button .mode-icon { color: var(--muted); font-size: 34px; text-align: center; }
+.party-mode-cards button > span { display: grid; }
+.party-mode-cards button strong { font-size: 17px; }
+.party-mode-cards button small { color: var(--muted); font-size: 13px; }
+.party-mode-cards button i { width: 22px; height: 22px; border: 2px solid var(--border-strong); border-radius: 50%; }
+.party-mode-cards button.selected { color: white; border-color: var(--primary); background: linear-gradient(145deg, var(--primary), var(--primary-strong)); box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 20%, transparent); }
+.party-mode-cards button.selected .mode-icon, .party-mode-cards button.selected small { color: white; }
+.party-mode-cards button.selected i { border: 5px solid white; }
+.party-selection-notice { display: flex; align-items: center; gap: 12px; min-height: 58px; padding: 12px 14px; color: var(--muted); border: 1.5px dashed color-mix(in srgb, var(--primary) 30%, var(--border)); border-radius: 16px; font-weight: 700; }
+.party-selection-notice b { display: grid; place-items: center; flex: none; width: 28px; height: 28px; color: white; border-radius: 50%; background: var(--muted); font-family: serif; }
+.party-submit-btn { display: grid; grid-template-columns: 30px 1fr 20px; align-items: center; min-height: 62px; border-radius: 18px; font-size: 18px; }
+.party-submit-btn > span { font-size: 24px; }
+.party-submit-btn > b { font-size: 30px; font-weight: 400; }
 .party-booking-summary { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 14px; border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border)); border-radius: 16px; background: var(--primary-soft); }
 .party-booking-summary > div { display: grid; gap: 3px; }
 .party-booking-summary > div:last-child { text-align: right; }

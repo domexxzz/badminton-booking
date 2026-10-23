@@ -65,18 +65,18 @@ export function PartyCreateForm({ courts, defaultName, openHour, closeHour }: {
       </div></div>
       </section>
 
-      <section className="card stack party-create">
-        <div className="party-create-head"><div><span className="queue-section-label">รายละเอียดห้อง</span><h2>ตั้งค่าห้องก๊วน</h2></div><span className="badge confirmed">เปิดห้องฟรี</span></div>
-        <div className="party-create-guide"><span>1</span><p><strong>หัวห้องจ่ายค่าจอง</strong><small>ชำระเต็มจำนวนผ่านระบบ</small></p><i>›</i><span>2</span><p><strong>สมาชิกเข้าร่วมฟรี</strong><small>ตกลงค่าใช้จ่ายกับหัวห้องเอง</small></p></div>
-        <label className="field"><span>ชื่อห้อง</span><input value={title} maxLength={PARTY_TITLE_MAX} onChange={(e) => setTitle(e.target.value)} required /></label>
-        <label className="field"><span>ชื่อของคุณในห้อง</span><input value={hostName} maxLength={PARTY_NAME_MAX} onChange={(e) => setHostName(e.target.value)} required /></label>
-        <div className="field"><span>รูปแบบการเล่น</span><div className="party-mode-pick">
-          <button type="button" className={`chip ${mode === "singles" ? "selected" : ""}`} onClick={() => setMode("singles")}><strong>เดี่ยว</strong><span>1 ต่อ 1</span></button>
-          <button type="button" className={`chip ${mode === "doubles" ? "selected" : ""}`} onClick={() => setMode("doubles")}><strong>คู่</strong><span>2 ต่อ 2</span></button>
+      <section className="card stack party-create party-detail-card">
+        <div className="party-detail-head"><div><span>รายละเอียดห้อง</span><h2>ตั้งค่าห้องก๊วน</h2></div><span className="party-free-pill">▣ เปิดห้องฟรี</span></div>
+        <div className="party-create-guide"><span>1</span><p><strong>♣ หัวห้องจ่ายค่าจอง</strong><small>ชำระเต็มจำนวนผ่านระบบ</small></p><i>›</i><span>2</span><p><strong>🔗 สมาชิกเข้าร่วมฟรี</strong><small>ตกลงค่าใช้จ่ายกับหัวห้องเอง</small></p></div>
+        <label className="field party-detail-field"><span><b aria-hidden="true">♣</b> ชื่อห้อง</span><div className="party-input-wrap"><b aria-hidden="true">✎</b><input value={title} maxLength={PARTY_TITLE_MAX} onChange={(e) => setTitle(e.target.value)} required /><small>{title.length}/{PARTY_TITLE_MAX}</small></div></label>
+        <label className="field party-detail-field"><span><b aria-hidden="true">◇</b> ชื่อของคุณในห้อง</span><div className="party-input-wrap"><b aria-hidden="true">♙</b><input value={hostName} maxLength={PARTY_NAME_MAX} onChange={(e) => setHostName(e.target.value)} required /><small>{hostName.length}/{PARTY_NAME_MAX}</small></div></label>
+        <div className="field party-detail-field"><span><b aria-hidden="true">▣</b> รูปแบบการเล่น</span><div className="party-mode-cards">
+          <button type="button" className={mode === "singles" ? "selected" : ""} onClick={() => setMode("singles")}><b className="mode-icon">♣</b><span><strong>เดี่ยว</strong><small>1 ต่อ 1</small></span><i /></button>
+          <button type="button" className={mode === "doubles" ? "selected" : ""} onClick={() => setMode("doubles")}><b className="mode-icon">♟</b><span><strong>คู่</strong><small>2 ต่อ 2</small></span><i /></button>
         </div></div>
-        {court && hour !== null ? <div className="party-booking-summary"><div><strong>{court.name}</strong><span>{formatHour(hour)}–{formatHour(hour + hours)} น. · {hours === .5 ? "30 นาที" : `${hours} ชม.`}</span></div><div><span>รวมทั้งหมด</span><strong>{formatBaht(court.price_per_hour * hours)}</strong></div></div> : <div className="booking-cart-empty">เลือกสนาม เวลา และระยะเวลาด้านบนเพื่อดูสรุปรายการ</div>}
+        {court && hour !== null ? <div className="party-booking-summary"><div><strong>{court.name}</strong><span>{formatHour(hour)}–{formatHour(hour + hours)} น. · {hours === .5 ? "30 นาที" : `${hours} ชม.`}</span></div><div><span>รวมทั้งหมด</span><strong>{formatBaht(court.price_per_hour * hours)}</strong></div></div> : <div className="party-selection-notice"><b>i</b><span>เลือกสนาม เวลา และระยะเวลาด้านบนเพื่อดูสรุปรายการ</span></div>}
       {loadError && <p className="error">{loadError}</p>}{error && <p className="error" role="alert">{error}</p>}
-      <button className="btn btn-block" type="submit" disabled={pending || hour === null}>{pending ? "กำลังสร้างห้อง…" : "จองสนามและไปชำระเงิน"}</button>
+      <button className="btn btn-block party-submit-btn" type="submit" disabled={pending || hour === null}><span aria-hidden="true">▣</span>{pending ? "กำลังสร้างห้อง…" : "จองสนามและไปชำระเงิน"}<b aria-hidden="true">›</b></button>
       </section>
     </form>
   );

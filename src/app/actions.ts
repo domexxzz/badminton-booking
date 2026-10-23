@@ -228,7 +228,7 @@ export async function reviewPayment(
   note: string,
   editedAmount?: number,
 ): Promise<ActionResult> {
-  if (!UUID_RE.test(bookingId) || typeof approve !== "boolean") {
+  if (!UUID_RE.test(bookingId) || typeof approve !== "boolean" || typeof note !== "string") {
     return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
   }
   const supabase = await createClient();
@@ -321,6 +321,8 @@ export async function adminCreateBooking(input: AdminBookingInput): Promise<Acti
     normalizedItems.some((it) => !isValidAdminItem(it)) ||
     !CHANNELS.has(channel) ||
     typeof name !== "string" ||
+    typeof phone !== "string" ||
+    typeof note !== "string" ||
     name.trim().length === 0 ||
     name.length > 100 ||
     phone.length > 20 ||

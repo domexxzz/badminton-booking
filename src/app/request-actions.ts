@@ -87,7 +87,13 @@ export async function resolveRequest(input: {
   refundSlipPath: string | null;
 }): Promise<ActionResult> {
   const { requestId, bookingId, approve, note, refundSlipPath } = input;
-  if (!UUID_RE.test(requestId) || !UUID_RE.test(bookingId) || typeof approve !== "boolean" || typeof note !== "string") {
+  if (
+    !UUID_RE.test(requestId) ||
+    !UUID_RE.test(bookingId) ||
+    typeof approve !== "boolean" ||
+    typeof note !== "string" ||
+    (refundSlipPath !== null && typeof refundSlipPath !== "string")
+  ) {
     return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
   }
   const supabase = await createClient();

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { notifyNewBooking } from "@/lib/line/notify-shop";
 import { friendlyError } from "@/lib/errors";
-import { PARTY_CAPACITY, PARTY_NAME_MAX, PARTY_TITLE_MAX, type PartyMode } from "@/lib/party";
+import { PARTY_CAPACITY, PARTY_NAME_MAX, PARTY_TITLE_MAX, type PartyMode, type PartyTeam } from "@/lib/party";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult } from "./actions";
 
@@ -36,18 +36,18 @@ export async function createPartyBooking(input: {
   return { ok: true, data: { partyId: data.party_id, bookingId: data.booking_id } };
 }
 
-export async function joinParty(partyId: string, name: string, slotNo: number): Promise<ActionResult> {
-  if (!UUID_RE.test(partyId) || !validText(name, PARTY_NAME_MAX) || !validSlot(slotNo)) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
+export async function joinParty(partyId: string, name: string, slotNo: number, team: PartyTeam): Promise<ActionResult> {
+  if (!UUID_RE.test(partyId) || !validText(name, PARTY_NAME_MAX) || !validSlot(slotNo) || !["A", "B"].includes(team)) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
   const supabase = await createClient();
-  const { error } = await supabase.rpc("join_party", { p_party_id: partyId, p_name: name.trim(), p_slot_no: slotNo });
+  const { error } = await supabase.rpc("join_party", { p_party_id: partyId, p_name: name.trim(), p_slot_no: slotNo, p_team: team });
   if (error) return { ok: false, error: friendlyError(error) };
   refreshParty(partyId); return { ok: true, data: null };
 }
 
-export async function movePartySlot(entryId: string, partyId: string, slotNo: number): Promise<ActionResult> {
-  if (!UUID_RE.test(entryId) || !UUID_RE.test(partyId) || !validSlot(slotNo)) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
+export async function movePartySlot(entryId: string, partyId: string, slotNo: number, team: PartyTeam): Promise<ActionResult> {
+  if (!UUID_RE.test(entryId) || !UUID_RE.test(partyId) || !validSlot(slotNo) || !["A", "B"].includes(team)) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
   const supabase = await createClient();
-  const { error } = await supabase.rpc("move_party_slot", { p_entry_id: entryId, p_slot_no: slotNo });
+  const { error } = await supabase.rpc("move_party_slot", { p_entry_id: entryId, p_slot_no: slotNo, p_team: team });
   if (error) return { ok: false, error: friendlyError(error) };
   refreshParty(partyId); return { ok: true, data: null };
 }

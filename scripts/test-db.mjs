@@ -25,6 +25,7 @@ const MIGRATIONS = [
   "0018_play_queue.sql",
   "0019_coach_lessons.sql",
   "0020_party_queue.sql",
+  "0021_party_join_flow.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -880,16 +881,16 @@ await db.query(`select review_payment('${party.booking_id}', true)`);
 check("approved payment opens the Party publicly",
   (await db.query(`select count(*)::int n from party_room_board where party_id='${party.party_id}'`)).rows[0].n === 1);
 await as(PARTY_GUEST);
-const partyGuest = (await db.query(`select * from join_party('${party.party_id}', ' แขกหนึ่ง ', 3::smallint)`)).rows[0];
+const partyGuest = (await db.query(`select * from join_party('${party.party_id}', ' แขกหนึ่ง ', 3::smallint, 'B'::party_team)`)).rows[0];
 check("a guest joins a chosen slot for free", partyGuest.slot_no === 3 &&
   (await db.query(`select count(*)::int n from party_member_board where party_id='${party.party_id}'`)).rows[0].n === 2);
 await as(PARTY_GUEST2);
-await expectError("two guests cannot take the same slot", `select join_party('${party.party_id}', 'แขกสอง', 3::smallint)`, "PARTY_SLOT_TAKEN");
+await expectError("two guests cannot take the same slot", `select join_party('${party.party_id}', 'แขกสอง', 3::smallint, 'A'::party_team)`, "PARTY_SLOT_TAKEN");
 await as(PARTY_GUEST);
-await db.query(`select move_party_slot('${partyGuest.id}', 4::smallint)`);
+await db.query(`select move_party_slot('${partyGuest.id}', 4::smallint, 'A'::party_team)`);
 check("a guest can move their own slot", (await db.query(`select slot_no from party_member_board where entry_id='${partyGuest.id}'`)).rows[0].slot_no === 4);
 await as(PARTY_GUEST2);
-await expectError("a guest cannot move another member", `select move_party_slot('${partyGuest.id}', 5::smallint)`, "PARTY_MEMBER_NOT_FOUND");
+await expectError("a guest cannot move another member", `select move_party_slot('${partyGuest.id}', 5::smallint, 'A'::party_team)`, "PARTY_MEMBER_NOT_FOUND");
 await as(PARTY_HOST);
 await db.query(`select kick_party_member('${party.party_id}', '${partyGuest.id}')`);
 check("the host can remove a guest", (await db.query(`select count(*)::int n from party_member_board where entry_id='${partyGuest.id}'`)).rows[0].n === 0);

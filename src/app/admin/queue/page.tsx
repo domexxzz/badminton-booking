@@ -4,7 +4,7 @@ import { getSessionUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 type Room = { id: string; booking_id: string; host_name: string; title: string; mode: "singles" | "doubles"; capacity: number; court_id: number; starts_at: string; ends_at: string; status: string; created_at: string };
-type Member = { id: string; party_id: string; name: string; slot_no: number; status: "active" | "left" | "kicked"; joined_at: string; left_at: string | null };
+type Member = { id: string; party_id: string; name: string; slot_no: number; team: "A" | "B"; status: "active" | "left" | "kicked"; joined_at: string; left_at: string | null };
 type Booking = { id: string; amount: number; status: string };
 const ROOM_STATUS: Record<string, string> = { pending_payment: "รอหัวห้องชำระ", open: "เปิดรับสมาชิก", closed: "จบแล้ว", cancelled: "ยกเลิก" };
 const MEMBER_STATUS: Record<string, string> = { active: "อยู่ในห้อง", left: "ออกเอง", kicked: "หัวห้องนำออก" };
@@ -19,7 +19,7 @@ export default async function AdminQueuePage() {
   const partyIds = (rooms ?? []).map((r) => r.id);
   const bookingIds = (rooms ?? []).map((r) => r.booking_id);
   const [{ data: members }, { data: bookings }] = await Promise.all([
-    partyIds.length ? supabase.from("party_members").select("id, party_id, name, slot_no, status, joined_at, left_at").in("party_id", partyIds).order("joined_at").returns<Member[]>() : Promise.resolve({ data: [] as Member[] }),
+    partyIds.length ? supabase.from("party_members").select("id, party_id, name, slot_no, team, status, joined_at, left_at").in("party_id", partyIds).order("joined_at").returns<Member[]>() : Promise.resolve({ data: [] as Member[] }),
     bookingIds.length ? supabase.from("bookings").select("id, amount, status").in("id", bookingIds).returns<Booking[]>() : Promise.resolve({ data: [] as Booking[] }),
   ]);
   const courtName = new Map((courts ?? []).map((c) => [c.id, c.name]));
@@ -38,7 +38,7 @@ export default async function AdminQueuePage() {
       return <article key={room.id} className="card stack admin-party-card">
         <div className="admin-party-head"><div><span className="badge confirmed">จองแบบก๊วน</span><h2>{room.title}</h2><span className="muted">เลขจอง {room.booking_id.slice(0, 8).toUpperCase()}</span></div><span className={`badge ${booking?.status ?? displayedStatus}`}>{ROOM_STATUS[displayedStatus] ?? displayedStatus}</span></div>
         <div className="admin-party-facts"><div><span>สนามและเวลา</span><strong>{courtName.get(room.court_id) ?? `สนาม ${room.court_id}`}</strong><small>{formatSlot(room.starts_at, room.ends_at)}</small></div><div><span>รายละเอียดห้อง</span><strong>{room.mode === "singles" ? "เดี่ยว 1 ต่อ 1" : "คู่ 2 ต่อ 2"}</strong><small>หัวห้อง: {room.host_name}</small></div><div><span>การชำระเงิน</span><strong>{formatBaht(booking?.amount ?? 0)}</strong><small>{STATUS_LABEL[booking?.status ?? ""] ?? booking?.status ?? "ไม่พบข้อมูล"}</small></div><div><span>สมาชิก</span><strong>{roomMembers.filter((m) => m.status === "active").length}/{room.capacity} คน</strong><small>เคยเข้ารวม {roomMembers.length} รายการ</small></div></div>
-        <details className="admin-party-history"><summary>ดูประวัติสมาชิก ({roomMembers.length})</summary>{roomMembers.length === 0 ? <p className="muted">ยังไม่มีสมาชิก</p> : <div>{roomMembers.map((m) => <div key={m.id}><span className="party-slot-no">{m.slot_no}</span><strong>{m.name}</strong><span className={`member-state ${m.status}`}>{MEMBER_STATUS[m.status]}</span><small>เข้า {new Date(m.joined_at).toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "short", timeStyle: "short" })}{m.left_at ? ` · สิ้นสุด ${new Date(m.left_at).toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "short", timeStyle: "short" })}` : ""}</small></div>)}</div>}</details>
+        <details className="admin-party-history"><summary>ดูประวัติสมาชิก ({roomMembers.length})</summary>{roomMembers.length === 0 ? <p className="muted">ยังไม่มีสมาชิก</p> : <div>{roomMembers.map((m) => <div key={m.id}><span className="party-slot-no">{m.slot_no}</span><strong>{m.name} · ทีม {m.team}</strong><span className={`member-state ${m.status}`}>{MEMBER_STATUS[m.status]}</span><small>เข้า {new Date(m.joined_at).toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "short", timeStyle: "short" })}{m.left_at ? ` · สิ้นสุด ${new Date(m.left_at).toLocaleString("th-TH", { timeZone: "Asia/Bangkok", dateStyle: "short", timeStyle: "short" })}` : ""}</small></div>)}</div>}</details>
       </article>;
     })}
   </section>;

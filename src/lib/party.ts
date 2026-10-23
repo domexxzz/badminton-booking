@@ -4,7 +4,8 @@ export const PARTY_NAME_MAX = 30;
 export const PARTY_TITLE_MAX = 60;
 
 export type PartyMode = "singles" | "doubles";
-export type PartyMember = { entry_id: string; name: string; slot_no: number };
+export type PartyTeam = "A" | "B";
+export type PartyMember = { entry_id: string; name: string; slot_no: number; team: PartyTeam };
 export type PartyMatch = { index: number; startsAt: string; sideA: string[]; sideB: string[] };
 
 const addMinutes = (iso: string, minutes: number) =>

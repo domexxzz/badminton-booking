@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildPartyMatches } from "../src/lib/party";
+import { buildPartyMatches, type PartyMember } from "../src/lib/party";
 
 const start = "2026-10-24T10:00:00.000Z";
 const end = "2026-10-24T11:00:00.000Z";
-const member = (slot: number, name = `P${slot}`) => ({ entry_id: String(slot), name, slot_no: slot });
+const member = (slot: number, name = `P${slot}`): PartyMember => ({ entry_id: String(slot), name, slot_no: slot, team: slot % 2 ? "A" : "B" });
 
 describe("party match rotation", () => {
   it("fills one hour with four 15-minute singles matches", () => {

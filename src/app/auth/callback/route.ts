@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 // Handles both link styles:
 //  - token_hash (recommended, see README): works even when the email is opened
 //    in a different browser or a LINE/Gmail in-app browser.
-//  - code (PKCE default): only works in the browser that requested the link.
+//  - code (PKCE default / OAuth e.g. Google): only works in the browser that requested the link.
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const origin = publicOrigin(request.url);
@@ -23,7 +23,30 @@ export async function GET(request: NextRequest) {
       ? await supabase.auth.exchangeCodeForSession(code)
       : { error: new Error("missing code") };
 
-  if (!error) return NextResponse.redirect(`${origin}${safeNext}`);
+  if (!error) {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const meta = user.user_metadata ?? {};
+        const avatarUrl = (meta.avatar_url ?? meta.picture ?? null) as string | null;
+        const displayName = (meta.full_name ?? meta.name ?? meta.display_name ?? null) as string | null;
+        if (avatarUrl || displayName) {
+          await supabase
+            .from("profiles")
+            .update({
+              ...(displayName ? { display_name: displayName } : {}),
+              ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+            })
+            .eq("id", user.id);
+        }
+      }
+    } catch (syncErr) {
+      console.warn("Failed to sync profile in auth callback:", syncErr);
+    }
+    return NextResponse.redirect(`${origin}${safeNext}`);
+  }
   console.error("Auth callback failed:", error);
   return NextResponse.redirect(`${origin}/login?error=link`);
 }

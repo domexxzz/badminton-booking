@@ -337,6 +337,8 @@ h2 { font-size: 16px; line-height: 1.4; margin: 0; font-weight: 600; }
 .btn-ghost { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-line { background: #06c755; color: #fff; }
+.btn-google { background: var(--surface); color: var(--text); border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-google:hover:not(:disabled) { background: var(--surface-subtle); border-color: color-mix(in srgb, var(--primary) 30%, var(--border)); }
 .link-btn { background: none; border: 0; padding: 0; color: var(--muted); cursor: pointer; }
 
 .field { display: grid; gap: 6px; }
@@ -1576,7 +1578,7 @@ details summary { cursor: pointer; }
 :is(.customer-app, .admin-app) h1 { font-size: 22px; font-weight: 600; letter-spacing: -.6px; }
 :is(.customer-app, .admin-app) h2 { font-weight: 600; }
 :is(.customer-app, .admin-app) .card { border: 1px solid color-mix(in srgb, var(--border) 65%, transparent); }
-:is(.customer-app, .admin-app) .btn:where(:not(.btn-ghost, .btn-danger, .btn-line)) {
+:is(.customer-app, .admin-app) .btn:where(:not(.btn-ghost, .btn-danger, .btn-line, .btn-google)) {
   background: linear-gradient(120deg, #00765e, #009875);
   box-shadow: 0 4px 10px rgba(0, 117, 86, .13);
 }

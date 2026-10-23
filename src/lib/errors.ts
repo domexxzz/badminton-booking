@@ -44,7 +44,7 @@ const MESSAGES: Record<string, string> = {
   INVALID_PLAYERS_PER_GAME: "จำนวนคนต่อเกมต้องเป็น 2–4 คน",
   INVALID_QUEUE_ACTION: "ทำรายการนี้กับคิวนี้ไม่ได้",
   QUEUE_CHANGED: "คิวเพิ่งถูกเปลี่ยนโดยคนอื่น หน้าจอกำลังอัปเดต กรุณาดูคิวล่าสุดแล้วลองใหม่",
-  PARTY_SUBSCRIPTION_REQUIRED: "บัญชีนี้ยังไม่มีสิทธิ์เปิดห้อง Party",
+  PARTY_SUBSCRIPTION_REQUIRED: "คุณยังไม่มีสิทธิ์เปิดห้องก๊วน กรุณาติดต่อทางร้านเพื่อเปิดสิทธิ์หัวหน้าก๊วน",
   INVALID_PARTY_DETAILS: "ข้อมูลห้อง Party ไม่ถูกต้อง",
   PARTY_NOT_OPEN: "ห้องนี้ยังไม่เปิด ปิดแล้ว หรือหมดเวลาแล้ว",
   PARTY_FULL: "ห้องนี้มีสมาชิกครบแล้ว",

@@ -65,7 +65,7 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
     {room.mode === "doubles" && <><div id="party-schedule" className="party-live-matching card">
       <div className="party-matching-title">
         <div>
-          <h2>▣ Matching ก๊วน</h2>
+          <h2>▣ Matching ห้องคู่</h2>
           <p>ชนะอยู่ต่อ · แพ้ไปต่อท้ายคิว (ทีมเต็มก่อน ได้คิวก่อน)</p>
         </div>
         <span>{teamQueue.length} ทีมพร้อม</span>

@@ -1,3 +1,4 @@
+-- 0028_party_singles_winner_stays.sql
 -- Singles rooms use the same winner-stays-on flow as doubles, but each member
 -- is one queue entry instead of waiting for a two-person team to be complete.
 

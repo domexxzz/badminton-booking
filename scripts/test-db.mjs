@@ -873,6 +873,11 @@ await db.exec(`insert into auth.users (id, email, raw_user_meta_data) values
   ('${PARTY_GUEST}', 'party-guest@x.com', '{"display_name":"แขกหนึ่ง"}'),
   ('${PARTY_GUEST2}', 'party-guest2@x.com', '{"display_name":"แขกสอง"}')`);
 const { rows: [{ party_at: partyAt }] } = await db.query(`select ((now() at time zone 'Asia/Bangkok')::date + 10 + time '18:00') at time zone 'Asia/Bangkok' as party_at`);
+// Since 0027 only an admin or a designated host may open a room (can_host_party).
+await as(ADMIN);
+await db.query(`select set_party_host('${PARTY_HOST}', true)`);
+await as(PARTY_GUEST);
+await expectError("a plain customer cannot open a Party room", `select create_party_booking(4::smallint, '${new Date(partyAt).toISOString()}', 1, 'doubles', 'x', 'x')`, "PARTY_SUBSCRIPTION_REQUIRED");
 await as(PARTY_HOST);
 const party = (await db.query(`select * from create_party_booking(4::smallint, '${new Date(partyAt).toISOString()}', 1, 'doubles', ' ก๊วน วันศุกร์ ', ' หัวห้อง ')`)).rows[0];
 check("creating a Party also creates a pending paid booking", Boolean(party.party_id && party.booking_id) &&
@@ -918,12 +923,12 @@ await db.query(`update profiles set avatar_url = 'https://profile.line-scdn.net/
 check("a user can save their avatar_url", (await db.query(`select avatar_url from profiles where id='${U1}'`)).rows[0].avatar_url === "https://profile.line-scdn.net/abc");
 const joined = (await db.query(`select * from join_party('${party.party_id}', 'ผู้เล่นหนึ่ง', 5::smallint, 'C'::party_team)`)).rows[0];
 check("party_member_board includes user avatar", (await db.query(`select avatar_url from party_member_board where entry_id='${joined.id}'`)).rows[0]?.avatar_url === "https://profile.line-scdn.net/abc");
-await db.query(`select leave_party('${joined.id}')`);
 
-// 0026 profile avatar update propagates to party_member_board
+// 0026 profile avatar update propagates to party_member_board, while the member is still active
 await db.query(`update profiles set avatar_url = 'https://profile.google.com/new' where id = '${U1}'`);
 check("updating profile avatar immediately updates party_member_board",
   (await db.query(`select avatar_url from party_member_board where entry_id='${joined.id}'`)).rows[0]?.avatar_url === "https://profile.google.com/new");
+await db.query(`select leave_party('${joined.id}')`);
 
 // ---- Party Winner Stays On Matching (0025) ----
 const P_GUEST1 = "dddddddd-dddd-dddd-dddd-dddddddddddd";

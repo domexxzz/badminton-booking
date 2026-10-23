@@ -918,6 +918,11 @@ const joined = (await db.query(`select * from join_party('${party.party_id}', 'à
 check("party_member_board includes user avatar", (await db.query(`select avatar_url from party_member_board where entry_id='${joined.id}'`)).rows[0]?.avatar_url === "https://profile.line-scdn.net/abc");
 await db.query(`select leave_party('${joined.id}')`);
 
+// 0026 profile avatar update propagates to party_member_board
+await db.query(`update profiles set avatar_url = 'https://profile.google.com/new' where id = '${U1}'`);
+check("updating profile avatar immediately updates party_member_board",
+  (await db.query(`select avatar_url from party_member_board where entry_id='${joined.id}'`)).rows[0]?.avatar_url === "https://profile.google.com/new");
+
 // ---- Party Winner Stays On Matching (0025) ----
 const P_GUEST1 = "dddddddd-dddd-dddd-dddd-dddddddddddd";
 const P_GUEST2 = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";

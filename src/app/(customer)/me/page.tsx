@@ -24,6 +24,9 @@ export default async function MyBookingsPage() {
   if (!user) redirect("/login?next=/me");
 
   const isLineAccount = Boolean(user.app_metadata?.line_user_id);
+  const isGoogleAccount =
+    user.app_metadata?.provider === "google" ||
+    (Array.isArray(user.app_metadata?.providers) && user.app_metadata.providers.includes("google"));
 
   const { data, error } = await supabase
     .from("bookings")
@@ -96,6 +99,20 @@ export default async function MyBookingsPage() {
                   }}
                 >
                   LINE
+                </span>
+              )}
+              {isGoogleAccount && (
+                <span
+                  className="badge"
+                  style={{
+                    background: "#4285F4",
+                    color: "#fff",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: "2px 6px",
+                  }}
+                >
+                  Google
                 </span>
               )}
             </div>

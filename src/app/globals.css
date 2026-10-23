@@ -66,6 +66,8 @@
 .party-payment-note strong { color: var(--primary-strong); }
 .party-payment-note span { color: var(--muted); font-size: 13px; }
 .party-view-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* The ladder sits under the two main choices, full width, so it stays readable at 390px. */
+.party-view-tabs a:nth-child(3) { grid-column: 1 / -1; min-height: 58px; }
 .party-view-tabs a { display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: 0 9px; min-height: 72px; padding: 11px 13px; color: var(--text); text-decoration: none; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow-sm); }
 .party-view-tabs a > span { grid-row: 1 / 3; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; color: var(--primary-strong); background: var(--primary-soft); font-size: 20px; }
 .party-view-tabs a strong { align-self: end; font-size: 15px; }
@@ -267,6 +269,59 @@
   .party-schedule-table-row > .match-status { grid-column: 1 / 3; justify-self: start; }
   .party-schedule-table-row > span:last-child { grid-column: 3; text-align: right; white-space: nowrap; }
 }
+/* ---------- The shop's ladder (migration 0030) ---------- */
+.leaderboard-intro { display: flex; align-items: center; gap: 13px; padding: 16px; }
+.leaderboard-intro h1 { margin: 0; font-size: 21px; }
+.leaderboard-intro span { color: var(--muted); font-size: 13px; }
+
+.leaderboard-me { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 12px; padding: 14px 16px; border-radius: var(--radius); background: var(--primary); color: var(--primary-ink); }
+.leaderboard-me > span { font-size: 12px; opacity: .9; }
+.leaderboard-me > strong { grid-column: 1; font-size: 24px; line-height: 1.1; }
+.leaderboard-me > strong small { font-size: 13px; font-weight: 500; opacity: .85; }
+.leaderboard-me > b { grid-column: 2; grid-row: 1 / 3; font-size: 19px; }
+
+.leaderboard-table { padding: 8px 12px 12px; }
+.leaderboard-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) 32px 36px 56px; align-items: center; gap: 6px; padding: 10px 2px; font-size: 14px; }
+.leaderboard-row > span:nth-child(n+3) { text-align: right; font-variant-numeric: tabular-nums; }
+.leaderboard-head { color: var(--muted); font-size: 11px; font-weight: 600; padding-bottom: 2px; }
+.leaderboard-row + .leaderboard-row { border-top: 1px solid var(--border); }
+.leaderboard-row.me { background: var(--primary-soft); border-radius: 12px; }
+.leaderboard-rank { font-weight: 700; color: var(--muted); font-size: 15px; }
+.leaderboard-player { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.leaderboard-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.leaderboard-initial { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--primary-soft); color: var(--primary-strong); font-size: 13px; font-weight: 700; flex-shrink: 0; }
+.leaderboard-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.leaderboard-player > i { flex-shrink: 0; padding: 1px 6px; border-radius: 999px; background: var(--primary); color: var(--primary-ink); font-size: 10px; font-style: normal; }
+.leaderboard-player > b { flex-shrink: 0; font-size: 11px; color: var(--primary-strong); }
+.leaderboard-rating { font-weight: 700; }
+
+.leaderboard-rules { padding: 16px; }
+.leaderboard-rules h2 { margin: 0 0 8px; font-size: 17px; }
+.leaderboard-rules ul { margin: 0 0 14px; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.leaderboard-rules b { color: var(--text); }
+
+/* My stats, on the profile page. */
+.player-card-top { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.player-card-top > div { padding: 12px; border-radius: var(--radius-sm); background: var(--primary-soft); }
+.player-card-top span { display: block; color: var(--primary-strong); font-size: 12px; }
+.player-card-top strong { font-size: 24px; color: var(--primary-strong); }
+.player-card-top strong small { font-size: 13px; font-weight: 500; opacity: .8; }
+.player-card-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; }
+.player-card-stats span { display: block; color: var(--muted); font-size: 11px; }
+.player-card-stats strong { font-size: 18px; }
+.player-visibility { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--border); }
+.player-visibility > div { flex: 1 1 190px; min-width: 0; }
+.player-visibility > .btn { flex: 1 1 140px; }
+.player-visibility strong { display: block; font-size: 13px; }
+.player-visibility small { display: block; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.player-visibility .error { flex-basis: 100%; margin: 0; }
+
+@media (max-width: 380px) {
+  .leaderboard-row { grid-template-columns: 28px minmax(0, 1fr) 26px 30px 48px; gap: 4px; font-size: 13px; }
+  .leaderboard-player > i { display: none; }
+  .player-card-stats strong { font-size: 16px; }
+}
+
 /* ---------- Party standings (matching ladder, migration 0029) ---------- */
 .party-rating-badge { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 600; }
 .party-rating-badge b { font-weight: 700; color: var(--primary-strong); }

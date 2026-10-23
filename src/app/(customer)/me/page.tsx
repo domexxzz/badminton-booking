@@ -5,6 +5,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions";
 import { STATUS_LABEL, formatBaht, formatSlot, formatTime } from "@/lib/format";
+import { PlayerStatsCard, type PlayerCard } from "@/components/party/PlayerStatsCard";
 import { getSessionUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,11 @@ export default async function MyBookingsPage() {
   const isGoogleAccount =
     user.app_metadata?.provider === "google" ||
     (Array.isArray(user.app_metadata?.providers) && user.app_metadata.providers.includes("google"));
+
+  // The ladder card (migration 0030). It is only ever about the signed-in player.
+  // A set-returning RPC hands back an array, the same shape my_party_entries does.
+  const { data: cardRows } = await supabase.rpc("my_player_card");
+  const card = (cardRows as PlayerCard[] | null)?.[0] ?? null;
 
   const { data, error } = await supabase
     .from("bookings")
@@ -146,6 +152,13 @@ export default async function MyBookingsPage() {
           </Link>
         )}
       </section>
+
+      {card && (
+        <section className="stack" style={{ gap: 10 }}>
+          <h2>สถิติการเล่นของฉัน</h2>
+          <PlayerStatsCard card={card} />
+        </section>
+      )}
 
       <section className="stack" style={{ gap: 10 }}>
         <h2>การจองของฉัน</h2>

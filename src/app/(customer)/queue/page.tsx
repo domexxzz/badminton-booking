@@ -37,6 +37,8 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
     <nav className="party-view-tabs" aria-label="เลือกการใช้งานคิวก๊วน">
       <Link href="/queue?view=create" className={view === "create" ? "active" : ""}><span>＋</span><strong>สร้างห้อง</strong><small>จองสนามและชำระเงิน</small></Link>
       <Link href="/queue?view=join" className={view === "join" ? "active" : ""}><span>♟</span><strong>เข้าห้อง</strong><small>เลือกทีมและสล็อต</small></Link>
+      {/* The ladder lives off this page, not in the bottom bar, which is full at five tabs. */}
+      <Link href="/leaderboard"><span>🏆</span><strong>อันดับ</strong><small>แต้มสะสมทั้งร้าน</small></Link>
     </nav>
     {view === "create" && (
       !user ? (

@@ -301,7 +301,50 @@ for (const [winner, loser, points] of ELO_GRID) {
 }
 
 // ---------------------------------------------------------------------------
-head("8. หัวห้องปรับกติกาได้");
+head("8. ตารางอันดับรวมของร้าน (migration 0030)");
+
+const ladder = await all(
+  `select name, rating, played, wins from player_ranking_board order by rating desc, played desc`,
+);
+line(`   มีผู้เล่นบนกระดาน ${ladder.length} คน`);
+for (const [i, r] of ladder.slice(0, 5).entries()) {
+  line(`   ${i + 1}. ${r.name.padEnd(6)} ${String(r.rating).padStart(5)} แต้ม  (${r.wins}/${r.played})`);
+}
+expect("ทุกคนที่ลงเล่นคืนนี้ขึ้นกระดาน", ladder.length >= NIGHT.length);
+expect("เรียงจากแต้มมากไปน้อย", ladder.every((r, i) => i === 0 || ladder[i - 1].rating >= r.rating));
+
+// The board is read by every signed-in player, so it must not carry an account id.
+const boardColumns = (await all(
+  `select column_name from information_schema.columns
+   where table_schema = 'public' and table_name = 'player_ranking_board'`,
+)).map((c) => c.column_name);
+expect(`กระดานไม่มี user id (คอลัมน์: ${boardColumns.join(", ")})`, !boardColumns.includes("user_id"));
+expect("คีย์ของกระดานไม่ใช่ user id ของบัญชี",
+  (await one(`select count(*)::int n from player_ranking_board b
+              join auth.users u on u.id = b.player_key`)).n === 0);
+expect("ผู้ใช้ทั่วไปอ่าน player_ratings ของคนอื่นไม่ได้ (RLS)",
+  (await one(`select count(*)::int n from pg_policies
+              where tablename = 'player_ratings' and cmd = 'SELECT'`)).n >= 1);
+
+await as(NIGHT_HOST);
+const card = await one(`select * from my_player_card()`);
+line(`   การ์ดของหัวห้อง: อันดับ ${card.place} จาก ${card.total_players} คน · ${card.rating} แต้ม · ${card.wins}-${card.losses}`);
+expect("หน้าโปรไฟล์บอกอันดับและสถิติของตัวเองได้", card.place >= 1 && card.played > 0 && card.listed === true);
+expect("รหัสผู้เล่นสาธารณะไม่ใช่ user id", card.player_key !== NIGHT_HOST);
+
+await db.query(`select set_leaderboard_visibility(false)`);
+const hidden = await one(`select count(*)::int n from player_ranking_board where player_key = '${card.player_key}'`);
+const cardHidden = await one(`select * from my_player_card()`);
+expect("ขอไม่อยู่บนกระดานแล้วแถวหายจริง ไม่ใช่แค่ซ่อน", hidden.n === 0 && cardHidden.listed === false);
+await db.query(`select set_leaderboard_visibility(true)`);
+expect("กลับขึ้นกระดานได้ พร้อมแต้มเดิม",
+  (await one(`select rating from player_ranking_board where player_key = '${card.player_key}'`))?.rating === card.rating);
+
+await as(null);
+await refused("ยังไม่ล็อกอิน เรียกการ์ดตัวเองไม่ได้", `select my_player_card()`, "LOGIN_REQUIRED");
+
+// ---------------------------------------------------------------------------
+head("9. หัวห้องปรับกติกาได้");
 await as(NIGHT_HOST);
 await db.query(`select set_party_match_rules('${night.party_id}', 5::smallint)`);
 const changed = await one(`select win_streak_cap from party_rooms where id = '${night.party_id}'`);

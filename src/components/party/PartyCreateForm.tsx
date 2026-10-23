@@ -17,7 +17,7 @@ export function PartyCreateForm({ courts, defaultName, openHour, closeHour }: {
   courts: Court[]; defaultName: string; openHour: number; closeHour: number;
 }) {
   const router = useRouter();
-  const dates = useMemo(() => upcomingDates(new Date(), BOOKING_RULES.maxDaysAhead + 1), []);
+  const dates = useMemo(() => upcomingDates(new Date(), BOOKING_RULES.maxDaysAhead), []);
   const [date, setDate] = useState(dates[0]);
   const [courtId, setCourtId] = useState(courts[0]?.id ?? 1);
   const [hour, setHour] = useState<number | null>(null);
@@ -46,32 +46,38 @@ export function PartyCreateForm({ courts, defaultName, openHour, closeHour }: {
   }
 
   return (
-    <form className="card stack party-create" onSubmit={submit}>
-      <div className="party-create-head"><div><span className="queue-section-label">เปิดห้องใหม่</span><h2>สร้างห้องก๊วน</h2></div><span className="badge confirmed">เปิดห้องฟรี</span></div>
-      <div className="party-create-guide"><span>1</span><p><strong>จองเหมือนหน้าจองสนาม</strong><small>เลือกวัน สนาม เวลา และระยะเวลา</small></p><i>›</i><span>2</span><p><strong>ชำระเต็มจำนวน</strong><small>ห้องจะเปิดหลังยืนยันเงิน</small></p></div>
-      <label className="field"><span>ชื่อห้อง</span><input value={title} maxLength={PARTY_TITLE_MAX} onChange={(e) => setTitle(e.target.value)} required /></label>
-      <label className="field"><span>ชื่อของคุณในห้อง</span><input value={hostName} maxLength={PARTY_NAME_MAX} onChange={(e) => setHostName(e.target.value)} required /></label>
-      <div className="field"><span>รูปแบบการเล่น</span><div className="party-mode-pick">
-        <button type="button" className={`chip ${mode === "singles" ? "selected" : ""}`} onClick={() => setMode("singles")}><strong>เดี่ยว</strong><span>1 ต่อ 1</span></button>
-        <button type="button" className={`chip ${mode === "doubles" ? "selected" : ""}`} onClick={() => setMode("doubles")}><strong>คู่</strong><span>2 ต่อ 2</span></button>
-      </div></div>
-      <div className="field"><span className="booking-section-title">เลือกวัน</span><DatePills dates={dates} value={date} onChange={chooseDate} /></div>
+    <form className="stack booking-cart-page party-create-flow" onSubmit={submit}>
+      <DatePills dates={dates} value={date} onChange={chooseDate} />
+      <section className="card stack booking-picker-card">
       <div className="field"><span className="booking-section-title">เลือกสนามและเวลาที่ต้องการ</span><div className="booking-court-scroller">
         {courts.map((c) => <button key={c.id} type="button" className={`booking-court-horiz-card ${c.id === courtId ? "selected" : ""}`} onClick={() => chooseCourt(c.id)}><div className="booking-court-horiz-thumb"><CourtArt label={c.name} /></div><div className="booking-court-horiz-info"><strong>{c.name} ({c.price_per_hour}฿/ชม.)</strong><span>เลือกเวลาด้านล่างเพื่อจองเปิดห้อง</span></div></button>)}
       </div></div>
-      <div className="field"><span className="booking-section-title">เลือกเวลาเริ่มต้น</span><div className="chip-grid">
+      <div className="field"><div className="row"><span className="booking-section-title">เลือกเวลาเริ่มต้น</span>{hour !== null && <span className="badge confirmed">{court.name} · {formatHour(hour)} – {formatHour(hour + hours)} น.</span>}</div><div className="chip-grid">
         {slots.map((slot) => {
           const available = maxBookableHours(courtId, date, slot, occupancy, now, 0.5, closeHour);
-          const disabled = available < 1;
-          return <button key={slot} type="button" disabled={disabled} className={`chip time-slot ${hour === slot ? "selected" : disabled ? "unavailable" : "free"}`} onClick={() => { setHour(slot); setHours(Math.min(hours, Math.max(.5, available))); }}><span className="chip-time-start">{formatHour(slot)}</span><span className="chip-time-end">{disabled ? "🔒 ล็อกแล้ว" : `– ${formatHour(slot + .5)}`}</span></button>;
+          const disabled = available < .5;
+          const selected = hour !== null && slot >= hour && slot < hour + hours;
+          return <button key={slot} type="button" disabled={disabled && !selected} className={`chip time-slot ${selected ? slot === hour ? "selected" : "in-range" : disabled ? "unavailable" : "free"}`} onClick={() => { setHour(slot); setHours(Math.min(hours, Math.max(.5, available))); }}><span className="chip-time-start">{formatHour(slot)}</span><span className="chip-time-end">{disabled && !selected ? "🔒 ล็อกแล้ว" : `– ${formatHour(slot + .5)}`}</span></button>;
         })}
       </div></div>
-      {hour !== null && <div className="field"><span className="booking-section-title">ระยะเวลา</span><div className="hours-grid">
-        {[.5, 1, 1.5, 2, 2.5, 3, 3.5, 4].filter((h) => h <= maxBookableHours(courtId, date, hour, occupancy, now, 0.5, closeHour)).map((h) => <button key={h} type="button" className={`chip duration-chip ${hours === h ? "selected" : "free"}`} onClick={() => setHours(h)}><span className="duration-title">{h === .5 ? "30 นาที" : `${h} ชม.`}</span><span className="duration-sub">เลิก {formatHour(hour + h)}</span></button>)}
-      </div></div>}
-      {court && hour !== null && <div className="party-booking-summary"><div><strong>{court.name}</strong><span>{formatHour(hour)}–{formatHour(hour + hours)} น. · {hours === .5 ? "30 นาที" : `${hours} ชม.`}</span></div><div><span>หัวห้องชำระทั้งหมด</span><strong>{formatBaht(court.price_per_hour * hours)}</strong></div></div>}
+      <div className="field"><div className="row"><span className="booking-section-title">ระยะเวลา</span>{hour !== null && <span className="muted">เล่นถึง {formatHour(hour + hours)} น.</span>}</div><div className="hours-grid">
+        {[.5, 1, 1.5, 2, 2.5, 3, 3.5, 4].map((h) => { const available = hour !== null && h <= maxBookableHours(courtId, date, hour, occupancy, now, 0.5, closeHour); return <button key={h} type="button" disabled={!available} className={`chip duration-chip ${hours === h && hour !== null ? "selected" : available ? "free" : "unavailable"}`} onClick={() => setHours(h)}><span className="duration-title">{h === .5 ? "30 นาที" : `${h} ชม.`}</span>{hour !== null && <span className="duration-sub">เลิก {formatHour(hour + h)}</span>}</button>; })}
+      </div></div>
+      </section>
+
+      <section className="card stack party-create">
+        <div className="party-create-head"><div><span className="queue-section-label">รายละเอียดห้อง</span><h2>ตั้งค่าห้องก๊วน</h2></div><span className="badge confirmed">เปิดห้องฟรี</span></div>
+        <div className="party-create-guide"><span>1</span><p><strong>หัวห้องจ่ายค่าจอง</strong><small>ชำระเต็มจำนวนผ่านระบบ</small></p><i>›</i><span>2</span><p><strong>สมาชิกเข้าร่วมฟรี</strong><small>ตกลงค่าใช้จ่ายกับหัวห้องเอง</small></p></div>
+        <label className="field"><span>ชื่อห้อง</span><input value={title} maxLength={PARTY_TITLE_MAX} onChange={(e) => setTitle(e.target.value)} required /></label>
+        <label className="field"><span>ชื่อของคุณในห้อง</span><input value={hostName} maxLength={PARTY_NAME_MAX} onChange={(e) => setHostName(e.target.value)} required /></label>
+        <div className="field"><span>รูปแบบการเล่น</span><div className="party-mode-pick">
+          <button type="button" className={`chip ${mode === "singles" ? "selected" : ""}`} onClick={() => setMode("singles")}><strong>เดี่ยว</strong><span>1 ต่อ 1</span></button>
+          <button type="button" className={`chip ${mode === "doubles" ? "selected" : ""}`} onClick={() => setMode("doubles")}><strong>คู่</strong><span>2 ต่อ 2</span></button>
+        </div></div>
+        {court && hour !== null ? <div className="party-booking-summary"><div><strong>{court.name}</strong><span>{formatHour(hour)}–{formatHour(hour + hours)} น. · {hours === .5 ? "30 นาที" : `${hours} ชม.`}</span></div><div><span>รวมทั้งหมด</span><strong>{formatBaht(court.price_per_hour * hours)}</strong></div></div> : <div className="booking-cart-empty">เลือกสนาม เวลา และระยะเวลาด้านบนเพื่อดูสรุปรายการ</div>}
       {loadError && <p className="error">{loadError}</p>}{error && <p className="error" role="alert">{error}</p>}
       <button className="btn btn-block" type="submit" disabled={pending || hour === null}>{pending ? "กำลังสร้างห้อง…" : "จองสนามและไปชำระเงิน"}</button>
+      </section>
     </form>
   );
 }

@@ -955,6 +955,14 @@ details summary { cursor: pointer; }
   color: var(--muted);
 }
 
+/* A second, quieter line: what the big number deliberately leaves out. */
+.kpi-body .kpi-note {
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.75;
+  margin-top: 1px;
+}
+
 /* Charts Grid */
 .analytics-charts-grid {
   display: grid;

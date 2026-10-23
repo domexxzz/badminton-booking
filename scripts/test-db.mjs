@@ -868,7 +868,7 @@ await db.query(`select kick_party_member('${party.party_id}', '${partyGuest.id}'
 check("the host can remove a guest", (await db.query(`select count(*)::int n from party_member_board where entry_id='${partyGuest.id}'`)).rows[0].n === 0);
 await expectError("the host cannot leave their own paid room", `select leave_party((select id from party_members where party_id='${party.party_id}' and user_id='${PARTY_HOST}'))`, "PARTY_MEMBER_NOT_FOUND");
 check("anonymous users cannot create or join a Party", !(await db.query(
-  `select has_function_privilege('anon', 'public.create_party_booking(smallint,timestamptz,numeric,party_mode,text,text)', 'execute') as p`)).rows[0].p);
+  `select has_function_privilege('anon', 'public.create_party_booking(smallint,timestamptz,numeric,party_mode,text,text,text,text)', 'execute') as p`)).rows[0].p);
 
 // 0024 profile avatar
 await as(U1);

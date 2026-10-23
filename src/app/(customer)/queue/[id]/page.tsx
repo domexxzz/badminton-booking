@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { LiveRefresh } from "@/components/LiveRefresh";
+import { PartyManagePanel } from "@/components/party/PartyManagePanel";
 import { PartyRoomCard, type PartyRoomView } from "@/components/party/PartyRoomCard";
+import { PartyShareCard } from "@/components/party/PartyShareCard";
 import type { PartyMember } from "@/lib/party";
 import { getPublicCourts } from "@/lib/public-data";
 import { getSessionUser } from "@/lib/supabase/server";
@@ -8,13 +10,23 @@ import { getSessionUser } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export default async function PartyRoomPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PartyRoomPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ code?: string }>;
+}) {
   const { id } = await params;
+  // A QR or a shared link carries ?code=, so scanning is enough to get into a private room.
+  const { code: inviteCode } = await searchParams;
   if (!UUID.test(id)) notFound();
   const [{ supabase, user, displayName, avatarUrl }, courts] = await Promise.all([getSessionUser(), getPublicCourts()]);
-  const [{ data: room }, { data: members }, { data: teamQueue }, { data: matches }, { data: singlesQueue }, { data: singlesMatches }, { data: stats }, mine] = await Promise.all([
+  const [{ data: room }, { data: members }, { data: joinCode }, { data: teamQueue }, { data: matches }, { data: singlesQueue }, { data: singlesMatches }, { data: stats }, mine] = await Promise.all([
     supabase.from("party_room_board").select("party_id, host_name, title, mode, capacity, court_id, starts_at, ends_at, win_streak_cap").eq("party_id", id).maybeSingle(),
     supabase.from("party_member_board").select("entry_id, name, slot_no, team, avatar_url").eq("party_id", id).order("slot_no"),
+    // The join code is not on the public board; a member asks for their own room's (0031).
+    user ? supabase.rpc("my_party_join_code", { p_party_id: id }) : Promise.resolve({ data: null }),
     supabase.from("party_team_queue").select("team, ready_at, queued_at, state, played, wins, streak, rating").eq("party_id", id).order("queued_at"),
     supabase.from("party_match_board").select("id, round_no, team_a, team_b, winner, status, started_at, ended_at").eq("party_id", id).order("round_no", { ascending: false }).limit(20),
     supabase.from("party_singles_queue").select("entry_id, name, queued_at, state").eq("party_id", id).order("queued_at"),
@@ -23,7 +35,12 @@ export default async function PartyRoomPage({ params }: { params: Promise<{ id: 
     user ? supabase.rpc("my_party_entries") : Promise.resolve({ data: [] }),
   ]);
   if (!room || !courts) notFound();
-  const my = (mine.data ?? []).find((entry: { party_id: string }) => entry.party_id === id) as { entry_id: string; is_host: boolean } | undefined;
+  const my = ((mine?.data ?? []) as { party_id: string }[]).find((entry: { party_id: string }) => entry.party_id === id) as
+    { entry_id: string; is_host: boolean; can_manage?: boolean } | undefined;
+  const canManage = my?.can_manage ?? my?.is_host ?? false;
   const view = { ...room, court_name: courts.find((c) => c.id === room.court_id)?.name ?? "สนาม" } as PartyRoomView;
-  return <><LiveRefresh table="party_room_board" /><LiveRefresh table="party_member_board" /><LiveRefresh table="party_team_queue" /><LiveRefresh table="party_match_board" /><LiveRefresh table="party_singles_queue" /><LiveRefresh table="party_singles_match_board" /><LiveRefresh table="party_player_stats" /><PartyRoomCard room={view} members={(members ?? []) as PartyMember[]} teamQueue={teamQueue ?? []} matchRows={matches ?? []} singlesQueue={singlesQueue ?? []} singlesMatchRows={singlesMatches ?? []} stats={stats ?? []} winStreakCap={room.win_streak_cap ?? 3} loggedIn={Boolean(user)} defaultName={displayName ?? ""} myEntry={my?.entry_id ?? null} isHost={my?.is_host ?? false} userAvatar={avatarUrl} /></>;
+  return <><LiveRefresh table="party_room_board" /><LiveRefresh table="party_member_board" /><LiveRefresh table="party_team_queue" /><LiveRefresh table="party_match_board" /><LiveRefresh table="party_singles_queue" /><LiveRefresh table="party_singles_match_board" /><LiveRefresh table="party_player_stats" /><PartyRoomCard room={view} members={(members ?? []) as PartyMember[]} teamQueue={teamQueue ?? []} matchRows={matches ?? []} singlesQueue={singlesQueue ?? []} singlesMatchRows={singlesMatches ?? []} stats={stats ?? []} winStreakCap={room.win_streak_cap ?? 3} inviteCode={inviteCode ?? null} loggedIn={Boolean(user)} defaultName={displayName ?? ""} myEntry={my?.entry_id ?? null} isHost={canManage} userAvatar={avatarUrl} />
+    {my && <PartyShareCard partyId={id} joinCode={(joinCode as string | null) ?? null} />}
+    {canManage && <PartyManagePanel partyId={id} members={(members ?? []) as PartyMember[]} myEntry={my?.entry_id ?? null} isHost={my?.is_host ?? false} />}
+  </>;
 }

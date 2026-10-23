@@ -19,7 +19,7 @@ type PlayerStat = {
 };
 type SinglesMatchRow = { id: string; round_no: number; player_a_entry: string; player_a_name: string; player_b_entry: string; player_b_name: string; winner_entry: string | null; winner_name: string | null; status: "playing" | "finished"; started_at: string; ended_at: string | null };
 
-export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueue, singlesMatchRows, stats = [], winStreakCap = 3, loggedIn, defaultName, myEntry, isHost, userAvatar }: { room: PartyRoomView; members: PartyMember[]; teamQueue: TeamQueueRow[]; matchRows: MatchRow[]; singlesQueue: SinglesQueueRow[]; singlesMatchRows: SinglesMatchRow[]; stats?: PlayerStat[]; winStreakCap?: number; loggedIn: boolean; defaultName: string; myEntry: string | null; isHost: boolean; userAvatar?: string | null }) {
+export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueue, singlesMatchRows, stats = [], winStreakCap = 3, inviteCode = null, loggedIn, defaultName, myEntry, isHost, userAvatar }: { room: PartyRoomView; members: PartyMember[]; teamQueue: TeamQueueRow[]; matchRows: MatchRow[]; singlesQueue: SinglesQueueRow[]; singlesMatchRows: SinglesMatchRow[]; stats?: PlayerStat[]; winStreakCap?: number; /** From ?code= on the link or QR, so a private room needs no typing. */ inviteCode?: string | null; loggedIn: boolean; defaultName: string; myEntry: string | null; isHost: boolean; userAvatar?: string | null }) {
   const router = useRouter();
   const mine = members.find((m) => m.entry_id === myEntry);
   const [name, setName] = useState(defaultName);
@@ -71,7 +71,7 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
     if (!name.trim()) return setError("กรุณาใส่ชื่อของคุณ");
     const success = () => setSaved({ slot: selectedSlot, team });
     if (myEntry) run(() => movePartySlot(myEntry, room.party_id, selectedSlot, team), success);
-    else run(() => joinParty(room.party_id, name, selectedSlot, team), success);
+    else run(() => joinParty(room.party_id, name, selectedSlot, team, inviteCode), success);
   }
   function matchAction(winner: PartyTeam | null) { run(() => advancePartyMatch(room.party_id, winner)); }
   function singlesMatchAction(winnerEntry: string | null) { run(() => advanceSinglesMatch(room.party_id, winnerEntry)); }

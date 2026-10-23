@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { PartyCreateForm } from "@/components/party/PartyCreateForm";
+import { PartyFinder } from "@/components/party/PartyFinder";
 import { PartyRoomListCard, type PartyRoomListView } from "@/components/party/PartyRoomListCard";
+import type { PartyMode, PartyScoring } from "@/lib/party";
 import { ShopContactCard } from "@/components/ShopContactCard";
 import { getPublicCourts, getPublicVenueHours } from "@/lib/public-data";
 import { getSessionUser } from "@/lib/supabase/server";
@@ -10,13 +12,16 @@ export const dynamic = "force-dynamic";
 type MyParty = { entry_id: string; party_id: string; slot_no: number; is_host: boolean };
 type PartyMemberRow = { entry_id: string; party_id: string; name: string; slot_no: number; joined_at: string };
 
-export default async function QueuePage({ searchParams }: { searchParams: Promise<{ view?: string; q?: string }> }) {
-  const { view: rawView, q = "" } = await searchParams;
+export default async function QueuePage({ searchParams }: { searchParams: Promise<{ view?: string; q?: string; mode?: string; scoring?: string }> }) {
+  const { view: rawView, q = "", mode: rawMode, scoring: rawScoring } = await searchParams;
   const view = rawView === "create" ? "create" : "join";
+  // Singles and doubles are different nights out, so the list is one or the other.
+  const mode: PartyMode = rawMode === "singles" ? "singles" : "doubles";
+  const scoring: PartyScoring = rawScoring === "casual" ? "casual" : "ranked";
   const [{ supabase, user, displayName, isPartyHost }, courts, hours] = await Promise.all([getSessionUser(), getPublicCourts(), getPublicVenueHours()]);
   if (!courts) return <p className="error">โหลดข้อมูลสนามไม่สำเร็จ กรุณารีเฟรช</p>;
   const [{ data: rooms, error: roomError }, mine] = await Promise.all([
-    supabase.from("party_room_board").select("party_id, host_name, title, mode, capacity, court_id, starts_at, ends_at").gt("ends_at", new Date().toISOString()).order("starts_at"),
+    supabase.from("party_room_board").select("party_id, host_name, title, mode, capacity, court_id, starts_at, ends_at, visibility, scoring").eq("visibility", "public").gt("ends_at", new Date().toISOString()).order("starts_at"),
     user ? supabase.rpc("my_party_entries") : Promise.resolve({ data: [] }),
   ]);
   if (roomError) return <p className="error">ระบบห้องก๊วนยังไม่พร้อมใช้งาน กรุณาติดต่อร้าน</p>;
@@ -30,7 +35,11 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
   const courtNames = new Map(courts.map((c) => [c.id, c.name]));
   const myEntries = (mine.data ?? []) as MyParty[];
   const normalizedQuery = q.trim().toLocaleLowerCase("th");
-  const visibleRooms = (rooms ?? []).filter((room) => !normalizedQuery || `${room.title} ${room.host_name} ${courtNames.get(room.court_id) ?? ""}`.toLocaleLowerCase("th").includes(normalizedQuery));
+  const visibleRooms = (rooms ?? [])
+    .filter((room) => room.mode === mode && room.scoring === scoring)
+    .filter((room) => !normalizedQuery || `${room.title} ${room.host_name} ${courtNames.get(room.court_id) ?? ""}`.toLocaleLowerCase("th").includes(normalizedQuery));
+  const tabHref = (next: { mode?: PartyMode; scoring?: PartyScoring }) =>
+    `/queue?view=join&mode=${next.mode ?? mode}&scoring=${next.scoring ?? scoring}`;
   return <div className="stack party-page">
     <LiveRefresh table="party_room_board" /><LiveRefresh table="party_member_board" />
     <div className="page-head"><div><h1>คิวก๊วน</h1><p className="muted">สร้างห้องหรือเลือกเข้าร่วมก๊วนที่เปิดอยู่</p></div><span className="live"><span className="live-dot on" aria-hidden="true" /> อัปเดตสด</span></div>
@@ -39,6 +48,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
       <Link href="/queue?view=join" className={view === "join" ? "active" : ""}><span>♟</span><strong>เข้าห้อง</strong><small>เลือกทีมและสล็อต</small></Link>
       {/* The ladder lives off this page, not in the bottom bar, which is full at five tabs. */}
       <Link href="/leaderboard"><span>🏆</span><strong>อันดับ</strong><small>แต้มสะสมทั้งร้าน</small></Link>
+      <Link href="/guide"><span>📖</span><strong>วิธีใช้งาน</strong><small>คู่มือทุกฟังก์ชั่น</small></Link>
     </nav>
     {view === "create" && (
       !user ? (
@@ -69,12 +79,23 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
         </section>
       )
     )}
-    {view === "join" && <><form className="party-room-search"><input name="q" defaultValue={q} placeholder="ค้นหาชื่อห้อง เจ้าของห้อง หรือสนาม" /><input type="hidden" name="view" value="join" /><button type="submit" aria-label="ค้นหา"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg></button></form><div className="party-list-head"><h2>ห้องที่เปิดอยู่</h2><span>{visibleRooms.length} ห้อง</span></div>
+    {view === "join" && <>
+    <nav className="party-filter-row" aria-label="เลือกรูปแบบการเล่น">
+      <Link href={tabHref({ mode: "singles" })} className={mode === "singles" ? "active" : ""}>♣ เดี่ยว</Link>
+      <Link href={tabHref({ mode: "doubles" })} className={mode === "doubles" ? "active" : ""}>♟ คู่</Link>
+    </nav>
+    <nav className="party-filter-row sub" aria-label="เลือกว่าจะเล่นจริงจังหรือชิล">
+      <Link href={tabHref({ scoring: "ranked" })} className={scoring === "ranked" ? "active" : ""}>🏆 จัดอันดับ</Link>
+      <Link href={tabHref({ scoring: "casual" })} className={scoring === "casual" ? "active" : ""}>☺ ชิลๆ</Link>
+    </nav>
+    <form className="party-room-search"><input name="q" defaultValue={q} placeholder="ค้นหาชื่อห้อง เจ้าของห้อง หรือสนาม" /><input type="hidden" name="view" value="join" /><button type="submit" aria-label="ค้นหา"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg></button></form><div className="party-list-head"><h2>ห้องที่เปิดอยู่</h2><span>{visibleRooms.length} ห้อง</span></div>
     {!visibleRooms.length ? <section className="card party-empty"><strong>{q ? "ไม่พบห้องที่ค้นหา" : "ยังไม่มีห้องก๊วนเปิดอยู่"}</strong><span className="muted">{q ? "ลองค้นหาด้วยชื่ออื่น" : "สร้างห้องแรก เลือกสนามและชำระเงินเพื่อเปิด Party ได้เลย"}</span></section> : visibleRooms.map((row) => {
       const room = { ...row, court_name: courtNames.get(row.court_id) ?? "สนาม" } as PartyRoomListView;
       const members = (memberRows ?? []).filter((m) => m.party_id === row.party_id);
       const my = myEntries.find((entry) => entry.party_id === row.party_id);
       return <PartyRoomListCard key={row.party_id} room={room} memberCount={members.length} isMine={Boolean(my)} />;
-    })}</>}
+    })}
+    <PartyFinder mode={mode} scoring={scoring} defaultName={displayName ?? ""} loggedIn={Boolean(user)} />
+    </>}
   </div>;
 }

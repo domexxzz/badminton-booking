@@ -354,6 +354,77 @@ await refused("ตั้งค่าเกินช่วงที่อนุ�
 await as(PLAYERS[0].id);
 await refused("คนที่ไม่ใช่หัวห้องแก้กติกาไม่ได้", `select set_party_match_rules('${night.party_id}', 2::smallint)`, "FORBIDDEN");
 
+// ---------------------------------------------------------------------------
+head("10. ห้องส่วนตัว รหัสห้อง และ auto join (migration 0031)");
+
+const LATE = [
+  { id: "ffffffff-0000-0000-0000-00000000f001", name: "น้องใหม่" },
+  { id: "ffffffff-0000-0000-0000-00000000f002", name: "ขาจร" },
+];
+await db.exec(`insert into auth.users (id, email) values
+  ${LATE.map((p) => `('${p.id}', '${p.id}@sandbox.test')`).join(", ")};`);
+
+await as(HOST);
+const privateRoom = await one(
+  `select * from create_party_booking(1::smallint, '${startsAt}', 2, 'doubles', 'ก๊วนเพื่อนสนิท', 'โดม', 'private', 'casual')`,
+);
+await db.exec(`update bookings set status = 'confirmed' where id = '${privateRoom.booking_id}'`);
+line(`   เปิดห้องส่วนตัวได้ รหัสห้อง: ${privateRoom.join_code}`);
+expect("ห้องส่วนตัวได้รหัส 6 ตัว ไม่มีตัวที่อ่านสับสน (0 O 1 I L)",
+  /^[23456789BCDFGHJKMNPQRSTVWXYZ]{6}$/.test(privateRoom.join_code ?? ""));
+expect("ห้องสาธารณะไม่มีรหัส", (await one(`select join_code from party_rooms where id = '${room.party_id}'`)).join_code === null);
+expect("ห้องส่วนตัวไม่ขึ้นในรายการห้องสาธารณะ",
+  (await one(`select count(*)::int n from party_room_board
+              where party_id = '${privateRoom.party_id}' and visibility = 'public'`)).n === 0);
+
+await as(LATE[0].id);
+await refused("ไม่มีรหัส เข้าห้องส่วนตัวไม่ได้",
+  `select join_party('${privateRoom.party_id}', 'น้องใหม่', 3::smallint, 'B'::party_team)`, "WRONG_PARTY_CODE");
+await refused("รหัสผิด ก็เข้าไม่ได้",
+  `select join_party('${privateRoom.party_id}', 'น้องใหม่', 3::smallint, 'B'::party_team, 'ZZZZZZ')`, "WRONG_PARTY_CODE");
+await db.query(`select join_party('${privateRoom.party_id}', 'น้องใหม่', 3::smallint, 'B'::party_team, '${privateRoom.join_code}')`);
+expect("ใส่รหัสถูก เข้าห้องได้",
+  (await one(`select count(*)::int n from party_members where party_id = '${privateRoom.party_id}' and status = 'active'`)).n === 2);
+
+const peek = await one(`select * from find_party_by_code('${privateRoom.join_code.toLowerCase()}')`);
+expect(`ดูรายละเอียดห้องจากรหัสได้ก่อนเข้า (${peek.title} · ${peek.members}/${peek.capacity} คน) พิมพ์เล็กก็ได้`,
+  peek.party_id === privateRoom.party_id);
+await refused("รหัสมั่วหาไม่เจอ", `select find_party_by_code('QQQQQQ')`, "WRONG_PARTY_CODE");
+
+await as(LATE[1].id);
+const autoId = await one(`select auto_join_party('singles', 'ranked', 'ขาจร') as id`);
+const autoRoom = await one(`select title, visibility, mode, scoring from party_rooms where id = '${autoId.id}'`);
+line(`   auto join พาเข้าห้อง "${autoRoom.title}"`);
+expect("auto join เข้าเฉพาะห้องสาธารณะ ตรงโหมดและตรงประเภทที่เลือก",
+  autoRoom.visibility === "public" && autoRoom.mode === "singles" && autoRoom.scoring === "ranked");
+await refused("อยู่ในห้องแล้ว กด auto join ซ้ำไม่ได้",
+  `select auto_join_party('singles', 'ranked', 'ขาจร')`, "ALREADY_IN_PARTY");
+
+// Casual rooms keep the night's score but leave the shop ladder alone.
+const beforeLadder = await one(`select count(*)::int n, coalesce(sum(played), 0)::int p from player_ratings`);
+await as(HOST);
+await db.query(`select set_party_moderator('${privateRoom.party_id}',
+  (select id from party_members where party_id = '${privateRoom.party_id}' and user_id = '${LATE[0].id}'), true)`);
+expect("หัวห้องตั้งผู้ดูแลได้",
+  (await one(`select role from party_members where party_id = '${privateRoom.party_id}' and user_id = '${LATE[0].id}'`)).role === "moderator");
+expect("ผู้ดูแลมีสิทธิ์จัดการห้อง",
+  (await (async () => { await as(LATE[0].id); return one(`select can_manage_party('${privateRoom.party_id}') as p`); })()).p === true);
+await refused("ผู้ดูแลโอนหัวห้องต่อไม่ได้ (เฉพาะหัวห้องเท่านั้น)",
+  `select transfer_party_host('${privateRoom.party_id}',
+     (select id from party_members where party_id = '${privateRoom.party_id}' and user_id = '${LATE[0].id}'))`, "FORBIDDEN");
+
+await as(HOST);
+await db.query(`select transfer_party_host('${privateRoom.party_id}',
+  (select id from party_members where party_id = '${privateRoom.party_id}' and user_id = '${LATE[0].id}'))`);
+const newHost = await one(`select host_user_id, host_name from party_rooms where id = '${privateRoom.party_id}'`);
+expect(`โอนหัวห้องให้ ${newHost.host_name} แล้ว`, newHost.host_user_id === LATE[0].id);
+expect("หัวห้องคนเดิมกลายเป็นผู้ดูแล ยังช่วยคุมห้องได้",
+  (await one(`select role from party_members where party_id = '${privateRoom.party_id}' and user_id = '${HOST}'`)).role === "moderator");
+
+const afterLadder = await one(`select count(*)::int n, coalesce(sum(played), 0)::int p from player_ratings`);
+expect("ห้อง casual ไม่ไปแตะตารางอันดับรวมของร้าน",
+  afterLadder.n === beforeLadder.n && afterLadder.p === beforeLadder.p);
+
 line();
 line(problems ? `พบปัญหา ${problems} จุด` : "ผ่านทั้งหมด — กฎใหม่ทำงานอย่างที่ออกแบบไว้ บนฐานข้อมูลใช้แล้วทิ้ง");
 line("ฐานข้อมูลนี้หายไปพร้อมกับการจบสคริปต์ ไม่มีอะไรค้างอยู่ที่ไหน");

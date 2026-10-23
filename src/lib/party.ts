@@ -4,6 +4,16 @@ export const PARTY_NAME_MAX = 30;
 export const PARTY_TITLE_MAX = 60;
 
 export type PartyMode = "singles" | "doubles";
+/** Listed for everyone, or unlisted and opened with a six-character code (0031). */
+export type PartyVisibility = "public" | "private";
+/** A ranked night moves the shop ladder; a casual one never does (0031). */
+export type PartyScoring = "ranked" | "casual";
+export const PARTY_CODE_LENGTH = 6;
+/** What find_party_by_code() shows before the player commits to a slot. */
+export type PartyPreview = {
+  party_id: string; title: string; host_name: string; mode: PartyMode; scoring: PartyScoring;
+  court_id: number; starts_at: string; ends_at: string; capacity: number; members: number;
+};
 export type PartyTeam = "A" | "B" | "C" | "D" | "E" | "F";
 export type PartyMember = { entry_id: string; name: string; slot_no: number; team: PartyTeam; avatar_url?: string | null };
 export type PartyMatch = { index: number; startsAt: string; sideA: string[]; sideB: string[] };

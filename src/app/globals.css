@@ -269,6 +269,70 @@
   .party-schedule-table-row > .match-status { grid-column: 1 / 3; justify-self: start; }
   .party-schedule-table-row > span:last-child { grid-column: 3; text-align: right; white-space: nowrap; }
 }
+/* ---------- Rooms v2: share, manage, find (migration 0031) ---------- */
+.party-filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.party-filter-row a { display: block; padding: 11px 10px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); font-weight: 600; font-size: 14px; text-align: center; text-decoration: none; }
+.party-filter-row a.active { border-color: var(--primary); background: var(--primary); color: var(--primary-ink); }
+.party-filter-row.sub a { padding: 8px 10px; font-size: 13px; font-weight: 500; }
+.party-filter-row.sub a.active { background: var(--primary-soft); color: var(--primary-strong); border-color: color-mix(in srgb, var(--primary) 30%, var(--border)); }
+
+.party-share { padding: 16px; }
+.party-share-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.party-share-head h2 { margin: 0; font-size: 18px; }
+.party-share-head span { color: var(--muted); font-size: 12px; }
+.party-share-code { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; padding: 14px; border-radius: var(--radius-sm); background: var(--primary-soft); }
+.party-share-code > span { grid-column: 1; color: var(--primary-strong); font-size: 12px; }
+.party-share-code > strong { grid-column: 1; color: var(--primary-strong); font-size: 26px; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+.party-share-code > .btn { grid-column: 2; grid-row: 1 / 3; }
+.party-share-qr { display: grid; justify-items: center; gap: 8px; padding: 12px 0; }
+.party-share-qr img { width: 200px; height: 200px; border-radius: 12px; background: #fff; }
+.party-share-qr small { color: var(--muted); font-size: 12px; text-align: center; }
+
+.party-manage { padding: 16px; }
+.party-manage-note { margin: 0; font-size: 12px; line-height: 1.55; }
+.party-manage-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--border); }
+.party-manage-row > div { display: flex; gap: 6px; flex-wrap: wrap; }
+.party-manage-name { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; }
+.party-manage-name > i { padding: 1px 7px; border-radius: 999px; background: var(--primary-soft); color: var(--primary-strong); font-size: 10px; font-style: normal; font-weight: 700; }
+.party-manage-kick { color: var(--danger); }
+
+.party-finder { padding: 16px; }
+.party-finder-code { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 8px; }
+.party-finder-code input { text-transform: uppercase; letter-spacing: 2px; font-weight: 600; }
+.party-finder-preview { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px; border-radius: var(--radius-sm); background: var(--primary-soft); }
+.party-finder-preview strong { display: block; font-size: 15px; }
+.party-finder-preview small { display: block; color: var(--primary-strong); font-size: 12px; }
+.party-finder-note { margin: 0; font-size: 12px; line-height: 1.55; }
+
+/* ---------- Guide book ---------- */
+.guide-page { padding-bottom: 8px; }
+.guide-hero { display: flex; align-items: center; gap: 13px; padding: 16px; }
+.guide-hero h1 { margin: 0; font-size: 22px; }
+.guide-hero span { color: var(--muted); font-size: 13px; }
+.guide-toc { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.guide-toc a { display: flex; align-items: center; gap: 8px; padding: 11px 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); font-size: 13px; font-weight: 600; text-decoration: none; }
+.guide-toc a > b { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 9px; background: var(--primary-soft); color: var(--primary-strong); font-size: 14px; flex-shrink: 0; }
+.guide-chapter { padding: 16px; scroll-margin-top: 14px; }
+.guide-chapter-head { display: flex; align-items: center; gap: 11px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.guide-chapter-head > b { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: var(--primary-soft); color: var(--primary-strong); font-size: 19px; flex-shrink: 0; }
+.guide-chapter-head h2 { margin: 0; font-size: 19px; }
+.guide-chapter-head span { color: var(--muted); font-size: 12.5px; }
+.guide-steps { counter-reset: guide; margin: 0; padding: 0; list-style: none; }
+.guide-steps > li { counter-increment: guide; position: relative; padding: 14px 0 14px 34px; border-bottom: 1px solid var(--border); }
+.guide-steps > li:last-child { border-bottom: 0; padding-bottom: 2px; }
+.guide-steps > li::before { content: counter(guide); position: absolute; left: 0; top: 14px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--primary); color: var(--primary-ink); font-size: 12px; font-weight: 700; }
+.guide-steps strong { display: block; font-size: 15px; }
+.guide-steps p { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.75; }
+.guide-steps small { display: block; margin-top: 7px; padding: 8px 10px; border-radius: 10px; background: var(--primary-soft); color: var(--primary-strong); font-size: 12.5px; line-height: 1.6; }
+.guide-footer { padding: 16px; text-align: center; }
+.guide-footer h2 { margin: 0 0 4px; font-size: 18px; }
+.guide-footer-links { display: grid; gap: 8px; margin-top: 12px; }
+
+@media (max-width: 380px) {
+  .guide-toc, .party-filter-row { grid-template-columns: 1fr; }
+  .party-share-qr img { width: 170px; height: 170px; }
+}
+
 /* ---------- The shop's ladder (migration 0030) ---------- */
 .leaderboard-intro { display: flex; align-items: center; gap: 13px; padding: 16px; }
 .leaderboard-intro h1 { margin: 0; font-size: 21px; }

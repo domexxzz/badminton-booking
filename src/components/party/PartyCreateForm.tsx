@@ -5,7 +5,7 @@ import { useMemo, useState, useTransition, type FormEvent } from "react";
 import { createPartyBooking } from "@/app/party-actions";
 import { BOOKING_RULES } from "@/lib/config";
 import { formatBaht } from "@/lib/format";
-import { PARTY_NAME_MAX, PARTY_TITLE_MAX, type PartyMode } from "@/lib/party";
+import { PARTY_NAME_MAX, PARTY_TITLE_MAX, type PartyMode, type PartyScoring, type PartyVisibility } from "@/lib/party";
 import { formatHour, maxBookableHours, openingSlots, slotStart, upcomingDates } from "@/lib/slots";
 import { DatePills } from "@/components/DatePills";
 import { CourtArt } from "@/components/CourtArt";
@@ -23,6 +23,8 @@ export function PartyCreateForm({ courts, defaultName, openHour, closeHour }: {
   const [hour, setHour] = useState<number | null>(null);
   const [hours, setHours] = useState(1);
   const [mode, setMode] = useState<PartyMode>("doubles");
+  const [visibility, setVisibility] = useState<PartyVisibility>("public");
+  const [scoring, setScoring] = useState<PartyScoring>("ranked");
   const [title, setTitle] = useState("ก๊วนแบดสนุก ๆ");
   const [hostName, setHostName] = useState(defaultName);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export function PartyCreateForm({ courts, defaultName, openHour, closeHour }: {
     if (hour === null || !court) return setError("กรุณาเลือกเวลาเริ่ม");
     setError(null);
     startTransition(async () => {
-      const result = await createPartyBooking({ courtId: court.id, startsAt: slotStart(date, hour), hours, mode, title, hostName });
+      const result = await createPartyBooking({ courtId: court.id, startsAt: slotStart(date, hour), hours, mode, title, hostName, visibility, scoring });
       if (!result.ok) return setError(result.error);
       router.push(`/bookings/${result.data.bookingId}?party=${result.data.partyId}`);
     });
@@ -74,6 +76,15 @@ export function PartyCreateForm({ courts, defaultName, openHour, closeHour }: {
           <button type="button" className={mode === "singles" ? "selected" : ""} onClick={() => setMode("singles")}><b className="mode-icon">♣</b><span><strong>เดี่ยว</strong><small>1 ต่อ 1</small></span><i /></button>
           <button type="button" className={mode === "doubles" ? "selected" : ""} onClick={() => setMode("doubles")}><b className="mode-icon">♟</b><span><strong>คู่</strong><small>2 ต่อ 2</small></span><i /></button>
         </div></div>
+        <div className="field party-detail-field"><span><b aria-hidden="true">⚿</b> ใครเข้าห้องได้บ้าง</span><div className="party-mode-cards">
+          <button type="button" className={visibility === "public" ? "selected" : ""} onClick={() => setVisibility("public")}><b className="mode-icon">◎</b><span><strong>สาธารณะ</strong><small>ขึ้นในรายการ ใครก็กดเข้าได้</small></span><i /></button>
+          <button type="button" className={visibility === "private" ? "selected" : ""} onClick={() => setVisibility("private")}><b className="mode-icon">☉</b><span><strong>ส่วนตัว</strong><small>ไม่ขึ้นรายการ ต้องมีรหัสห้อง</small></span><i /></button>
+        </div></div>
+        <div className="field party-detail-field"><span><b aria-hidden="true">⚑</b> เล่นจริงจังแค่ไหน</span><div className="party-mode-cards">
+          <button type="button" className={scoring === "ranked" ? "selected" : ""} onClick={() => setScoring("ranked")}><b className="mode-icon">🏆</b><span><strong>จัดอันดับ</strong><small>แต้มขึ้นลงจริง มีผลกับอันดับร้าน</small></span><i /></button>
+          <button type="button" className={scoring === "casual" ? "selected" : ""} onClick={() => setScoring("casual")}><b className="mode-icon">☺</b><span><strong>ชิลๆ</strong><small>เก็บสถิติในห้อง ไม่กระทบอันดับร้าน</small></span><i /></button>
+        </div></div>
+        {visibility === "private" && <div className="party-selection-notice"><b>☉</b><span>ระบบจะสร้างรหัสห้อง 6 ตัวให้หลังจ่ายเงินสำเร็จ ส่งรหัสหรือ QR ให้เพื่อนเพื่อเข้าห้อง</span></div>}
         {court && hour !== null ? <div className="party-booking-summary"><div><strong>{court.name}</strong><span>{formatHour(hour)}–{formatHour(hour + hours)} น. · {hours === .5 ? "30 นาที" : `${hours} ชม.`}</span></div><div><span>รวมทั้งหมด</span><strong>{formatBaht(court.price_per_hour * hours)}</strong></div></div> : <div className="party-selection-notice"><b>i</b><span>เลือกสนาม เวลา และระยะเวลาด้านบนเพื่อดูสรุปรายการ</span></div>}
       {loadError && <p className="error">{loadError}</p>}{error && <p className="error" role="alert">{error}</p>}
       <button className="btn btn-block party-submit-btn" type="submit" disabled={pending || hour === null}><span aria-hidden="true">▣</span>{pending ? "กำลังสร้างห้อง…" : "จองสนามและไปชำระเงิน"}<b aria-hidden="true">›</b></button>

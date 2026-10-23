@@ -975,14 +975,31 @@ await as(PARTY_HOST);
 await db.query(`select advance_singles_match('${singles.party_id}', null)`);
 const singlesRound1 = (await db.query(`select * from party_singles_match_board where party_id='${singles.party_id}' and status='playing'`)).rows[0];
 const singlesHostEntry = (await db.query(`select id from party_members where party_id='${singles.party_id}' and user_id='${PARTY_HOST}'`)).rows[0].id;
-check("singles round 1 starts with the first two players",
-  singlesRound1.player_a_entry === singlesHostEntry && singlesRound1.player_b_entry === singlesGuest1.id);
-await db.query(`select advance_singles_match('${singles.party_id}', '${singlesHostEntry}')`);
+// Since 0029 the challenger is matched, not just queued: court time first, then the
+// closest rating. These three played the doubles room above, so they arrive carrying
+// ladder ratings and the pairing is the matchmaker's, not join order.
+const singlesStats = (await db.query(
+  `select entry_id, rating, played from party_player_stats where party_id='${singles.party_id}'`)).rows;
+const ratingOf = (id) => singlesStats.find((r) => r.entry_id === id)?.rating;
+check("everyone in the room has a rating and a scoreboard row", singlesStats.length === 3 && singlesStats.every((r) => r.rating > 0));
+check("round 1 pairs the two closest ratings in the room",
+  Math.abs(ratingOf(singlesRound1.player_a_entry) - ratingOf(singlesRound1.player_b_entry)) ===
+  Math.min(...singlesStats.flatMap((a, i) => singlesStats.slice(i + 1).map((b) => Math.abs(a.rating - b.rating)))),
+  JSON.stringify(singlesStats.map((r) => r.rating)));
+const singlesWinner = singlesRound1.player_a_entry;
+const singlesLoser = singlesRound1.player_b_entry;
+await db.query(`select advance_singles_match('${singles.party_id}', '${singlesWinner}')`);
 const singlesRound2 = (await db.query(`select * from party_singles_match_board where party_id='${singles.party_id}' and status='playing'`)).rows[0];
-check("singles winner stays and the next player enters",
-  singlesRound2.round_no === 2 && singlesRound2.player_a_entry === singlesHostEntry && singlesRound2.player_b_entry === singlesGuest2.id);
+check("singles winner stays and the player who has not played yet comes on",
+  singlesRound2.round_no === 2 && singlesRound2.player_a_entry === singlesWinner &&
+  singlesRound2.player_b_entry !== singlesLoser);
 check("singles loser moves to the back of the queue",
-  (await db.query(`select entry_id from party_singles_queue where party_id='${singles.party_id}' and state='waiting' order by queued_at`)).rows[0]?.entry_id === singlesGuest1.id);
+  (await db.query(`select entry_id from party_singles_queue where party_id='${singles.party_id}' and state='waiting' order by queued_at`)).rows[0]?.entry_id === singlesLoser);
+check("the win and the loss are both on the scoreboard",
+  (await db.query(`select wins, played from party_player_stats where party_id='${singles.party_id}' and entry_id='${singlesWinner}'`)).rows[0]?.wins === 1 &&
+  (await db.query(`select losses, played from party_player_stats where party_id='${singles.party_id}' and entry_id='${singlesLoser}'`)).rows[0]?.losses === 1);
+check("the winner gained exactly what the loser lost",
+  (await db.query(`select sum(rating_delta)::int total from party_player_stats where party_id='${singles.party_id}'`)).rows[0]?.total === 0);
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

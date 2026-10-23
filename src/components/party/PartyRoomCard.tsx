@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { advancePartyMatch, advanceSinglesMatch, joinParty, kickPartyMember, leaveParty, movePartySlot } from "@/app/party-actions";
+import { advancePartyMatch, advanceSinglesMatch, joinParty, kickPartyMember, leaveParty, movePartySlot, setPartyMatchRules } from "@/app/party-actions";
 import { formatSlot, formatTime } from "@/lib/format";
 import { PARTY_NAME_MAX, PARTY_TEAMS, type PartyMember, type PartyMode, type PartyTeam } from "@/lib/party";
 
@@ -12,9 +12,14 @@ export type PartyRoomView = { party_id: string; host_name: string; title: string
 type TeamQueueRow = { team: PartyTeam; ready_at: string; queued_at: string; state: "waiting" | "playing" };
 type MatchRow = { id: string; round_no: number; team_a: PartyTeam; team_b: PartyTeam; winner: PartyTeam | null; status: "playing" | "finished"; started_at: string; ended_at: string | null };
 type SinglesQueueRow = { entry_id: string; name: string; queued_at: string; state: "waiting" | "playing" };
+/** One player's night: the ladder rating they carry, and what this room did to it. */
+type PlayerStat = {
+  entry_id: string; name: string; rating: number; rating_delta: number;
+  played: number; wins: number; losses: number; streak: number; best_streak: number;
+};
 type SinglesMatchRow = { id: string; round_no: number; player_a_entry: string; player_a_name: string; player_b_entry: string; player_b_name: string; winner_entry: string | null; winner_name: string | null; status: "playing" | "finished"; started_at: string; ended_at: string | null };
 
-export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueue, singlesMatchRows, loggedIn, defaultName, myEntry, isHost, userAvatar }: { room: PartyRoomView; members: PartyMember[]; teamQueue: TeamQueueRow[]; matchRows: MatchRow[]; singlesQueue: SinglesQueueRow[]; singlesMatchRows: SinglesMatchRow[]; loggedIn: boolean; defaultName: string; myEntry: string | null; isHost: boolean; userAvatar?: string | null }) {
+export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueue, singlesMatchRows, stats = [], winStreakCap = 3, loggedIn, defaultName, myEntry, isHost, userAvatar }: { room: PartyRoomView; members: PartyMember[]; teamQueue: TeamQueueRow[]; matchRows: MatchRow[]; singlesQueue: SinglesQueueRow[]; singlesMatchRows: SinglesMatchRow[]; stats?: PlayerStat[]; winStreakCap?: number; loggedIn: boolean; defaultName: string; myEntry: string | null; isHost: boolean; userAvatar?: string | null }) {
   const router = useRouter();
   const mine = members.find((m) => m.entry_id === myEntry);
   const [name, setName] = useState(defaultName);
@@ -28,10 +33,27 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
   const playingTeam = teamQueue.find((row) => row.state === "playing")?.team ?? null;
   const waitingTeams = teamQueue.filter((row) => row.state === "waiting").sort((a, b) => a.queued_at.localeCompare(b.queued_at));
   const nextTeam = waitingTeams[0]?.team ?? null;
+  const statOf = (entryId: string) => stats.find((s) => s.entry_id === entryId);
   const currentSinglesMatch = singlesMatchRows.find((match) => match.status === "playing") ?? null;
   const playingPlayer = singlesQueue.find((row) => row.state === "playing" && !currentSinglesMatch) ?? null;
-  const waitingPlayers = singlesQueue.filter((row) => row.state === "waiting").sort((a, b) => a.queued_at.localeCompare(b.queued_at));
+  // Show the line in the order the database will actually call people on (0029): fewest
+  // games first, then whoever has waited longest. Sorting by arrival alone used to name
+  // the wrong player as next up.
+  const waitingPlayers = singlesQueue
+    .filter((row) => row.state === "waiting")
+    .sort((a, b) =>
+      (statOf(a.entry_id)?.played ?? 0) - (statOf(b.entry_id)?.played ?? 0) ||
+      a.queued_at.localeCompare(b.queued_at));
   const teamMembers = (t: PartyTeam) => members.filter((m) => m.team === t);
+  // Highest rating first; someone who has not played yet sits below those who have.
+  const standings = [...stats].sort((a, b) => b.rating - a.rating || b.wins - a.wins || a.played - b.played);
+  // Each game is one win and one loss, so the room's game count is half the total.
+  const played = Math.round(stats.reduce((sum, s) => sum + s.played, 0) / 2);
+  const ratingBadge = (entryId: string) => {
+    const st = statOf(entryId);
+    if (!st) return null;
+    return <span className="party-rating-badge">{st.rating}{st.streak > 1 && <b title={`ชนะติดกัน ${st.streak} เกม`}>🔥{st.streak}</b>}</span>;
+  };
   const teamMemberNames = (t: PartyTeam) => {
     const names = members.filter((m) => m.team === t).map((m) => m.name);
     return names.length > 0 ? names.join(", ") : "ยังไม่มีสมาชิก";
@@ -49,6 +71,7 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
   }
   function matchAction(winner: PartyTeam | null) { run(() => advancePartyMatch(room.party_id, winner)); }
   function singlesMatchAction(winnerEntry: string | null) { run(() => advanceSinglesMatch(room.party_id, winnerEntry)); }
+  function changeCap(cap: number) { run(() => setPartyMatchRules(room.party_id, cap)); }
   return <section className="stack party-room-detail">
     <Link href="/queue?view=join" className="party-back">‹ <span>เข้าห้อง</span></Link>
     <header className="card party-room-profile"><div className="party-list-icon">🏸</div><div><h1>{room.title}</h1><span>โดย {room.host_name} {isHost && <b>เจ้าของห้อง</b>}</span></div><div className="party-room-facts"><span>▣ {room.court_name}</span><span>◷ {formatSlot(room.starts_at, room.ends_at)}</span><span>♟ {members.length}/{room.capacity}</span></div></header>
@@ -236,12 +259,12 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
     </div></>}
     {room.mode === "singles" && <><div id="party-schedule" className="party-live-matching card">
       <div className="party-matching-title">
-        <div><h2>▣ Matching เดี่ยว</h2><p>ชนะอยู่ต่อ · แพ้ไปต่อท้ายคิว (เข้าห้องก่อน ได้คิวก่อน)</p></div>
+        <div><h2>▣ Matching เดี่ยว</h2><p>ชนะอยู่ต่อ · ชนะครบ {winStreakCap} เกมติดต้องพัก · เลือกคู่จากคนที่ลงสนามน้อยที่สุดก่อน แล้วจึงดูฝีมือใกล้เคียง</p></div>
         <span>{singlesQueue.length} คนพร้อม</span>
       </div>
       <div className="party-current-match">
         <span>กำลังแข่งขัน</span>
-        {currentSinglesMatch ? <strong>{currentSinglesMatch.player_a_name}<em>VS</em>{currentSinglesMatch.player_b_name}</strong>
+        {currentSinglesMatch ? <div><strong>{currentSinglesMatch.player_a_name}<em>VS</em>{currentSinglesMatch.player_b_name}</strong><small className="party-match-ratings">{statOf(currentSinglesMatch.player_a_entry)?.rating ?? "-"} · {statOf(currentSinglesMatch.player_b_entry)?.rating ?? "-"} แต้ม</small></div>
           : playingPlayer ? <strong>{playingPlayer.name} ชนะรอบที่ผ่านมาและครองสนาม</strong>
           : <strong className="muted">รอหัวห้องเริ่มการแข่งขัน</strong>}
         <small>{room.court_name}</small>
@@ -255,8 +278,8 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
             : waitingPlayers.length >= 2 ? `${waitingPlayers[0].name} พบ ${waitingPlayers[1].name}` : "รออย่างน้อย 2 คน"}</strong>
       </div>
       <div className="party-queue-strip">
-        <span>ลำดับผู้เล่นที่รอ ({waitingPlayers.length} คน)</span>
-        <div>{waitingPlayers.map((row, index) => <b key={row.entry_id}>{index + 1}. {row.name}</b>)}{waitingPlayers.length === 0 && <small>ยังไม่มีผู้เล่นรอคิว</small>}</div>
+        <span>ลำดับผู้เล่นที่รอ ({waitingPlayers.length} คน) · คนที่ลงสนามน้อยที่สุดได้ก่อน</span>
+        <div>{waitingPlayers.map((row, index) => <b key={row.entry_id}>{index + 1}. {row.name}{ratingBadge(row.entry_id)}</b>)}{waitingPlayers.length === 0 && <small>ยังไม่มีผู้เล่นรอคิว</small>}</div>
       </div>
       {isHost && <div className="party-host-match-actions">
         {currentSinglesMatch ? <><p>หัวห้องเลือกผู้ชนะ (ผู้ชนะอยู่ต่อ · ผู้แพ้ไปต่อท้ายคิว)</p><div>
@@ -276,6 +299,36 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
         <span className={`match-status ${match.status === "playing" ? "playing" : ""}`}>{match.status === "playing" ? "กำลังแข่ง" : `${match.winner_name} ชนะ`}</span><span>{room.court_name}</span>
       </div>)}
     </div></>}
+    {stats.length > 0 && <div className="party-standings card">
+      <div className="party-standings-head">
+        <h2>▣ อันดับคืนนี้</h2>
+        <span>{played > 0 ? `เล่นไปแล้ว ${played} เกม` : "ยังไม่เริ่มเล่น"}</span>
+      </div>
+      <p className="muted party-standings-note">แต้มเริ่มที่ 1000 ชนะคนแต้มสูงกว่าได้เยอะ ชนะคนแต้มต่ำกว่าได้น้อย และแต้มติดตัวไปก๊วนครั้งหน้าด้วย</p>
+      <div className="party-standings-row party-standings-header"><span>#</span><span>ผู้เล่น</span><span>ลง</span><span>ชนะ</span><span>แต้ม</span></div>
+      {standings.map((row, index) => (
+        <div key={row.entry_id} className={`party-standings-row ${row.entry_id === myEntry ? "me" : ""}`}>
+          <span className="party-standings-rank">{index + 1}</span>
+          <span className="party-standings-name">
+            {row.name}
+            {row.entry_id === myEntry && <i>คุณ</i>}
+            {row.streak > 1 && <b title={`ชนะติดกัน ${row.streak} เกม`}>🔥{row.streak}</b>}
+          </span>
+          <span>{row.played}</span>
+          <span>{row.wins}-{row.losses}</span>
+          <span className="party-standings-rating">
+            {row.rating}
+            {row.rating_delta !== 0 && <small className={row.rating_delta > 0 ? "up" : "down"}>{row.rating_delta > 0 ? "+" : ""}{row.rating_delta}</small>}
+          </span>
+        </div>
+      ))}
+      {isHost && <div className="party-standings-rules">
+        <p>ชนะติดกันได้กี่เกมก่อนต้องพัก</p>
+        <div>{[2, 3, 5].map((cap) => (
+          <button key={cap} type="button" className={`btn btn-sm ${cap === winStreakCap ? "" : "btn-ghost"}`} disabled={pending || cap === winStreakCap} onClick={() => changeCap(cap)}>{cap} เกม</button>
+        ))}</div>
+      </div>}
+    </div>}
     {saved && <div className="party-saved-overlay" role="dialog" aria-modal="true" aria-labelledby="party-saved-title"><div className="party-saved-modal"><div className="party-saved-check">✓</div><h2 id="party-saved-title">บันทึกแล้ว</h2><p>สล็อต {saved.slot}{room.mode === "doubles" ? ` · ทีม ${saved.team}` : ""}</p><span>ข้อมูลการเข้าห้องของคุณเรียบร้อยแล้ว</span><button type="button" className="btn btn-block" onClick={() => setSaved(null)}>ตกลง</button></div></div>}
   </section>;
 }

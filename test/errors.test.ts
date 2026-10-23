@@ -26,7 +26,10 @@ describe("friendlyError", () => {
 
   test("explains the singles matching errors in Thai", () => {
     expect(friendlyError({ message: "NOT_ENOUGH_READY_PLAYERS" })).toBe("ต้องมีผู้เล่นในห้องอย่างน้อย 2 คนจึงจะเริ่มแข่งได้");
-    expect(friendlyError({ message: "INVALID_PARTY_MODE" })).toBe("ห้องนี้ไม่ใช่ห้องเดี่ยว จึงจับคู่แบบผู้เล่นเดี่ยวไม่ได้");
+    // Both advance_singles_match and advance_party_match raise it since 0029, so the
+    // wording cannot name one mode.
+    expect(friendlyError({ message: "INVALID_PARTY_MODE" })).toBe("โหมดของห้องไม่ตรงกับการจับคู่แบบนี้ กรุณารีเฟรชหน้าแล้วลองใหม่");
+    expect(friendlyError({ message: "INVALID_STREAK_CAP" })).toBe("จำนวนเกมที่ชนะติดกันได้ ต้องอยู่ระหว่าง 1 ถึง 10 เกม");
   });
 
   test("still falls back for a code it has never seen", () => {

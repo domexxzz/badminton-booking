@@ -91,6 +91,28 @@ const singlesMatchRows = [
   singlesMatch(1, host, som, host),
 ];
 
+// A night three quarters of the way through, so the ladder has moved.
+const stat = (m: PartyMember, rating: number, delta: number, played: number, wins: number, streak: number) => ({
+  entry_id: m.entry_id,
+  name: m.name,
+  rating,
+  rating_delta: delta,
+  played,
+  wins,
+  losses: played - wins,
+  streak,
+  best_streak: Math.max(streak, 2),
+});
+
+const singlesStats = [
+  stat(host, 1047, 47, 7, 5, 2),
+  stat(benz, 1021, 21, 6, 4, 1),
+  stat(som, 998, -2, 7, 3, 0),
+  stat(pond, 974, -26, 6, 2, 0),
+  // มิกซ์ joined late, so the matchmaker puts them on next even though they queued last.
+  stat(mix, 960, -40, 3, 1, 0),
+];
+
 const doublesMembers: PartyMember[] = [
   member(1, "โดม", "A"),
   member(2, "ส้ม", "A"),
@@ -151,6 +173,8 @@ export default function PartySandboxPage() {
           matchRows={[]}
           singlesQueue={singlesQueue}
           singlesMatchRows={singlesMatchRows}
+          stats={singlesStats}
+          winStreakCap={3}
           loggedIn
           defaultName="โดม"
           myEntry={host.entry_id}
@@ -165,6 +189,8 @@ export default function PartySandboxPage() {
           matchRows={[]}
           singlesQueue={singlesQueue}
           singlesMatchRows={singlesMatchRows}
+          stats={singlesStats}
+          winStreakCap={3}
           loggedIn
           defaultName="ผู้เล่นใหม่"
           myEntry={null}
@@ -179,6 +205,8 @@ export default function PartySandboxPage() {
           matchRows={[]}
           singlesQueue={[{ entry_id: host.entry_id, name: host.name, queued_at: at(0), state: "waiting" }]}
           singlesMatchRows={[]}
+          stats={[stat(host, 1000, 0, 0, 0, 0)]}
+          winStreakCap={3}
           loggedIn
           defaultName="โดม"
           myEntry={host.entry_id}

@@ -136,11 +136,19 @@ for (let round = 1; round <= 3; round += 1) {
   line(`   ${current.player_a_name} ชนะ ${current.player_b_name}${next}`);
 }
 
-const justLost = beaten.at(-1);
-expect("ผู้ชนะยังอยู่ในสนาม", state.playing?.player_a_name === "โดม");
-expect(`ผู้แพ้คนล่าสุด (${justLost}) ไปต่อท้ายคิว — รอคิว: ${state.waiting.join(" -> ")}`, state.waiting.at(-1) === justLost);
+// โดม won three in a row, which is the room's cap, so the court changes hands even
+// though nobody beat him: he goes to the back and a fresh pair starts (migration 0029).
+const streakCap = (await one(`select win_streak_cap from party_rooms where id = '${room.party_id}'`)).win_streak_cap;
+const domeStats = await one(
+  `select wins, streak, best_streak, rating from party_player_stats
+   where party_id = '${room.party_id}' and entry_id = '${hostEntry.id}'`,
+);
+line(`   โดมชนะครบ ${streakCap} เกมติด จึงต้องลงไปพัก แม้ไม่มีใครเอาชนะได้`);
+expect(`ชนะครบ ${streakCap} เกมแล้วต้องพัก ผู้ครองสนามเปลี่ยนมือ`, state.playing?.player_a_name !== "โดม");
+expect(`โดมกลับไปต่อคิว — รอคิว: ${state.waiting.join(" -> ")}`, state.waiting.includes("โดม"));
 expect("ทุกคนได้ลงเล่น ไม่มีใครถูกข้าม", new Set(beaten).size === PLAYERS.length);
-expect(`หมุนคิวครบวง กลับมาเจอ ${state.playing?.player_b_name} อีกครั้ง`, state.playing?.player_b_name === beaten[0]);
+expect(`สถิติถูกบันทึก: ชนะ ${domeStats.wins} เกม ชนะติดสูงสุด ${domeStats.best_streak} แต้ม ${domeStats.rating}`,
+  domeStats.wins === 3 && domeStats.best_streak === streakCap && domeStats.rating > 1000);
 
 await refused(
   "หัวห้องเลือกคนที่ไม่ได้อยู่ในคู่นี้ไม่ได้",
@@ -171,6 +179,127 @@ await refused("จองทับเวลาเดิมไม่ได้", `s
 
 const teams = await one(`select count(*)::int n from party_team_queue where party_id = '${room.party_id}'`);
 expect("คิวทีม (ของห้องคู่) ไม่ปนเข้ามาในห้องเดี่ยว", teams.n === 0);
+
+// ---------------------------------------------------------------------------
+head("6. คืนก๊วนเต็มรูปแบบ 8 คน 24 เกม — ระบบจับคู่ทำงานจริงแค่ไหน");
+
+// Eight players of genuinely different standard. "ฝีมือจริง" is only used to decide who
+// wins each simulated game; the matchmaker never sees it. It has to work the ratings out.
+const NIGHT = [
+  { name: "เอ", skill: 95 },
+  { name: "บี", skill: 85 },
+  { name: "ซี", skill: 72 },
+  { name: "ดี", skill: 68 },
+  { name: "อี", skill: 55 },
+  { name: "เอฟ", skill: 50 },
+  { name: "จี", skill: 35 },
+  { name: "เอช", skill: 20 },
+];
+const NIGHT_HOST = "dddddddd-0000-0000-0000-00000000dddd";
+
+// A fixed sequence, so two runs of this script print the same night.
+let seed = 20261107;
+const random = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+
+await db.exec(`insert into auth.users (id, email, raw_user_meta_data) values
+  ('${NIGHT_HOST}', 'night@sandbox.test', '{"display_name":"${NIGHT[0].name}"}'),
+  ${NIGHT.slice(1)
+    .map((p, i) => `('eeeeeeee-0000-0000-0000-0000000000${String(i + 10).padStart(2, "0")}', '${p.name}@sandbox.test', '{"display_name":"${p.name}"}')`)
+    .join(",\n  ")};`);
+const nightIds = NIGHT.map((p, i) =>
+  i === 0 ? NIGHT_HOST : `eeeeeeee-0000-0000-0000-0000000000${String(i + 9).padStart(2, "0")}`,
+);
+
+await as(ADMIN);
+await db.query(`select set_party_host('${NIGHT_HOST}', true)`);
+await as(NIGHT_HOST);
+const night = await one(
+  `select * from create_party_booking(3::smallint, '${startsAt}', 3, 'singles', 'ก๊วนเดี่ยว 8 คน', '${NIGHT[0].name}')`,
+);
+await db.exec(`update bookings set status = 'confirmed' where id = '${night.booking_id}'`);
+for (let i = 1; i < NIGHT.length; i += 1) {
+  await as(nightIds[i]);
+  await db.query(
+    `select join_party('${night.party_id}', '${NIGHT[i].name}', ${i + 1}::smallint, '${teamForSlot(i + 1)}'::party_team)`,
+  );
+}
+
+const cap = (await one(`select win_streak_cap from party_rooms where id = '${night.party_id}'`)).win_streak_cap;
+line(`   ผู้เล่น ${NIGHT.length} คน · ชนะติดกันได้ไม่เกิน ${cap} เกมแล้วต้องพัก`);
+
+const skillOf = Object.fromEntries(NIGHT.map((p) => [p.name, p.skill]));
+await as(NIGHT_HOST);
+await db.query(`select advance_singles_match('${night.party_id}', null)`);
+
+const held = [];
+for (let game = 1; game <= 24; game += 1) {
+  const m = await one(
+    `select player_a_entry, player_a_name, player_b_entry, player_b_name
+     from party_singles_match_board where party_id = '${night.party_id}' and status = 'playing'`,
+  );
+  if (!m) break;
+  // The better player usually wins, but not always — that is what makes a rating useful.
+  const edge = skillOf[m.player_a_name] / (skillOf[m.player_a_name] + skillOf[m.player_b_name]);
+  const aWins = random() < edge;
+  const winner = aWins ? m.player_a_entry : m.player_b_entry;
+  held.push(aWins ? m.player_a_name : m.player_b_name);
+  await db.query(`select advance_singles_match('${night.party_id}', '${winner}')`);
+}
+
+const table = await all(
+  `select name, rating, rating_delta, played, wins, losses, best_streak
+   from party_player_stats where party_id = '${night.party_id}' order by rating desc`,
+);
+line();
+line("   อันดับหลังจบคืน            แต้ม   +/-   ลง  ชนะ  แพ้  ชนะติดสูงสุด   (ฝีมือจริง)");
+for (const [i, r] of table.entries()) {
+  const pad = (v, n) => String(v).padStart(n);
+  line(
+    `   ${pad(i + 1, 2)}. ${r.name.padEnd(6)}        ${pad(r.rating, 5)} ${pad(
+      (r.rating_delta > 0 ? "+" : "") + r.rating_delta,
+      5,
+    )} ${pad(r.played, 3)} ${pad(r.wins, 4)} ${pad(r.losses, 4)} ${pad(r.best_streak, 8)}        ${pad(skillOf[r.name], 4)}`,
+  );
+}
+
+const playedCounts = table.map((r) => r.played);
+const spread = Math.max(...playedCounts) - Math.min(...playedCounts);
+line();
+expect(`ทุกคนได้ลงเล่น ไม่มีใครนั่งทั้งคืน (น้อยสุด ${Math.min(...playedCounts)} เกม)`, Math.min(...playedCounts) > 0);
+expect(`เวลาลงสนามใกล้เคียงกัน ต่างกันไม่เกิน 2 เกม (ต่างจริง ${spread})`, spread <= 2);
+expect(
+  `ไม่มีใครครองสนามเกิน ${cap} เกมติด (สูงสุดที่ทำได้ ${Math.max(...table.map((r) => r.best_streak))})`,
+  table.every((r) => r.best_streak <= cap),
+);
+expect("แต้มรวมไม่งอกไม่หาย (ได้เท่าที่อีกฝ่ายเสีย)", table.reduce((sum, r) => sum + r.rating_delta, 0) === 0);
+const mostWins = [...table].sort((a, b) => b.wins - a.wins)[0];
+const fewestWins = [...table].sort((a, b) => a.wins - b.wins)[0];
+expect(`คนชนะมากที่สุด (${mostWins.name}) แต้มสูงกว่าคนชนะน้อยที่สุด (${fewestWins.name})`, mostWins.rating > fewestWins.rating);
+const strongHalf = table.slice(0, 4).map((r) => skillOf[r.name]).reduce((a, b) => a + b, 0);
+const weakHalf = table.slice(4).map((r) => skillOf[r.name]).reduce((a, b) => a + b, 0);
+expect(`ตารางอันดับเรียงตามฝีมือจริงคร่าวๆ (ครึ่งบน ${strongHalf} > ครึ่งล่าง ${weakHalf})`, strongHalf > weakHalf);
+
+const gaps = await all(
+  `select round_no, player_a_name, player_b_name from party_singles_match_board
+   where party_id = '${night.party_id}' and status = 'finished' order by round_no`,
+);
+const rematches = gaps.filter((m, i) => {
+  const prev = gaps[i - 1];
+  return prev && new Set([m.player_a_name, m.player_b_name]).size === 2 &&
+    [prev.player_a_name, prev.player_b_name].sort().join() === [m.player_a_name, m.player_b_name].sort().join();
+});
+expect(`ไม่มีการเจอคู่เดิมซ้ำติดกันเลย (${gaps.length} เกม)`, rematches.length === 0);
+
+// ---------------------------------------------------------------------------
+head("7. หัวห้องปรับกติกาได้");
+await as(NIGHT_HOST);
+await db.query(`select set_party_match_rules('${night.party_id}', 5::smallint)`);
+const changed = await one(`select win_streak_cap from party_rooms where id = '${night.party_id}'`);
+const boardCap = await one(`select win_streak_cap from party_room_board where party_id = '${night.party_id}'`);
+expect(`เปลี่ยนเป็นชนะติดกันได้ ${changed.win_streak_cap} เกม และหน้าห้องเห็นค่าเดียวกัน`, changed.win_streak_cap === 5 && boardCap.win_streak_cap === 5);
+await refused("ตั้งค่าเกินช่วงที่อนุญาตไม่ได้", `select set_party_match_rules('${night.party_id}', 99::smallint)`, "INVALID_STREAK_CAP");
+await as(PLAYERS[0].id);
+await refused("คนที่ไม่ใช่หัวห้องแก้กติกาไม่ได้", `select set_party_match_rules('${night.party_id}', 2::smallint)`, "FORBIDDEN");
 
 line();
 line(problems ? `พบปัญหา ${problems} จุด` : "ผ่านทั้งหมด — กฎใหม่ทำงานอย่างที่ออกแบบไว้ บนฐานข้อมูลใช้แล้วทิ้ง");

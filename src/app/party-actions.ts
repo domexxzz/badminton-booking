@@ -76,6 +76,17 @@ export async function advancePartyMatch(partyId: string, winner: PartyTeam | nul
   refreshParty(partyId); return { ok: true, data: null };
 }
 
+/** The host decides how many games in a row one side may hold the court. */
+export async function setPartyMatchRules(partyId: string, winStreakCap: number): Promise<ActionResult> {
+  if (!UUID_RE.test(partyId) || !Number.isInteger(winStreakCap) || winStreakCap < 1 || winStreakCap > 10) {
+    return { ok: false, error: friendlyError({ message: "INVALID_STREAK_CAP" }) };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_party_match_rules", { p_party_id: partyId, p_win_streak_cap: winStreakCap });
+  if (error) return { ok: false, error: friendlyError(error) };
+  refreshParty(partyId); return { ok: true, data: null };
+}
+
 export async function advanceSinglesMatch(partyId: string, winnerEntry: string | null): Promise<ActionResult> {
   if (!UUID_RE.test(partyId) || (winnerEntry !== null && !UUID_RE.test(winnerEntry))) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
   const supabase = await createClient();

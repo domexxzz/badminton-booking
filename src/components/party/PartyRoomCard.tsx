@@ -3,13 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { joinParty, kickPartyMember, leaveParty, movePartySlot } from "@/app/party-actions";
+import { advancePartyMatch, joinParty, kickPartyMember, leaveParty, movePartySlot } from "@/app/party-actions";
 import { formatSlot, formatTime } from "@/lib/format";
-import { buildPartyTeamSchedule, PARTY_NAME_MAX, PARTY_TEAMS, type PartyMember, type PartyMode, type PartyTeam } from "@/lib/party";
+import { PARTY_NAME_MAX, PARTY_TEAMS, type PartyMember, type PartyMode, type PartyTeam } from "@/lib/party";
 
 export type PartyRoomView = { party_id: string; host_name: string; title: string; mode: PartyMode; capacity: number; court_id: number; court_name: string; starts_at: string; ends_at: string };
 
-export function PartyRoomCard({ room, members, loggedIn, defaultName, myEntry, isHost }: { room: PartyRoomView; members: PartyMember[]; loggedIn: boolean; defaultName: string; myEntry: string | null; isHost: boolean }) {
+type TeamQueueRow = { team: PartyTeam; ready_at: string; queued_at: string; state: "waiting" | "playing" };
+type MatchRow = { id: string; round_no: number; team_a: PartyTeam; team_b: PartyTeam; winner: PartyTeam | null; status: "playing" | "finished"; started_at: string; ended_at: string | null };
+
+export function PartyRoomCard({ room, members, teamQueue, matchRows, loggedIn, defaultName, myEntry, isHost }: { room: PartyRoomView; members: PartyMember[]; teamQueue: TeamQueueRow[]; matchRows: MatchRow[]; loggedIn: boolean; defaultName: string; myEntry: string | null; isHost: boolean }) {
   const router = useRouter();
   const mine = members.find((m) => m.entry_id === myEntry);
   const [name, setName] = useState(defaultName);
@@ -19,8 +22,14 @@ export function PartyRoomCard({ room, members, loggedIn, defaultName, myEntry, i
   const [saved, setSaved] = useState<{ slot: number; team: PartyTeam } | null>(null);
   const [pending, startTransition] = useTransition();
   const occupied = new Map(members.map((m) => [m.slot_no, m]));
-  const matches = buildPartyTeamSchedule(room.starts_at, room.ends_at);
-  const now = Date.now();
+  const currentMatch = matchRows.find((match) => match.status === "playing") ?? null;
+  const playingTeam = teamQueue.find((row) => row.state === "playing")?.team ?? null;
+  const waitingTeams = teamQueue.filter((row) => row.state === "waiting").sort((a, b) => a.queued_at.localeCompare(b.queued_at));
+  const nextTeam = waitingTeams[0]?.team ?? null;
+  const teamMemberNames = (t: PartyTeam) => {
+    const names = members.filter((m) => m.team === t).map((m) => m.name);
+    return names.length > 0 ? names.join(", ") : "ยังไม่มีสมาชิก";
+  };
   const teamCount = (value: PartyTeam) => members.filter((m) => m.team === value && m.entry_id !== myEntry).length + (team === value && selectedSlot !== null ? 1 : 0);
   const chooseTeam = (value: PartyTeam) => { setTeam(value); if (!mine || mine.team !== value) setSelectedSlot(null); };
   function run(action: () => Promise<{ ok: boolean; error?: string }>, success?: () => void) { setError(null); startTransition(async () => { const result = await action(); if (!result.ok) setError(result.error === "สล็อตนี้มีคนเลือกแล้ว" ? result.error : result.error ?? "เกิดข้อผิดพลาด"); else { success?.(); router.refresh(); } }); }
@@ -31,6 +40,7 @@ export function PartyRoomCard({ room, members, loggedIn, defaultName, myEntry, i
     if (myEntry) run(() => movePartySlot(myEntry, room.party_id, selectedSlot, team), success);
     else run(() => joinParty(room.party_id, name, selectedSlot, team), success);
   }
+  function matchAction(winner: PartyTeam | null) { run(() => advancePartyMatch(room.party_id, winner)); }
   return <section className="stack party-room-detail">
     <Link href="/queue?view=join" className="party-back">‹ <span>เข้าห้อง</span></Link>
     <header className="card party-room-profile"><div className="party-list-icon">🏸</div><div><h1>{room.title}</h1><span>โดย {room.host_name} {isHost && <b>เจ้าของห้อง</b>}</span></div><div className="party-room-facts"><span>▣ {room.court_name}</span><span>◷ {formatSlot(room.starts_at, room.ends_at)}</span><span>♟ {members.length}/{room.capacity}</span></div></header>
@@ -46,7 +56,127 @@ export function PartyRoomCard({ room, members, loggedIn, defaultName, myEntry, i
       <button type="button" className="btn btn-block party-confirm-join" disabled={pending || selectedSlot === null} onClick={confirmJoin}>{pending ? "กำลังตรวจสอบสล็อต…" : "▣ บันทึกทีมและดูตารางแข่ง →"}</button>
       {myEntry && !isHost && <button type="button" className="btn btn-ghost btn-block" disabled={pending} onClick={() => confirm("ออกจากห้องนี้?") && run(() => leaveParty(myEntry, room.party_id), () => router.push("/queue?view=join"))}>ออกจากห้อง</button>}
     </>}
-    <div id="party-schedule" className="party-schedule-table card"><h2>▣ ตารางการแข่งขัน</h2><div className="party-schedule-table-head"><span>รอบ</span><span>คู่แข่งขัน</span><span>เวลา</span><span>สถานะ</span><span>สนาม</span></div>{matches.map((match) => { const start = Date.parse(match.startsAt); const end = start + 15 * 60_000; const ready = members.filter((m) => m.team === match.teamA).length === 2 && members.filter((m) => m.team === match.teamB).length === 2; const status = !ready ? "รอสมาชิก" : now >= end ? "จบแล้ว" : now >= start ? "กำลังแข่งขัน" : "รอแข่งขัน"; return <div className="party-schedule-table-row" key={match.index}><span>รอบ {match.index}</span><strong>ทีม <b>{match.teamA}</b> <em>vs</em> ทีม <b>{match.teamB}</b></strong><span>{formatTime(match.startsAt)}</span><span className={`match-status ${status === "กำลังแข่งขัน" ? "playing" : ""}`}>{status}</span><span>{room.court_name}</span></div>; })}</div>
+    <div id="party-schedule" className="party-live-matching card">
+      <div className="party-matching-title">
+        <div>
+          <h2>▣ Matching ก๊วน</h2>
+          <p>ชนะอยู่ต่อ · แพ้ไปต่อท้ายคิว (ทีมเต็มก่อน ได้คิวก่อน)</p>
+        </div>
+        <span>{teamQueue.length} ทีมพร้อม</span>
+      </div>
+      <div className="party-current-match">
+        <span>กำลังแข่งขัน</span>
+        {currentMatch ? (
+          <div>
+            <strong>ทีม <b>{currentMatch.team_a}</b><em>VS</em>ทีม <b>{currentMatch.team_b}</b></strong>
+            <small className="muted" style={{ display: "block", marginTop: 2, fontSize: 12 }}>
+              {teamMemberNames(currentMatch.team_a)} พบ {teamMemberNames(currentMatch.team_b)}
+            </small>
+          </div>
+        ) : playingTeam ? (
+          <div>
+            <strong>ทีม <b>{playingTeam}</b> ชนะในรอบที่ผ่านมา (ครองสนาม)</strong>
+            <small className="muted" style={{ display: "block", marginTop: 2, fontSize: 12 }}>
+              รอผู้ท้าชิงขึ้นมาแข่งขัน
+            </small>
+          </div>
+        ) : (
+          <strong className="muted">รอหัวห้องเริ่มการแข่งขัน</strong>
+        )}
+        <small>{room.court_name}</small>
+      </div>
+      <div className="party-next-queue">
+        <span>คิวถัดไป</span>
+        <strong>
+          {currentMatch
+            ? (nextTeam ? `ผู้ชนะ พบ ทีม ${nextTeam} (${teamMemberNames(nextTeam)})` : "รอทีมที่สมาชิกครบ")
+            : playingTeam
+              ? (nextTeam ? `ทีม ${playingTeam} (${teamMemberNames(playingTeam)}) พบ ทีม ${nextTeam} (${teamMemberNames(nextTeam)})` : "รอผู้ท้าชิงที่สมาชิกครบ")
+              : waitingTeams.length >= 2
+                ? `ทีม ${waitingTeams[0].team} (${teamMemberNames(waitingTeams[0].team)}) พบ ทีม ${waitingTeams[1].team} (${teamMemberNames(waitingTeams[1].team)})`
+                : "รออย่างน้อย 2 ทีมที่สมาชิกครบ"}
+        </strong>
+      </div>
+      <div className="party-queue-strip">
+        <span>ลำดับทีมพร้อม ({waitingTeams.length} ทีม)</span>
+        <div>
+          {waitingTeams.map((row, index) => (
+            <b key={row.team} title={teamMemberNames(row.team)}>
+              {index + 1}. ทีม {row.team} ({teamMemberNames(row.team)})
+            </b>
+          ))}
+          {waitingTeams.length === 0 && <small>ยังไม่มีทีมรอคิว</small>}
+        </div>
+      </div>
+      {isHost && (
+        <div className="party-host-match-actions">
+          {currentMatch ? (
+            <>
+              <p>หัวห้องเลือกทีมที่ชนะ (ทีมชนะอยู่ต่อ · ทีมแพ้ไปต่อท้ายคิว)</p>
+              <div>
+                <button type="button" className="btn" disabled={pending} onClick={() => matchAction(currentMatch.team_a)}>
+                  🏆 ทีม {currentMatch.team_a} ชนะ
+                  <span style={{ display: "block", fontSize: 11, fontWeight: "normal", opacity: 0.85 }}>
+                    ({teamMemberNames(currentMatch.team_a)})
+                  </span>
+                </button>
+                <button type="button" className="btn" disabled={pending} onClick={() => matchAction(currentMatch.team_b)}>
+                  🏆 ทีม {currentMatch.team_b} ชนะ
+                  <span style={{ display: "block", fontSize: 11, fontWeight: "normal", opacity: 0.85 }}>
+                    ({teamMemberNames(currentMatch.team_b)})
+                  </span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-block"
+              disabled={pending || (playingTeam ? waitingTeams.length < 1 : waitingTeams.length < 2)}
+              onClick={() => matchAction(null)}
+            >
+              {playingTeam
+                ? (waitingTeams.length >= 1
+                    ? `เริ่มคู่ถัดไป (ทีม ${playingTeam} พบ ทีม ${waitingTeams[0].team})`
+                    : "รอทีมผู้ท้าชิงที่สมาชิกครบ")
+                : (waitingTeams.length >= 2
+                    ? `เริ่มคู่แรก (ทีม ${waitingTeams[0].team} พบ ทีม ${waitingTeams[1].team})`
+                    : "รออย่างน้อย 2 ทีมที่สมาชิกครบ")}
+            </button>
+          )}
+        </div>
+      )}
+      {error && <p className="error">{error}</p>}
+    </div>
+    <div className="party-schedule-table card">
+      <h2>▣ ประวัติการแข่งขัน</h2>
+      <div className="party-schedule-table-head">
+        <span>รอบ</span>
+        <span>คู่แข่งขัน</span>
+        <span>เวลา</span>
+        <span>ผล</span>
+        <span>สนาม</span>
+      </div>
+      {matchRows.length === 0 ? (
+        <p className="muted">ตารางพร้อมแล้ว เมื่อมี 2 ทีมเต็ม หัวห้องกดเริ่มคู่แรกได้ทันที</p>
+      ) : (
+        [...matchRows].reverse().map((match) => (
+          <div className="party-schedule-table-row" key={match.id}>
+            <span>รอบ {match.round_no}</span>
+            <strong>
+              ทีม <b>{match.team_a}</b> <small style={{ fontWeight: 400, opacity: 0.85 }}>({teamMemberNames(match.team_a)})</small>{" "}
+              <em>vs</em>{" "}
+              ทีม <b>{match.team_b}</b> <small style={{ fontWeight: 400, opacity: 0.85 }}>({teamMemberNames(match.team_b)})</small>
+            </strong>
+            <span>{formatTime(match.started_at)}</span>
+            <span className={`match-status ${match.status === "playing" ? "playing" : ""}`}>
+              {match.status === "playing" ? "กำลังแข่ง" : `ทีม ${match.winner} ชนะ`}
+            </span>
+            <span>{room.court_name}</span>
+          </div>
+        ))
+      )}
+    </div>
     {saved && <div className="party-saved-overlay" role="dialog" aria-modal="true" aria-labelledby="party-saved-title"><div className="party-saved-modal"><div className="party-saved-check">✓</div><h2 id="party-saved-title">บันทึกแล้ว</h2><p>สล็อต {saved.slot} · ทีม {saved.team}</p><span>ข้อมูลการเข้าห้องของคุณเรียบร้อยแล้ว</span><button type="button" className="btn btn-block" onClick={() => setSaved(null)}>ตกลง</button></div></div>}
   </section>;
 }

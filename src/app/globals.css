@@ -304,6 +304,66 @@
 .party-finder-preview small { display: block; color: var(--primary-strong); font-size: 12px; }
 .party-finder-note { margin: 0; font-size: 12px; line-height: 1.55; }
 
+/* ---------- Community (migration 0032) ---------- */
+.community-hero { display: flex; align-items: center; gap: 13px; padding: 16px; }
+.community-hero h1 { margin: 0; font-size: 21px; }
+.community-hero span { color: var(--muted); font-size: 13px; }
+
+.community-composer { padding: 14px; }
+.community-composer-head strong { display: block; font-size: 15px; }
+.community-composer-head small { color: var(--muted); font-size: 12px; }
+.community-composer textarea { width: 100%; padding: 11px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font: inherit; font-size: 15px; line-height: 1.6; resize: vertical; }
+.community-composer-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.community-composer-foot small { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.community-closed { padding: 14px; text-align: center; }
+.community-closed strong { display: block; font-size: 15px; }
+.community-closed small { color: var(--muted); font-size: 12.5px; }
+
+.community-post { padding: 14px; }
+.community-post-head { display: flex; align-items: center; gap: 10px; }
+.community-post-head strong { display: flex; align-items: center; gap: 6px; font-size: 14.5px; }
+.community-post-head strong > i { padding: 1px 6px; border-radius: 999px; background: var(--primary); color: var(--primary-ink); font-size: 10px; font-style: normal; }
+.community-post-head small { display: block; color: var(--muted); font-size: 11.5px; }
+.community-avatar { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.community-avatar.initial { display: grid; place-items: center; background: var(--primary-soft); color: var(--primary-strong); font-size: 16px; font-weight: 700; }
+.community-post-body { margin: 11px 0 0; font-size: 15px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+.community-post-actions { display: flex; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.community-post-actions button { flex: 1; padding: 8px 6px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.community-post-actions button:hover:not(:disabled) { background: var(--surface-2); }
+.community-post-actions button.liked { color: var(--danger); }
+.community-post-actions button:disabled { opacity: .55; }
+
+.community-comments { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); display: grid; gap: 10px; }
+.community-comments > .muted { margin: 0; font-size: 13px; }
+.community-comment { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: start; gap: 8px; }
+.community-comment .community-avatar { width: 30px; height: 30px; font-size: 13px; }
+.community-comment strong { font-size: 13px; }
+.community-comment p { margin: 2px 0 0; font-size: 13.5px; line-height: 1.6; overflow-wrap: anywhere; }
+.community-comment > button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 11.5px; cursor: pointer; padding: 2px 4px; }
+.community-reply { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+
+.community-empty { padding: 20px 16px; text-align: center; }
+.community-empty strong { display: block; font-size: 15px; }
+.community-rules { padding: 16px; }
+.community-rules h2 { margin: 0 0 8px; font-size: 17px; }
+.community-rules ul { margin: 0 0 12px; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.8; }
+
+.moderation-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px; }
+.moderation-switch strong { display: block; font-size: 15px; }
+.moderation-switch small { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.55; max-width: 44ch; }
+.moderation-item { padding: 14px; }
+.moderation-item-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.moderation-item-head small { color: var(--muted); font-size: 12px; }
+.moderation-item-head .badge.warn { background: var(--held); color: var(--held-ink); }
+.moderation-item blockquote { margin: 10px 0 0; padding: 10px 12px; border-left: 3px solid var(--border); border-radius: 0 10px 10px 0; background: var(--surface-2); font-size: 14px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.moderation-reason { margin: 9px 0 0; color: var(--muted); font-size: 13px; }
+.moderation-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.moderation-actions .btn { flex: 1 1 140px; }
+
+@media (max-width: 380px) {
+  .community-post-actions button { font-size: 12px; }
+}
+
 /* ---------- Guide book ---------- */
 .guide-page { padding-bottom: 8px; }
 .guide-hero { display: flex; align-items: center; gap: 13px; padding: 16px; }

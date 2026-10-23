@@ -133,6 +133,9 @@ export default async function MyBookingsPage() {
             </button>
           </form>
         </div>
+        <Link href="/community" className="btn btn-block btn-ghost" style={{ textAlign: "center" }}>
+          💬 คอมมูนิตี้
+        </Link>
         <Link href="/guide" className="btn btn-block btn-ghost" style={{ textAlign: "center" }}>
           📖 วิธีใช้งานระบบ
         </Link>

@@ -425,6 +425,85 @@ const afterLadder = await one(`select count(*)::int n, coalesce(sum(played), 0):
 expect("ห้อง casual ไม่ไปแตะตารางอันดับรวมของร้าน",
   afterLadder.n === beforeLadder.n && afterLadder.p === beforeLadder.p);
 
+// ---------------------------------------------------------------------------
+head("11. Community — โพสต์ คอมเมนต์ รายงาน และการดูแล (migration 0032)");
+
+const WRITER = PLAYERS[0].id;
+const READER = PLAYERS[1].id;
+
+await as(WRITER);
+const post = await one(
+  `select create_community_post('คืนนี้สนุกมาก เจอคู่สูสีสามเกมติด 🏸', '${room.party_id}') as id`,
+);
+expect("โพสต์ได้ และขึ้นบนฟีดสาธารณะ",
+  (await one(`select count(*)::int n from community_feed where post_id = '${post.id}'`)).n === 1);
+const feedRow = await one(`select author_key, author_name, party_title from community_feed where post_id = '${post.id}'`);
+expect(`ฟีดแสดงชื่อและห้องที่ไปเล่นมา (${feedRow.author_name} · ${feedRow.party_title})`, Boolean(feedRow.party_title));
+expect("ฟีดไม่มี user id ของบัญชี",
+  !(await all(`select column_name from information_schema.columns
+               where table_schema = 'public' and table_name = 'community_feed'`))
+    .map((c) => c.column_name).includes("user_id") && feedRow.author_key !== WRITER);
+
+await as(READER);
+const comment = await one(`select add_community_comment('${post.id}', 'เสียดายไม่ได้ไป ครั้งหน้าชวนด้วยนะ') as id`);
+const liked = await one(`select toggle_community_like('${post.id}') as on`);
+const counts = await one(`select likes, comments from community_feed where post_id = '${post.id}'`);
+expect(`กดไลก์และคอมเมนต์แล้วตัวเลขขึ้นเอง (${counts.likes} ไลก์ ${counts.comments} คอมเมนต์)`,
+  liked.on === true && counts.likes === 1 && counts.comments === 1);
+const unliked = await one(`select toggle_community_like('${post.id}') as on`);
+expect("กดไลก์ซ้ำคือเอาไลก์ออก",
+  unliked.on === false && (await one(`select likes from community_feed where post_id = '${post.id}'`)).likes === 0);
+await db.query(`select toggle_community_like('${post.id}')`);
+
+await refused("คอมเมนต์ในโพสต์ที่ไม่มีอยู่ไม่ได้",
+  `select add_community_comment('00000000-0000-4000-8000-000000000000', 'x')`, "POST_NOT_FOUND");
+await refused("โพสต์ว่างเปล่าไม่ได้", `select create_community_post('   ')`, "INVALID_POST");
+
+// Reporting and what an admin does about it.
+await db.query(`select report_community_content('post', '${post.id}', 'ข้อความไม่เหมาะสม')`);
+await db.query(`select report_community_content('post', '${post.id}', 'รายงานซ้ำของคนเดิม')`);
+expect("คนหนึ่งรายงานของชิ้นเดิมได้ครั้งเดียว ไม่ปั่นคิวได้",
+  (await one(`select count(*)::int n from community_reports where target_id = '${post.id}'`)).n === 1);
+await refused("ผู้ใช้ทั่วไปเปิดคิวรายงานไม่ได้", `select open_community_reports()`, "FORBIDDEN");
+await refused("ผู้ใช้ทั่วไปซ่อนโพสต์คนอื่นไม่ได้",
+  `select moderate_community_content('post', '${post.id}', 'hide')`, "FORBIDDEN");
+
+await as(ADMIN);
+const reportQueue = await all(`select * from open_community_reports()`);
+line(`   คิวรายงานของแอดมิน: ${reportQueue.length} รายการ — "${reportQueue[0]?.reason}"`);
+expect("แอดมินเห็นคิวรายงานพร้อมข้อความที่ถูกรายงาน", reportQueue.length === 1 && Boolean(reportQueue[0].body));
+
+await db.query(`select moderate_community_content('post', '${post.id}', 'hide', 'ไม่เหมาะสม')`);
+expect("แอดมินซ่อนแล้ว โพสต์หายจากฟีดทันที",
+  (await one(`select count(*)::int n from community_feed where post_id = '${post.id}'`)).n === 0);
+expect("คอมเมนต์ใต้โพสต์ที่ถูกซ่อน ไม่ค้างอยู่บนกระดานแยก",
+  (await one(`select count(*)::int n from community_comment_board where comment_id = '${comment.id}'`)).n === 1);
+const hiddenPost = await one(`select status, status_note, body from community_posts where id = '${post.id}'`);
+expect(`ข้อความยังเก็บไว้ตรวจสอบได้ (สถานะ ${hiddenPost.status} เหตุผล "${hiddenPost.status_note}")`,
+  hiddenPost.status === "hidden" && hiddenPost.body.length > 0);
+expect("รายงานถูกปิดเป็น actioned พร้อมบันทึกว่าใครจัดการ",
+  (await one(`select status, handled_by from community_reports where target_id = '${post.id}'`)).status === "actioned");
+expect("คิวรายงานว่างแล้ว", (await all(`select * from open_community_reports()`)).length === 0);
+
+await db.query(`select moderate_community_content('post', '${post.id}', 'restore', 'ตรวจแล้วไม่ผิดกติกา')`);
+expect("เอากลับขึ้นฟีดได้ ไม่ใช่ลบทิ้งถาวร",
+  (await one(`select count(*)::int n from community_feed where post_id = '${post.id}'`)).n === 1);
+
+// The shop can close posting for a while without a deploy.
+await db.query(`select set_community_posting(false)`);
+await as(WRITER);
+await refused("ปิดรับโพสต์แล้ว โพสต์ใหม่ไม่ได้", `select create_community_post('ทดสอบ')`, "COMMUNITY_CLOSED");
+await refused("ปิดรับโพสต์แล้ว คอมเมนต์ก็ไม่ได้", `select add_community_comment('${post.id}', 'ทดสอบ')`, "COMMUNITY_CLOSED");
+await as(ADMIN);
+await db.query(`select set_community_posting(true)`);
+
+await as(WRITER);
+await db.query(`select delete_community_post('${post.id}')`);
+expect("เจ้าของลบเองแล้วหายจากฟีด แต่แถวยังอยู่ให้ตรวจสอบได้",
+  (await one(`select count(*)::int n from community_feed where post_id = '${post.id}'`)).n === 0 &&
+  (await one(`select status from community_posts where id = '${post.id}'`)).status === "removed");
+await refused("ลบโพสต์ของคนอื่นไม่ได้", `select delete_community_comment('${comment.id}')`, "POST_NOT_FOUND");
+
 line();
 line(problems ? `พบปัญหา ${problems} จุด` : "ผ่านทั้งหมด — กฎใหม่ทำงานอย่างที่ออกแบบไว้ บนฐานข้อมูลใช้แล้วทิ้ง");
 line("ฐานข้อมูลนี้หายไปพร้อมกับการจบสคริปต์ ไม่มีอะไรค้างอยู่ที่ไหน");

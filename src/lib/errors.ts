@@ -79,6 +79,11 @@ const MESSAGES: Record<string, string> = {
   COACH_HAS_LESSON: "ช่วงเวลานี้คุณมีคลาสสอนอยู่ จองสนามเล่นเองทับเวลาสอนไม่ได้",
   PRICE_CHANGED: "ราคาเพิ่งเปลี่ยน กรุณารีเฟรชหน้านี้แล้วเลือกเวลาอีกครั้ง",
   NOTHING_TO_PAY: "ไม่มีค่าสอนที่ค้างจ่ายให้บันทึก",
+  COMMUNITY_CLOSED: "ตอนนี้ทางร้านปิดรับโพสต์ชั่วคราว อ่านของเดิมได้ตามปกติ",
+  INVALID_POST: "ข้อความไม่ถูกต้อง พิมพ์อย่างน้อย 1 ตัวอักษร และโพสต์ยาวได้ไม่เกิน 2,000 ตัว",
+  POST_NOT_FOUND: "ไม่พบโพสต์นี้ อาจถูกลบไปแล้ว หรือไม่ใช่โพสต์ของคุณ",
+  TOO_MANY_POSTS: "โพสต์ถี่เกินไป พักสักครู่แล้วลองใหม่",
+  INVALID_REPORT: "ข้อมูลการรายงานไม่ถูกต้อง",
 };
 
 export function friendlyError(error: { message?: string } | null | undefined): string {

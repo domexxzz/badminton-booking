@@ -1,8 +1,20 @@
-# Design: per-court play queue (คิวก๊วน)
+# Design: booking-backed Party queue (คิวก๊วน)
 
-Status: proposed, 2026-10-22. Needs the owner's approval because it adds migration 0018.
+Status: replaced by the Party model in migration 0020. Owner approved on 2026-10-23.
 
-## Why
+## Party model (0020)
+
+- The customer-facing name stays “คิวก๊วน”.
+- A host chooses a court, date, start time and duration, then pays the normal court booking in full.
+- The room remains private while payment is pending and opens publicly only after the booking is confirmed.
+- Hosting is free during launch. `can_host_party()` is the single switch for a future subscription check.
+- Guests join free in the app. Any cost sharing is agreed and paid directly to the host; the shop does not collect it.
+- A room can be singles or doubles and has 12 numbered slots. In doubles, adjacent slots form a fixed team.
+- Members choose and move their own slot. The host occupies slot 1 initially and may remove other members.
+- The app produces 15-minute round-robin matches and repeats the rotation until the booked time is full.
+- Public realtime mirror tables contain display names and slot numbers, but no account user IDs.
+
+## Previous queue model (0018, retained for migration history)
 
 On a ก๊วน night players stand around a court and someone keeps the order on paper. Players
 want to see where they are without asking, and the person running the court wants one tap to

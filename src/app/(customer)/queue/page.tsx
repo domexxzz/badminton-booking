@@ -1,107 +1,35 @@
 import Link from "next/link";
 import { LiveRefresh } from "@/components/LiveRefresh";
-import { CourtQueueBoard } from "@/components/queue/CourtQueueBoard";
-import { JoinQueueForm } from "@/components/queue/JoinQueueForm";
-import { LeaveQueueButton } from "@/components/queue/LeaveQueueButton";
-import { getPublicCourts } from "@/lib/public-data";
-import { gamesAhead, waitingPosition } from "@/lib/queue";
-import { loadCourtQueues } from "@/lib/queue-data";
+import { PartyCreateForm } from "@/components/party/PartyCreateForm";
+import { PartyRoomCard, type PartyRoomView } from "@/components/party/PartyRoomCard";
+import { getPublicCourts, getPublicVenueHours } from "@/lib/public-data";
+import type { PartyMember } from "@/lib/party";
 import { getSessionUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
-
-type MyEntry = { id: string; court_id: number; status: "waiting" | "playing" };
+type MyParty = { entry_id: string; party_id: string; slot_no: number; is_host: boolean };
 
 export default async function QueuePage() {
-  const { supabase, user, displayName } = await getSessionUser();
-  const courts = await getPublicCourts();
-  const [views, mine] = await Promise.all([
-    courts ? loadCourtQueues(supabase, courts) : Promise.resolve(null),
-    user
-      ? supabase
-          .from("queue_entries")
-          .select("id, court_id, status")
-          .eq("user_id", user.id)
-          .in("status", ["waiting", "playing"])
-          .maybeSingle<MyEntry>()
-      : Promise.resolve({ data: null }),
+  const [{ supabase, user, displayName }, courts, hours] = await Promise.all([getSessionUser(), getPublicCourts(), getPublicVenueHours()]);
+  if (!courts) return <p className="error">โหลดข้อมูลสนามไม่สำเร็จ กรุณารีเฟรช</p>;
+  const [{ data: rooms, error: roomError }, { data: memberRows }, mine] = await Promise.all([
+    supabase.from("party_room_board").select("party_id, host_name, title, mode, capacity, court_id, starts_at, ends_at").gt("ends_at", new Date().toISOString()).order("starts_at"),
+    supabase.from("party_member_board").select("entry_id, party_id, name, slot_no, joined_at").order("slot_no"),
+    user ? supabase.rpc("my_party_entries") : Promise.resolve({ data: [] }),
   ]);
-
-  if (!views) return <p className="error">โหลดคิวก๊วนไม่สำเร็จ กรุณารีเฟรช</p>;
-
-  const open = views.filter((v) => v.isOpen);
-  const myEntry = mine.data;
-  const myView = myEntry ? views.find((v) => v.courtId === myEntry.court_id) : undefined;
-  const myPlace = myEntry && myView ? waitingPosition(myView, myEntry.id) : null;
-
-  return (
-    <div className="stack">
-      <LiveRefresh table="queue_board" />
-      <LiveRefresh table="court_queues" />
-      <div className="page-head">
-        <h1 style={{ flex: 1 }}>คิวก๊วน</h1>
-        <span className="live">
-          <span className="live-dot on" aria-hidden="true" /> อัปเดตสด
-        </span>
-      </div>
-
-      {myEntry && myView && (
-        <section className="card queue-me-card" aria-live="polite">
-          {myEntry.status === "playing" ? (
-            <>
-              <span className="queue-section-label">ถึงตาคุณแล้ว</span>
-              <strong className="queue-me-title">ลงเล่นที่ {myView.courtName} ได้เลย 🏸</strong>
-            </>
-          ) : (
-            <>
-              <span className="queue-section-label">คิวของคุณ · {myView.courtName}</span>
-              <div className="queue-me-row">
-                <span className="queue-me-pos">{myPlace ?? "-"}</span>
-                <span className="muted">
-                  {myPlace === null
-                    ? "กำลังอัปเดตลำดับ"
-                    : gamesAhead(myPlace, myView.playersPerGame) === 0
-                      ? "ได้ลงเกมถัดไป เตรียมตัวได้เลย"
-                      : `รออีก ${gamesAhead(myPlace, myView.playersPerGame)} เกม`}
-                </span>
-              </div>
-            </>
-          )}
-          <LeaveQueueButton entryId={myEntry.id} playing={myEntry.status === "playing"} />
-        </section>
-      )}
-
-      {open.length === 0 ? (
-        <section className="card stack">
-          <h2>ตอนนี้ยังไม่มีสนามเปิดคิวก๊วน</h2>
-          <p className="muted" style={{ margin: 0 }}>
-            เมื่อร้านเปิดคิว หน้านี้จะขึ้นเองโดยไม่ต้องรีเฟรช ระหว่างนี้จองสนามแบบเหมาได้ตามปกติ
-          </p>
-          <Link className="btn btn-block" href="/book">
-            จองสนาม
-          </Link>
-        </section>
-      ) : (
-        <>
-          {!user && (
-            <section className="card stack">
-              <p style={{ margin: 0 }}>เข้าสู่ระบบเพื่อต่อคิวจากมือถือ ไม่ต้องจดชื่อที่สนาม</p>
-              <Link className="btn btn-block" href="/login?next=/queue">
-                เข้าสู่ระบบเพื่อต่อคิว
-              </Link>
-            </section>
-          )}
-          {user && !myEntry && (
-            <JoinQueueForm
-              courts={open.map((v) => ({ id: v.courtId, name: v.courtName, waiting: v.waiting.length }))}
-              defaultName={displayName ?? ""}
-            />
-          )}
-          {open.map((view) => (
-            <CourtQueueBoard key={view.courtId} view={view} myEntryId={myEntry?.id ?? null} />
-          ))}
-        </>
-      )}
-    </div>
-  );
+  if (roomError) return <p className="error">ระบบห้องก๊วนยังไม่พร้อมใช้งาน กรุณาติดต่อร้าน</p>;
+  const courtNames = new Map(courts.map((c) => [c.id, c.name]));
+  const myEntries = (mine.data ?? []) as MyParty[];
+  return <div className="stack party-page">
+    <LiveRefresh table="party_room_board" /><LiveRefresh table="party_member_board" />
+    <div className="page-head"><div><h1>คิวก๊วน</h1><p className="muted">เปิด Party จองสนาม แล้วเลือกทีมเล่นด้วยกัน</p></div><span className="live"><span className="live-dot on" aria-hidden="true" /> อัปเดตสด</span></div>
+    {user ? <PartyCreateForm courts={courts} defaultName={displayName ?? ""} openHour={hours.openHour} closeHour={hours.closeHour} /> : <section className="card stack"><h2>อยากเปิดห้องหรือเข้าร่วม?</h2><p className="muted">เข้าสู่ระบบเพื่อสร้าง Party และเลือกช่องของคุณ</p><Link href="/login?next=/queue" className="btn btn-block">เข้าสู่ระบบ</Link></section>}
+    <div className="party-list-head"><h2>ห้องที่เปิดอยู่</h2><span>{rooms?.length ?? 0} ห้อง</span></div>
+    {!rooms?.length ? <section className="card party-empty"><strong>ยังไม่มีห้องก๊วนเปิดอยู่</strong><span className="muted">สร้างห้องแรก เลือกสนามและชำระเงินเพื่อเปิด Party ได้เลย</span></section> : rooms.map((row) => {
+      const room = { ...row, court_name: courtNames.get(row.court_id) ?? "สนาม" } as PartyRoomView;
+      const members = (memberRows ?? []).filter((m) => m.party_id === row.party_id) as PartyMember[];
+      const my = myEntries.find((entry) => entry.party_id === row.party_id);
+      return <PartyRoomCard key={row.party_id} room={room} members={members} loggedIn={Boolean(user)} defaultName={displayName ?? ""} myEntry={my?.entry_id ?? null} isHost={my?.is_host ?? false} />;
+    })}
+  </div>;
 }

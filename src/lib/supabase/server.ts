@@ -45,6 +45,7 @@ export const getSessionUser = cache(async () => {
     user: data.user,
     isAdmin: profile?.is_admin === true,
     isCoach: profile?.is_coach === true,
+    isPartyHost: profile?.is_admin === true || profile?.is_party_host === true,
     displayName: (profile?.display_name as string | null | undefined) ?? null,
     avatarUrl,
   } as const;

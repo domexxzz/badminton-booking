@@ -31,6 +31,7 @@ const MIGRATIONS = [
   "0024_profile_avatar.sql",
   "0025_party_winner_stays.sql",
   "0026_sync_party_member_avatars.sql",
+  "0027_party_host_role.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -976,6 +977,22 @@ check("round 2 is team A (winner) vs team C (challenger)", r2.round_no === 2 && 
 // Check queue order: Team B should now be waiting in queue behind Team C
 const queueWaiting = (await db.query(`select team from party_team_queue where party_id='${party.party_id}' and state='waiting' order by queued_at`)).rows;
 check("loser (team B) goes to the back of the queue", queueWaiting.length === 1 && queueWaiting[0].team === "B");
+
+// ---- Party Host Role (0027) ----
+// Non-admin cannot set party host
+await as(U1);
+await expectError("non-admin cannot set party host", `select set_party_host('${U1}', true)`, "FORBIDDEN");
+
+// Admin can set party host
+await as(ADMIN);
+await db.query(`select set_party_host('${U1}', true)`);
+check("party host role is saved", (await db.query(`select is_party_host from profiles where id='${U1}'`)).rows[0].is_party_host === true);
+check("can_host_party returns true for designated host", (await db.query(`select can_host_party('${U1}') as p`)).rows[0].p === true);
+check("can_host_party returns true for admin", (await db.query(`select can_host_party('${ADMIN}') as p`)).rows[0].p === true);
+
+// Admin can revoke party host
+await db.query(`select set_party_host('${U1}', false)`);
+check("can_host_party returns false when revoked", (await db.query(`select can_host_party('${U1}') as p`)).rows[0].p === false);
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

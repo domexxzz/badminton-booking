@@ -7,6 +7,7 @@ import { CancelButton } from "@/components/CancelButton";
 import { ChevronLeft } from "@/components/icons";
 import { Countdown } from "@/components/Countdown";
 import { LiveRefresh } from "@/components/LiveRefresh";
+import { PaymentSlipReminder } from "@/components/PaymentSlipReminder";
 import { SaveQrButton } from "@/components/SaveQrButton";
 import { ShopContactCard } from "@/components/ShopContactCard";
 import { SlipUploader } from "@/components/SlipUploader";
@@ -206,8 +207,10 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
       )}
 
       {awaitingPayment && (
-        <div className="card pay">
-          <div>
+        <>
+          <PaymentSlipReminder />
+          <div className="card pay">
+            <div>
             {qr ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -265,8 +268,9 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
             </ol>
             <SlipUploader bookingId={booking.id} userId={user.id} />
             <CancelButton bookingId={booking.id} />
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {booking.status === "awaiting_review" && (

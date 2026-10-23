@@ -116,8 +116,8 @@ Things that would make this a failure even if it worked:
    between `queue_entries` and `queue_board`.
 4. **The free allowance is one join per account, ever — not one a month.** A monthly free join
    would undercut the ฿29 day pass: a player who comes once a month would never need to buy one.
-   One free join to try, then pay, keeps the day pass worth selling. (Prices are the owner's;
-   this reading of how the free tier has to work with them is mine.)
+   One free join to try, then pay, keeps the day pass worth selling. Agreed with the owner on
+   2026-10-23, along with the prices.
 
 ## How it is built
 

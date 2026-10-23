@@ -73,6 +73,26 @@ The month is comfortable for a regular. The day pass is a heavy add-on for someo
 once — close to half the price of the court again — so the one free join matters: it is how a
 casual player finds out the room is worth ฿29 before being asked for it.
 
+**How a membership is bought** (owner's decision, 2026-10-23): both the day pass and the month
+are bought on the site, the same way a court is — transfer, attach the slip, an admin approves.
+Nothing is sold at the counter.
+
+That gives the shop one way of taking money instead of two, and every baht lands in the same
+place with a slip behind it. The cost is that **a membership is not instant**. A player who
+wants to join a room right now has to transfer, upload, and wait for an admin to look. The month
+does not care: it is bought the night before. The day pass does — it is the purchase someone
+makes while standing at the court. Two things follow from that, and the build should carry both:
+
+- The shop should be told the moment a membership slip arrives, the way it already is for a
+  booking slip (`src/lib/line/notify-shop.ts`), so approval is minutes rather than hours.
+- `/admin/members` should be one tap from that alert, showing the slip and the amount, with one
+  button to approve.
+
+If approving in time turns out to be a problem in practice, the cheapest fix is to let the
+existing EasySlip check look at a membership slip too. The amounts are fixed (฿29 and ฿149) and
+the stakes are small, so auto-approving one is a much easier decision than auto-confirming a
+court booking. That is not in this design; it is where to go if the queue at the counter is real.
+
 **Rollout:** open everything free for the first one or two months. At launch there are no rooms,
 so nobody would pay to join one, and we have no idea yet how many rooms a week this venue
 actually produces. Count rooms opened and join requests over that period, then set the gate and
@@ -136,6 +156,17 @@ public mirror carries no PII, every write goes through a `SECURITY DEFINER` RPC 
   One table covers both products: a day pass is a row expiring at the end of that Bangkok day, a
   month is the same row a month out. A `has_membership()` helper is the only thing the join path
   asks.
+- `membership_orders` — one row per purchase: who, which plan, the amount, the slip path, and
+  the review status, mirroring `payments` but for a purchase that is not a booking. The existing
+  `payments` table hangs off `booking_id` and the `slips` bucket's policy only accepts a path
+  shaped like a booking's, so a membership slip needs its own row and its own storage path.
+  Approving an order is what writes `memberships.expires_at`; approving twice must not extend
+  twice.
+
+This is the one place the feature touches money, and it adds a second payment path to a site
+that has had exactly one. Everything about it should copy the booking path rather than invent:
+same bucket conventions, same "a slip is reviewed by a human" rule, same refusal to let an
+automatic check confirm anything on its own.
 - A trigger on `bookings`: when the bill behind a room stops being confirmed, the room closes and
   its pending requests are withdrawn.
 
@@ -162,7 +193,5 @@ status on `/me`, and `/admin/members` for granting and renewing.
    more than five day passes stapled together.
 2. When the shop switches the gate on, do existing free accounts keep their old access for a
    while, or does everyone start fresh?
-3. A day pass is bought by slip like everything else, so an admin has to see it and grant it —
-   possibly while the player is standing at the court wanting to join a room now. Is that
-   workable at the counter, or should a day pass be something the staff grant on the spot
-   (`/admin/members`) and the player never pays online at all?
+3. Should an admin be able to extend or cancel a membership by hand as well as by approving an
+   order — for a refund, a mistake, or a free month given to someone who complained?

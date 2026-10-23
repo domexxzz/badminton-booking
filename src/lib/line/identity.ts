@@ -13,7 +13,7 @@ import type { LineProfile } from "./login";
 // account on this domain.
 export const LINE_EMAIL_DOMAIN = "line-login.invalid";
 
-async function findLinkedUserEmail(admin: SupabaseClient, lineUserId: string): Promise<string | null> {
+async function findLinkedUser(admin: SupabaseClient, lineUserId: string): Promise<{ email: string; userId: string } | null> {
   const { data: profile, error } = await admin
     .from("profiles")
     .select("id")
@@ -28,7 +28,23 @@ async function findLinkedUserEmail(admin: SupabaseClient, lineUserId: string): P
   if (data.user.app_metadata?.line_user_id !== lineUserId || !data.user.email) {
     throw new Error("Profile linked to this LINE id is not a LINE account");
   }
-  return data.user.email;
+  return { email: data.user.email, userId: profile.id };
+}
+
+async function syncLineProfile(admin: SupabaseClient, userId: string, profile: LineProfile): Promise<void> {
+  const updates: { display_name?: string; avatar_url?: string } = {};
+  if (profile.name) updates.display_name = profile.name;
+  if (profile.picture) updates.avatar_url = profile.picture;
+
+  if (Object.keys(updates).length > 0) {
+    await admin.from("profiles").update(updates).eq("id", userId);
+    await admin.auth.admin.updateUserById(userId, {
+      user_metadata: {
+        ...(profile.name ? { display_name: profile.name } : {}),
+        ...(profile.picture ? { avatar_url: profile.picture, line_picture: profile.picture } : {}),
+      },
+    });
+  }
 }
 
 async function createLineUser(admin: SupabaseClient, profile: LineProfile): Promise<string> {
@@ -37,13 +53,20 @@ async function createLineUser(admin: SupabaseClient, profile: LineProfile): Prom
     email,
     email_confirm: true,
     app_metadata: { line_user_id: profile.userId },
-    user_metadata: { display_name: profile.name ?? "ผู้ใช้ LINE", line_picture: profile.picture },
+    user_metadata: {
+      display_name: profile.name ?? "ผู้ใช้ LINE",
+      avatar_url: profile.picture,
+      line_picture: profile.picture,
+    },
   });
   if (error) throw error;
 
   const { error: linkError } = await admin
     .from("profiles")
-    .update({ line_user_id: profile.userId })
+    .update({
+      line_user_id: profile.userId,
+      ...(profile.picture ? { avatar_url: profile.picture } : {}),
+    })
     .eq("id", data.user.id);
   // A unique violation here means a parallel login linked this LINE id first;
   // the orphan account we just made is harmless (unreachable random email).
@@ -59,7 +82,19 @@ export async function issueLineSession(profile: LineProfile): Promise<{ tokenHas
   const admin = getServiceClient();
   if (!admin) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not set");
 
-  const email = (await findLinkedUserEmail(admin, profile.userId)) ?? (await createLineUser(admin, profile));
+  const existing = await findLinkedUser(admin, profile.userId);
+  let email: string;
+  if (existing) {
+    email = existing.email;
+    try {
+      await syncLineProfile(admin, existing.userId, profile);
+    } catch (err) {
+      console.warn("Failed to sync LINE profile on login:", err);
+    }
+  } else {
+    email = await createLineUser(admin, profile);
+  }
+
   const { data, error } = await admin.auth.admin.generateLink({ type: "magiclink", email });
   if (error) throw error;
   return { tokenHash: data.properties.hashed_token, type: data.properties.verification_type };

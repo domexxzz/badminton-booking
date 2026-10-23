@@ -20,8 +20,10 @@ type Row = {
 };
 
 export default async function MyBookingsPage() {
-  const { supabase, user, isAdmin, isCoach, displayName } = await getSessionUser();
+  const { supabase, user, isAdmin, isCoach, displayName, avatarUrl } = await getSessionUser();
   if (!user) redirect("/login?next=/me");
+
+  const isLineAccount = Boolean(user.app_metadata?.line_user_id);
 
   const { data, error } = await supabase
     .from("bookings")
@@ -66,14 +68,35 @@ export default async function MyBookingsPage() {
     <>
       <section className="card stack" style={{ gap: 12 }}>
         <div className="profile-card">
-          <span className="avatar">{(displayName ?? "ผ").trim().charAt(0)}</span>
+          <span className="avatar">
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt="" className="avatar-img" />
+            ) : (
+              (displayName ?? "ผ").trim().charAt(0)
+            )}
+          </span>
           <div style={{ display: "grid", flex: 1, gap: 2 }}>
             <strong>{displayName ?? "ผู้เล่น"}</strong>
-            <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               {isAdmin ? (
                 <span className="badge confirmed">แอดมิน</span>
               ) : (
                 <span className="muted">สมาชิก</span>
+              )}
+              {isLineAccount && (
+                <span
+                  className="badge"
+                  style={{
+                    background: "#06c755",
+                    color: "#fff",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: "2px 6px",
+                  }}
+                >
+                  LINE
+                </span>
               )}
             </div>
           </div>

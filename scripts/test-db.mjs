@@ -28,6 +28,7 @@ const MIGRATIONS = [
   "0021_party_join_flow.sql",
   "0022_party_six_teams.sql",
   "0023_party_slot_null_check.sql",
+  "0024_profile_avatar.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -906,6 +907,11 @@ check("the host can remove a guest", (await db.query(`select count(*)::int n fro
 await expectError("the host cannot leave their own paid room", `select leave_party((select id from party_members where party_id='${party.party_id}' and user_id='${PARTY_HOST}'))`, "PARTY_MEMBER_NOT_FOUND");
 check("anonymous users cannot create or join a Party", !(await db.query(
   `select has_function_privilege('anon', 'public.create_party_booking(smallint,timestamptz,numeric,party_mode,text,text)', 'execute') as p`)).rows[0].p);
+
+// 0024 profile avatar
+await as(U1);
+await db.query(`update profiles set avatar_url = 'https://profile.line-scdn.net/abc' where id = '${U1}'`);
+check("a user can save their avatar_url", (await db.query(`select avatar_url from profiles where id='${U1}'`)).rows[0].avatar_url === "https://profile.line-scdn.net/abc");
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

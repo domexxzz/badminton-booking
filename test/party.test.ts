@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPartyMatches, type PartyMember } from "../src/lib/party";
+import { buildPartyMatches, buildPartyTeamSchedule, type PartyMember } from "../src/lib/party";
 
 const start = "2026-10-24T10:00:00.000Z";
 const end = "2026-10-24T11:00:00.000Z";
@@ -26,5 +26,11 @@ describe("party match rotation", () => {
   it("returns no match until two sides are ready", () => {
     expect(buildPartyMatches("singles", [member(1)], start, end)).toEqual([]);
     expect(buildPartyMatches("doubles", [1, 2, 3].map((n) => member(n)), start, end)).toEqual([]);
+  });
+
+  it("shows team fixtures before any member joins", () => {
+    const schedule = buildPartyTeamSchedule(start, end);
+    expect(schedule).toHaveLength(4);
+    expect(schedule[0]).toMatchObject({ teamA: "A", teamB: "F" });
   });
 });

@@ -4,9 +4,11 @@ export const PARTY_NAME_MAX = 30;
 export const PARTY_TITLE_MAX = 60;
 
 export type PartyMode = "singles" | "doubles";
-export type PartyTeam = "A" | "B";
+export type PartyTeam = "A" | "B" | "C" | "D" | "E" | "F";
 export type PartyMember = { entry_id: string; name: string; slot_no: number; team: PartyTeam };
 export type PartyMatch = { index: number; startsAt: string; sideA: string[]; sideB: string[] };
+export type PartyTeamMatch = { index: number; startsAt: string; teamA: PartyTeam; teamB: PartyTeam };
+export const PARTY_TEAMS: PartyTeam[] = ["A", "B", "C", "D", "E", "F"];
 
 const addMinutes = (iso: string, minutes: number) =>
   new Date(Date.parse(iso) + minutes * 60_000).toISOString();
@@ -25,6 +27,16 @@ function roundRobin<T>(items: T[]): [T, T][] {
     list.splice(1, 0, list.pop()!);
   }
   return result;
+}
+
+/** Publishes the full timetable immediately, even while team slots are empty. */
+export function buildPartyTeamSchedule(startsAt: string, endsAt: string): PartyTeamMatch[] {
+  const pairings = roundRobin(PARTY_TEAMS);
+  const available = Math.max(0, Math.floor((Date.parse(endsAt) - Date.parse(startsAt)) / (PARTY_GAME_MINUTES * 60_000)));
+  return Array.from({ length: available }, (_, index) => {
+    const [teamA, teamB] = pairings[index % pairings.length];
+    return { index: index + 1, startsAt: addMinutes(startsAt, index * PARTY_GAME_MINUTES), teamA, teamB };
+  });
 }
 
 export function buildPartyMatches(

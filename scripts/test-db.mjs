@@ -26,6 +26,8 @@ const MIGRATIONS = [
   "0019_coach_lessons.sql",
   "0020_party_queue.sql",
   "0021_party_join_flow.sql",
+  "0022_party_six_teams.sql",
+  "0023_party_slot_null_check.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -884,11 +886,18 @@ await as(PARTY_GUEST);
 const partyGuest = (await db.query(`select * from join_party('${party.party_id}', ' แขกหนึ่ง ', 3::smallint, 'B'::party_team)`)).rows[0];
 check("a guest joins a chosen slot for free", partyGuest.slot_no === 3 &&
   (await db.query(`select count(*)::int n from party_member_board where party_id='${party.party_id}'`)).rows[0].n === 2);
+await expectError("a team can only use its two assigned slots", `select join_party('${party.party_id}', 'แขกสอง', 5::smallint, 'A'::party_team)`, "INVALID_PARTY_DETAILS");
 await as(PARTY_GUEST2);
-await expectError("two guests cannot take the same slot", `select join_party('${party.party_id}', 'แขกสอง', 3::smallint, 'A'::party_team)`, "PARTY_SLOT_TAKEN");
+await expectError("two guests cannot take the same slot", `select join_party('${party.party_id}', 'แขกสอง', 3::smallint, 'B'::party_team)`, "PARTY_SLOT_TAKEN");
 await as(PARTY_GUEST);
-await db.query(`select move_party_slot('${partyGuest.id}', 4::smallint, 'A'::party_team)`);
+await db.query(`select move_party_slot('${partyGuest.id}', 4::smallint, 'B'::party_team)`);
 check("a guest can move their own slot", (await db.query(`select slot_no from party_member_board where entry_id='${partyGuest.id}'`)).rows[0].slot_no === 4);
+// A null slot used to slip past the guard: every comparison against it is null, so the
+// OR was never true, and the update failed on the NOT NULL column with a raw 23502.
+await expectError("moving to a null slot is refused, not left to the column",
+  `select move_party_slot('${partyGuest.id}', null, 'B'::party_team)`, "INVALID_PARTY_DETAILS");
+check("the refused move left the slot alone",
+  (await db.query(`select slot_no from party_member_board where entry_id='${partyGuest.id}'`)).rows[0].slot_no === 4);
 await as(PARTY_GUEST2);
 await expectError("a guest cannot move another member", `select move_party_slot('${partyGuest.id}', 5::smallint, 'A'::party_team)`, "PARTY_MEMBER_NOT_FOUND");
 await as(PARTY_HOST);

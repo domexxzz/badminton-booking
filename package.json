@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:db": "node scripts/test-db.mjs",
+    "sandbox": "node scripts/sandbox.mjs",
     "seed:demo": "node scripts/seed-demo.mjs"
   },
   "dependencies": {

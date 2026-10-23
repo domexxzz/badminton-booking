@@ -2,6 +2,7 @@ import "server-only";
 import { getServiceClient } from "@/lib/supabase/service";
 import { buildCheckRecord, receiverFromEnv, type CheckRecord } from "./check-record";
 import { verifyWithEasySlip } from "./easyslip";
+import { pickSlipProvider } from "./provider";
 import { verifyWithTyphoon } from "./typhoon";
 import type { ProviderResult } from "./types";
 
@@ -13,7 +14,7 @@ type PendingPayment = {
 };
 
 export function isSlipVerificationEnabled(): boolean {
-  return Boolean(process.env.EASYSLIP_API_KEY || process.env.TYPHOON_API_KEY) && getServiceClient() !== null;
+  return pickSlipProvider(process.env) !== null && getServiceClient() !== null;
 }
 
 function toRecord(result: ProviderResult, payment: PendingPayment): CheckRecord {
@@ -33,10 +34,9 @@ function toRecord(result: ProviderResult, payment: PendingPayment): CheckRecord 
  * Returns the recorded status, or null when nothing was checked.
  */
 export async function verifyLatestSlip(bookingId: string): Promise<string | null> {
-  const easySlipKey = process.env.EASYSLIP_API_KEY;
-  const typhoonKey = process.env.TYPHOON_API_KEY;
+  const provider = pickSlipProvider(process.env);
   const supabase = getServiceClient();
-  if ((!easySlipKey && !typhoonKey) || !supabase) return null;
+  if (!provider || !supabase) return null;
 
   try {
     const { data: payment, error } = await supabase
@@ -55,10 +55,10 @@ export async function verifyLatestSlip(bookingId: string): Promise<string | null
     if (downloadError) {
       console.error("Slip download failed:", downloadError);
       result = { kind: "error", message: "ดาวน์โหลดไฟล์สลิปไม่สำเร็จ" };
-    } else if (typhoonKey) {
-      result = await verifyWithTyphoon(image, typhoonKey);
+    } else if (provider === "easyslip") {
+      result = await verifyWithEasySlip(image, process.env.EASYSLIP_API_KEY!);
     } else {
-      result = await verifyWithEasySlip(image, easySlipKey!);
+      result = await verifyWithTyphoon(image, process.env.TYPHOON_API_KEY!);
     }
 
     const check = toRecord(result, payment);

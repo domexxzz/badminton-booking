@@ -71,6 +71,9 @@ const MESSAGES: Record<string, string> = {
 export function friendlyError(error: { message?: string } | null | undefined): string {
   const code = error?.message?.trim() ?? "";
   if (MESSAGES[code]) return MESSAGES[code];
+  for (const [key, msg] of Object.entries(MESSAGES)) {
+    if (code.includes(key)) return msg;
+  }
   console.error("Unexpected booking error:", error);
-  return "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง";
+  return code ? `เกิดข้อผิดพลาด: ${code}` : "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง";
 }

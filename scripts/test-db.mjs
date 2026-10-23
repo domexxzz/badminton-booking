@@ -30,6 +30,7 @@ const MIGRATIONS = [
   "0023_party_slot_null_check.sql",
   "0024_profile_avatar.sql",
   "0025_party_winner_stays.sql",
+  "0026_party_singles_winner_stays.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -915,6 +916,7 @@ await db.query(`update profiles set avatar_url = 'https://profile.line-scdn.net/
 check("a user can save their avatar_url", (await db.query(`select avatar_url from profiles where id='${U1}'`)).rows[0].avatar_url === "https://profile.line-scdn.net/abc");
 const joined = (await db.query(`select * from join_party('${party.party_id}', 'ผู้เล่นหนึ่ง', 5::smallint, 'C'::party_team)`)).rows[0];
 check("party_member_board includes user avatar", (await db.query(`select avatar_url from party_member_board where entry_id='${joined.id}'`)).rows[0]?.avatar_url === "https://profile.line-scdn.net/abc");
+await db.query(`select leave_party('${joined.id}')`);
 
 // ---- Party Winner Stays On Matching (0025) ----
 const P_GUEST1 = "dddddddd-dddd-dddd-dddd-dddddddddddd";
@@ -970,6 +972,36 @@ check("round 2 is team A (winner) vs team C (challenger)", r2.round_no === 2 && 
 // Check queue order: Team B should now be waiting in queue behind Team C
 const queueWaiting = (await db.query(`select team from party_team_queue where party_id='${party.party_id}' and state='waiting' order by queued_at`)).rows;
 check("loser (team B) goes to the back of the queue", queueWaiting.length === 1 && queueWaiting[0].team === "B");
+
+// ---- Singles Winner Stays On Matching (0026) ----
+await as(PARTY_HOST);
+const singlesAt = new Date(Date.parse(partyAt) + 24 * 60 * 60 * 1000).toISOString();
+const singles = (await db.query(`select * from create_party_booking(4::smallint, '${singlesAt}', 1, 'singles', 'เดี่ยวชนะอยู่ต่อ', 'หัวห้อง')`)).rows[0];
+await db.query(`update bookings set status='confirmed' where id='${singles.booking_id}'`);
+check("singles host enters the player queue immediately",
+  (await db.query(`select count(*)::int n from party_singles_queue where party_id='${singles.party_id}'`)).rows[0].n === 1);
+
+await as(P_GUEST1);
+const singlesGuest1 = (await db.query(`select * from join_party('${singles.party_id}', 'ผู้เล่นเดี่ยว 1', 2::smallint, 'A'::party_team)`)).rows[0];
+await as(P_GUEST2);
+const singlesGuest2 = (await db.query(`select * from join_party('${singles.party_id}', 'ผู้เล่นเดี่ยว 2', 3::smallint, 'B'::party_team)`)).rows[0];
+check("every singles member queues by join order",
+  (await db.query(`select count(*)::int n from party_singles_queue where party_id='${singles.party_id}'`)).rows[0].n === 3);
+
+await as(P_GUEST1);
+await expectError("singles guest cannot advance match", `select advance_singles_match('${singles.party_id}', null)`, "FORBIDDEN");
+await as(PARTY_HOST);
+await db.query(`select advance_singles_match('${singles.party_id}', null)`);
+const singlesRound1 = (await db.query(`select * from party_singles_match_board where party_id='${singles.party_id}' and status='playing'`)).rows[0];
+const singlesHostEntry = (await db.query(`select id from party_members where party_id='${singles.party_id}' and user_id='${PARTY_HOST}'`)).rows[0].id;
+check("singles round 1 starts with the first two players",
+  singlesRound1.player_a_entry === singlesHostEntry && singlesRound1.player_b_entry === singlesGuest1.id);
+await db.query(`select advance_singles_match('${singles.party_id}', '${singlesHostEntry}')`);
+const singlesRound2 = (await db.query(`select * from party_singles_match_board where party_id='${singles.party_id}' and status='playing'`)).rows[0];
+check("singles winner stays and the next player enters",
+  singlesRound2.round_no === 2 && singlesRound2.player_a_entry === singlesHostEntry && singlesRound2.player_b_entry === singlesGuest2.id);
+check("singles loser moves to the back of the queue",
+  (await db.query(`select entry_id from party_singles_queue where party_id='${singles.party_id}' and state='waiting' order by queued_at`)).rows[0]?.entry_id === singlesGuest1.id);
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

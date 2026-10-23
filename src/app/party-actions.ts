@@ -75,3 +75,11 @@ export async function advancePartyMatch(partyId: string, winner: PartyTeam | nul
   if (error) return { ok: false, error: friendlyError(error) };
   refreshParty(partyId); return { ok: true, data: null };
 }
+
+export async function advanceSinglesMatch(partyId: string, winnerEntry: string | null): Promise<ActionResult> {
+  if (!UUID_RE.test(partyId) || (winnerEntry !== null && !UUID_RE.test(winnerEntry))) return { ok: false, error: "ข้อมูลไม่ถูกต้อง" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("advance_singles_match", { p_party_id: partyId, p_winner_entry: winnerEntry });
+  if (error) return { ok: false, error: friendlyError(error) };
+  refreshParty(partyId); return { ok: true, data: null };
+}

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { advancePartyMatch, joinParty, kickPartyMember, leaveParty, movePartySlot } from "@/app/party-actions";
+import { advancePartyMatch, advanceSinglesMatch, joinParty, kickPartyMember, leaveParty, movePartySlot } from "@/app/party-actions";
 import { formatSlot, formatTime } from "@/lib/format";
 import { PARTY_NAME_MAX, PARTY_TEAMS, type PartyMember, type PartyMode, type PartyTeam } from "@/lib/party";
 
@@ -11,8 +11,10 @@ export type PartyRoomView = { party_id: string; host_name: string; title: string
 
 type TeamQueueRow = { team: PartyTeam; ready_at: string; queued_at: string; state: "waiting" | "playing" };
 type MatchRow = { id: string; round_no: number; team_a: PartyTeam; team_b: PartyTeam; winner: PartyTeam | null; status: "playing" | "finished"; started_at: string; ended_at: string | null };
+type SinglesQueueRow = { entry_id: string; name: string; queued_at: string; state: "waiting" | "playing" };
+type SinglesMatchRow = { id: string; round_no: number; player_a_entry: string; player_a_name: string; player_b_entry: string; player_b_name: string; winner_entry: string | null; winner_name: string | null; status: "playing" | "finished"; started_at: string; ended_at: string | null };
 
-export function PartyRoomCard({ room, members, teamQueue, matchRows, loggedIn, defaultName, myEntry, isHost, userAvatar }: { room: PartyRoomView; members: PartyMember[]; teamQueue: TeamQueueRow[]; matchRows: MatchRow[]; loggedIn: boolean; defaultName: string; myEntry: string | null; isHost: boolean; userAvatar?: string | null }) {
+export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueue, singlesMatchRows, loggedIn, defaultName, myEntry, isHost, userAvatar }: { room: PartyRoomView; members: PartyMember[]; teamQueue: TeamQueueRow[]; matchRows: MatchRow[]; singlesQueue: SinglesQueueRow[]; singlesMatchRows: SinglesMatchRow[]; loggedIn: boolean; defaultName: string; myEntry: string | null; isHost: boolean; userAvatar?: string | null }) {
   const router = useRouter();
   const mine = members.find((m) => m.entry_id === myEntry);
   const [name, setName] = useState(defaultName);
@@ -26,6 +28,9 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, loggedIn, d
   const playingTeam = teamQueue.find((row) => row.state === "playing")?.team ?? null;
   const waitingTeams = teamQueue.filter((row) => row.state === "waiting").sort((a, b) => a.queued_at.localeCompare(b.queued_at));
   const nextTeam = waitingTeams[0]?.team ?? null;
+  const currentSinglesMatch = singlesMatchRows.find((match) => match.status === "playing") ?? null;
+  const playingPlayer = singlesQueue.find((row) => row.state === "playing" && !currentSinglesMatch) ?? null;
+  const waitingPlayers = singlesQueue.filter((row) => row.state === "waiting").sort((a, b) => a.queued_at.localeCompare(b.queued_at));
   const teamMemberNames = (t: PartyTeam) => {
     const names = members.filter((m) => m.team === t).map((m) => m.name);
     return names.length > 0 ? names.join(", ") : "ยังไม่มีสมาชิก";
@@ -42,6 +47,7 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, loggedIn, d
     else run(() => joinParty(room.party_id, name, selectedSlot, team), success);
   }
   function matchAction(winner: PartyTeam | null) { run(() => advancePartyMatch(room.party_id, winner)); }
+  function singlesMatchAction(winnerEntry: string | null) { run(() => advanceSinglesMatch(room.party_id, winnerEntry)); }
   return <section className="stack party-room-detail">
     <Link href="/queue?view=join" className="party-back">‹ <span>เข้าห้อง</span></Link>
     <header className="card party-room-profile"><div className="party-list-icon">🏸</div><div><h1>{room.title}</h1><span>โดย {room.host_name} {isHost && <b>เจ้าของห้อง</b>}</span></div><div className="party-room-facts"><span>▣ {room.court_name}</span><span>◷ {formatSlot(room.starts_at, room.ends_at)}</span><span>♟ {members.length}/{room.capacity}</span></div></header>
@@ -176,6 +182,48 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, loggedIn, d
           </div>
         ))
       )}
+    </div></>}
+    {room.mode === "singles" && <><div id="party-schedule" className="party-live-matching card">
+      <div className="party-matching-title">
+        <div><h2>▣ Matching เดี่ยว</h2><p>ชนะอยู่ต่อ · แพ้ไปต่อท้ายคิว (เข้าห้องก่อน ได้คิวก่อน)</p></div>
+        <span>{singlesQueue.length} คนพร้อม</span>
+      </div>
+      <div className="party-current-match">
+        <span>กำลังแข่งขัน</span>
+        {currentSinglesMatch ? <strong>{currentSinglesMatch.player_a_name}<em>VS</em>{currentSinglesMatch.player_b_name}</strong>
+          : playingPlayer ? <strong>{playingPlayer.name} ชนะรอบที่ผ่านมาและครองสนาม</strong>
+          : <strong className="muted">รอหัวห้องเริ่มการแข่งขัน</strong>}
+        <small>{room.court_name}</small>
+      </div>
+      <div className="party-next-queue">
+        <span>คิวถัดไป</span>
+        <strong>{currentSinglesMatch
+          ? (waitingPlayers[0] ? `ผู้ชนะ พบ ${waitingPlayers[0].name}` : "รอผู้เล่นคนถัดไป")
+          : playingPlayer
+            ? (waitingPlayers[0] ? `${playingPlayer.name} พบ ${waitingPlayers[0].name}` : "รอผู้ท้าชิง")
+            : waitingPlayers.length >= 2 ? `${waitingPlayers[0].name} พบ ${waitingPlayers[1].name}` : "รออย่างน้อย 2 คน"}</strong>
+      </div>
+      <div className="party-queue-strip">
+        <span>ลำดับผู้เล่นที่รอ ({waitingPlayers.length} คน)</span>
+        <div>{waitingPlayers.map((row, index) => <b key={row.entry_id}>{index + 1}. {row.name}</b>)}{waitingPlayers.length === 0 && <small>ยังไม่มีผู้เล่นรอคิว</small>}</div>
+      </div>
+      {isHost && <div className="party-host-match-actions">
+        {currentSinglesMatch ? <><p>หัวห้องเลือกผู้ชนะ (ผู้ชนะอยู่ต่อ · ผู้แพ้ไปต่อท้ายคิว)</p><div>
+          <button type="button" className="btn" disabled={pending} onClick={() => singlesMatchAction(currentSinglesMatch.player_a_entry)}>🏆 {currentSinglesMatch.player_a_name} ชนะ</button>
+          <button type="button" className="btn" disabled={pending} onClick={() => singlesMatchAction(currentSinglesMatch.player_b_entry)}>🏆 {currentSinglesMatch.player_b_name} ชนะ</button>
+        </div></> : <button type="button" className="btn btn-block" disabled={pending || (playingPlayer ? waitingPlayers.length < 1 : waitingPlayers.length < 2)} onClick={() => singlesMatchAction(null)}>
+          {playingPlayer ? (waitingPlayers[0] ? `เริ่มคู่ถัดไป (${playingPlayer.name} พบ ${waitingPlayers[0].name})` : "รอผู้ท้าชิง") : waitingPlayers.length >= 2 ? `เริ่มคู่แรก (${waitingPlayers[0].name} พบ ${waitingPlayers[1].name})` : "รออย่างน้อย 2 คน"}
+        </button>}
+      </div>}
+      {error && <p className="error">{error}</p>}
+    </div>
+    <div className="party-schedule-table card">
+      <h2>▣ ประวัติการแข่งขัน</h2>
+      <div className="party-schedule-table-head"><span>รอบ</span><span>คู่แข่งขัน</span><span>เวลา</span><span>ผล</span><span>สนาม</span></div>
+      {singlesMatchRows.length === 0 ? <p className="muted">เมื่อมีผู้เล่น 2 คน หัวห้องสามารถเริ่มคู่แรกได้ทันที</p> : [...singlesMatchRows].reverse().map((match) => <div className="party-schedule-table-row" key={match.id}>
+        <span>รอบ {match.round_no}</span><strong>{match.player_a_name} <em>พบ</em> {match.player_b_name}</strong><span>{formatTime(match.started_at)} น.</span>
+        <span className={`match-status ${match.status === "playing" ? "playing" : ""}`}>{match.status === "playing" ? "กำลังแข่ง" : `${match.winner_name} ชนะ`}</span><span>{room.court_name}</span>
+      </div>)}
     </div></>}
     {saved && <div className="party-saved-overlay" role="dialog" aria-modal="true" aria-labelledby="party-saved-title"><div className="party-saved-modal"><div className="party-saved-check">✓</div><h2 id="party-saved-title">บันทึกแล้ว</h2><p>สล็อต {saved.slot}{room.mode === "doubles" ? ` · ทีม ${saved.team}` : ""}</p><span>ข้อมูลการเข้าห้องของคุณเรียบร้อยแล้ว</span><button type="button" className="btn btn-block" onClick={() => setSaved(null)}>ตกลง</button></div></div>}
   </section>;

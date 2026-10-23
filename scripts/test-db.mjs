@@ -30,6 +30,7 @@ const MIGRATIONS = [
   "0023_party_slot_null_check.sql",
   "0024_profile_avatar.sql",
   "0025_party_winner_stays.sql",
+  "0026_sync_party_member_avatars.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -915,6 +916,11 @@ await db.query(`update profiles set avatar_url = 'https://profile.line-scdn.net/
 check("a user can save their avatar_url", (await db.query(`select avatar_url from profiles where id='${U1}'`)).rows[0].avatar_url === "https://profile.line-scdn.net/abc");
 const joined = (await db.query(`select * from join_party('${party.party_id}', 'ผู้เล่นหนึ่ง', 5::smallint, 'C'::party_team)`)).rows[0];
 check("party_member_board includes user avatar", (await db.query(`select avatar_url from party_member_board where entry_id='${joined.id}'`)).rows[0]?.avatar_url === "https://profile.line-scdn.net/abc");
+
+// 0026 profile avatar update propagates to party_member_board
+await db.query(`update profiles set avatar_url = 'https://profile.google.com/new' where id = '${U1}'`);
+check("updating profile avatar immediately updates party_member_board",
+  (await db.query(`select avatar_url from party_member_board where entry_id='${joined.id}'`)).rows[0]?.avatar_url === "https://profile.google.com/new");
 
 // ---- Party Winner Stays On Matching (0025) ----
 const P_GUEST1 = "dddddddd-dddd-dddd-dddd-dddddddddddd";

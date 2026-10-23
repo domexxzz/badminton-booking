@@ -25,7 +25,7 @@ export async function createClient() {
 export const getSessionUser = cache(async () => {
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
-  if (!data.user) return { supabase, user: null, isAdmin: false, isCoach: false, displayName: null } as const;
+  if (!data.user) return { supabase, user: null, isAdmin: false, isCoach: false, displayName: null, avatarUrl: null } as const;
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -34,11 +34,18 @@ export const getSessionUser = cache(async () => {
     .eq("id", data.user.id)
     .maybeSingle();
 
+  const avatarUrl =
+    (profile?.avatar_url as string | null | undefined) ??
+    (data.user.user_metadata?.avatar_url as string | null | undefined) ??
+    (data.user.user_metadata?.line_picture as string | null | undefined) ??
+    null;
+
   return {
     supabase,
     user: data.user,
     isAdmin: profile?.is_admin === true,
     isCoach: profile?.is_coach === true,
     displayName: (profile?.display_name as string | null | undefined) ?? null,
+    avatarUrl,
   } as const;
 });

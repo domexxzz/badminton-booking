@@ -4,7 +4,9 @@ type Props = {
   revenue: number;
   confirmedCount: number;
   pendingCount: number;
-  totalCount: number;
+  /** Confirmed plus still-waiting. Cancelled and expired are counted separately. */
+  activeCount: number;
+  droppedCount: number;
   totalHours: number;
   capacityHours: number;
   utilization: number;
@@ -16,7 +18,8 @@ export function AnalyticsKpiCards({
   revenue,
   confirmedCount,
   pendingCount,
-  totalCount,
+  activeCount,
+  droppedCount,
   totalHours,
   capacityHours,
   utilization,
@@ -41,10 +44,15 @@ export function AnalyticsKpiCards({
           <span>🏸</span>
         </div>
         <div className="kpi-body">
-          <span className="label">การจองทั้งหมด</span>
-          <span className="value">{totalCount} คิว</span>
+          <span className="label">การจองทั้งหมด ({periodLabel})</span>
+          <span className="value">{activeCount} คิว</span>
           <span className="sub">
-            {pendingCount > 0 ? `รอชำระ/ตรวจ ${pendingCount} · ยืนยัน ${confirmedCount}` : "ยืนยันแล้วทั้งหมด"}
+            {pendingCount > 0
+              ? `ยืนยัน ${confirmedCount} · รอชำระ/ตรวจ ${pendingCount}`
+              : `ยืนยันแล้วครบทั้ง ${confirmedCount} คิว`}
+          </span>
+          <span className="kpi-note">
+            {droppedCount > 0 ? `ไม่รวมที่ยกเลิก/หมดเวลา ${droppedCount} คิว` : "ไม่มีรายการที่ยกเลิกหรือหมดเวลา"}
           </span>
         </div>
       </div>

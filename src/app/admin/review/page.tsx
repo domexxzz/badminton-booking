@@ -103,16 +103,21 @@ export default async function ReviewPage() {
     }),
   );
   const slipPaths = [...new Set(slipPathByBooking.values())];
+  const reviewBookingIds = groupedReviews.flatMap((g) => g.items.map((item) => item.id));
 
   // One round trip each, in parallel, instead of one signed-URL call per slip.
-  const [{ data: profiles }, { data: signed }] = await Promise.all([
+  const [{ data: profiles }, { data: signed }, { data: partyRooms }] = await Promise.all([
     userIds.length
       ? supabase.from("profiles").select("id, display_name, phone").in("id", userIds)
       : Promise.resolve({ data: [] }),
     slipPaths.length
       ? supabase.storage.from("slips").createSignedUrls(slipPaths, SIGNED_URL_TTL_SECONDS)
       : Promise.resolve({ data: [] }),
+    reviewBookingIds.length
+      ? supabase.from("party_rooms").select("booking_id, title, mode, host_name").in("booking_id", reviewBookingIds)
+      : Promise.resolve({ data: [] }),
   ]);
+  const partyByBooking = new Map((partyRooms ?? []).map((p) => [p.booking_id, p]));
   const who = new Map((profiles ?? []).map((p) => [p.id, p]));
   const urlByPath = new Map(
     (signed ?? []).flatMap((s) => (s.signedUrl && s.path ? [[s.path, s.signedUrl] as const] : [])),
@@ -131,6 +136,7 @@ export default async function ReviewPage() {
         <h2>สลิปรอตรวจ ({groupedReviews.length})</h2>
         {groupedReviews.length === 0 && <div className="card muted">ไม่มีสลิปค้างตรวจ</div>}
         {groupedReviews.map(({ lead: b, items, totalAmount, payments }) => {
+          const party = items.map((item) => partyByBooking.get(item.id)).find(Boolean);
           const payment = latestPayment(payments);
           const isNotSlip = payment?.verify_status === "unreadable";
           const isMismatch = payment?.verify_status === "mismatch" || payment?.verify_status === "duplicate";
@@ -223,6 +229,7 @@ export default async function ReviewPage() {
                       )}
                     </>
                   )}
+                  {party && <span className="party-admin-note"><strong>🏸 จองแบบก๊วน: {party.title}</strong><span>{party.mode === "singles" ? "เดี่ยว 1 ต่อ 1" : "คู่ 2 ต่อ 2"} · หัวห้อง {party.host_name}</span></span>}
                 </div>
                 <span className="amount" style={{ fontSize: 22 }}>
                   {formatBaht(totalAmount)}

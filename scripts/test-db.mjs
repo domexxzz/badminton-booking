@@ -24,6 +24,8 @@ const MIGRATIONS = [
   "0017_multi_slot_bookings.sql",
   "0018_play_queue.sql",
   "0019_coach_lessons.sql",
+  "0020_party_queue.sql",
+  "0021_party_join_flow.sql",
 ];
 const db = new PGlite({ extensions: { btree_gist } });
 
@@ -854,6 +856,47 @@ check("anonymous users cannot book a lesson", !(await db.query(
 check("anonymous users can read the open lesson times", (await db.query(
   `select has_function_privilege('anon', 'public.coach_open_starts(uuid,date,numeric)', 'execute') as p`)).rows[0].p === true);
 check("setup: the coach's own booking is untouched", (await lessonRow(coachOwn.id)).status === "confirmed");
+
+// ---- Booking-backed Party queue (0020) ----
+const PARTY_HOST = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+const PARTY_GUEST = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+const PARTY_GUEST2 = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+await db.exec(`insert into auth.users (id, email, raw_user_meta_data) values
+  ('${PARTY_HOST}', 'party-host@x.com', '{"display_name":"หัวห้อง"}'),
+  ('${PARTY_GUEST}', 'party-guest@x.com', '{"display_name":"แขกหนึ่ง"}'),
+  ('${PARTY_GUEST2}', 'party-guest2@x.com', '{"display_name":"แขกสอง"}')`);
+const { rows: [{ party_at: partyAt }] } = await db.query(`select ((now() at time zone 'Asia/Bangkok')::date + 10 + time '18:00') at time zone 'Asia/Bangkok' as party_at`);
+await as(PARTY_HOST);
+const party = (await db.query(`select * from create_party_booking(4::smallint, '${new Date(partyAt).toISOString()}', 1, 'doubles', ' ก๊วน วันศุกร์ ', ' หัวห้อง ')`)).rows[0];
+check("creating a Party also creates a pending paid booking", Boolean(party.party_id && party.booking_id) &&
+  (await db.query(`select status from bookings where id='${party.booking_id}'`)).rows[0].status === "pending_payment");
+check("a Party stays private until payment is confirmed",
+  (await db.query(`select count(*)::int n from party_room_board where party_id='${party.party_id}'`)).rows[0].n === 0);
+check("the host starts in slot 1",
+  (await db.query(`select slot_no from party_members where party_id='${party.party_id}' and user_id='${PARTY_HOST}'`)).rows[0].slot_no === 1);
+await db.exec(`insert into storage.objects (bucket_id, name) values ('slips', '${PARTY_HOST}/${party.booking_id}-1.jpg')`);
+await db.query(`select submit_slip('${party.booking_id}', '${PARTY_HOST}/${party.booking_id}-1.jpg')`);
+await as(ADMIN);
+await db.query(`select review_payment('${party.booking_id}', true)`);
+check("approved payment opens the Party publicly",
+  (await db.query(`select count(*)::int n from party_room_board where party_id='${party.party_id}'`)).rows[0].n === 1);
+await as(PARTY_GUEST);
+const partyGuest = (await db.query(`select * from join_party('${party.party_id}', ' แขกหนึ่ง ', 3::smallint, 'B'::party_team)`)).rows[0];
+check("a guest joins a chosen slot for free", partyGuest.slot_no === 3 &&
+  (await db.query(`select count(*)::int n from party_member_board where party_id='${party.party_id}'`)).rows[0].n === 2);
+await as(PARTY_GUEST2);
+await expectError("two guests cannot take the same slot", `select join_party('${party.party_id}', 'แขกสอง', 3::smallint, 'A'::party_team)`, "PARTY_SLOT_TAKEN");
+await as(PARTY_GUEST);
+await db.query(`select move_party_slot('${partyGuest.id}', 4::smallint, 'A'::party_team)`);
+check("a guest can move their own slot", (await db.query(`select slot_no from party_member_board where entry_id='${partyGuest.id}'`)).rows[0].slot_no === 4);
+await as(PARTY_GUEST2);
+await expectError("a guest cannot move another member", `select move_party_slot('${partyGuest.id}', 5::smallint, 'A'::party_team)`, "PARTY_MEMBER_NOT_FOUND");
+await as(PARTY_HOST);
+await db.query(`select kick_party_member('${party.party_id}', '${partyGuest.id}')`);
+check("the host can remove a guest", (await db.query(`select count(*)::int n from party_member_board where entry_id='${partyGuest.id}'`)).rows[0].n === 0);
+await expectError("the host cannot leave their own paid room", `select leave_party((select id from party_members where party_id='${party.party_id}' and user_id='${PARTY_HOST}'))`, "PARTY_MEMBER_NOT_FOUND");
+check("anonymous users cannot create or join a Party", !(await db.query(
+  `select has_function_privilege('anon', 'public.create_party_booking(smallint,timestamptz,numeric,party_mode,text,text)', 'execute') as p`)).rows[0].p);
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

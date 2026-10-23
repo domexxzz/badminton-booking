@@ -85,8 +85,10 @@ async function promptPayQr(amount: number): Promise<string | null> {
 }
 
 
-export default async function BookingPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function BookingPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ party?: string }> }) {
   const { id } = await params;
+  const partyId = (await searchParams).party;
+  const isPartyBooking = Boolean(partyId && /^[0-9a-f-]{36}$/i.test(partyId));
   const { supabase, user } = await getSessionUser();
   if (!user) redirect(`/login?next=/bookings/${id}`);
 
@@ -237,6 +239,12 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
       {awaitingPayment && (
         <>
           <PaymentSlipReminder />
+          {isPartyBooking && (
+            <div className="card party-payment-note">
+              <strong>ชำระเงินเพื่อเปิดห้องก๊วน</strong>
+              <span>เมื่อสลิปผ่าน ห้อง Party จะเปิดให้ทุกคนเห็นอัตโนมัติ และสมาชิกเข้าร่วมได้ฟรี</span>
+            </div>
+          )}
           <div className="card pay">
             <div>
             {qr ? (

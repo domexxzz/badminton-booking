@@ -58,6 +58,11 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
     console.error("Dashboard load failed:", day.error ?? monthRows.error ?? courts.error);
     return <p className="error">โหลดข้อมูลไม่สำเร็จ</p>;
   }
+  const bookingIds = day.data.map((b) => b.id);
+  const { data: partyRooms } = bookingIds.length
+    ? await supabase.from("party_rooms").select("booking_id, title, mode, host_name").in("booking_id", bookingIds)
+    : { data: [] };
+  const partyByBooking = new Map((partyRooms ?? []).map((p) => [p.booking_id, p]));
 
   // Online bookings carry the customer's profile; phone/LINE/walk-in carry customer_name.
   const userIds = [...new Set(day.data.filter((b) => !b.customer_name).map((b) => b.user_id))];
@@ -133,6 +138,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
             </h2>
             {rows.length === 0 && <p className="muted" style={{ margin: 0 }}>ว่างทั้งวัน</p>}
             {rows.map((b) => {
+              const party = partyByBooking.get(b.id);
               const name = b.customer_name ?? who.get(b.user_id)?.display_name ?? "ลูกค้า";
               const phone = b.customer_phone ?? who.get(b.user_id)?.phone ?? null;
               const paidByTransfer = b.payments.some((p) => p.status === "approved" && p.source === "bank_notification");
@@ -143,7 +149,8 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
                     <span>{formatTime(b.ends_at)}</span>
                   </div>
                   <div className="who">
-                    <strong>{name}</strong>
+                    <strong>{name} {party && <span className="badge confirmed">🏸 จองแบบก๊วน</span>}</strong>
+                    {party && <span className="muted">{party.title} · {party.mode === "singles" ? "เดี่ยว" : "คู่"} · หัวห้อง {party.host_name}</span>}
                     <span className="muted">
                       {CHANNEL_LABEL[b.channel]}
                       {phone && (

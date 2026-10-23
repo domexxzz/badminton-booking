@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { confirmedRevenue, monthBounds, summarizeDay } from "../src/lib/admin/summary";
+import { confirmedRevenue, countBookings, monthBounds, summarizeDay } from "../src/lib/admin/summary";
 
 const b = (status: string, amount: number | string, from: string, to: string) => ({
   status,
@@ -37,6 +37,35 @@ describe("summarizeDay", () => {
       4,
     );
     expect(summary).toEqual({ revenue: 650, confirmedCount: 2, waitingCount: 2, bookedHours: 5, utilization: 9 });
+  });
+});
+
+describe("countBookings", () => {
+  test("keeps cancelled and expired out of the active count", () => {
+    expect(
+      countBookings([
+        b("confirmed", 130, "17", "18"),
+        b("confirmed", 130, "18", "19"),
+        b("awaiting_review", 130, "19", "20"),
+        b("pending_payment", 130, "20", "21"),
+        b("cancelled", 130, "09", "10"),
+        b("expired", 130, "10", "11"),
+        b("expired", 130, "11", "12"),
+      ]),
+    ).toEqual({ confirmed: 2, waiting: 2, dropped: 3, active: 4 });
+  });
+
+  test("is all zeros for no bookings", () => {
+    expect(countBookings([])).toEqual({ confirmed: 0, waiting: 0, dropped: 0, active: 0 });
+  });
+
+  test("ignores a status it does not know", () => {
+    expect(countBookings([{ status: "something_new" }])).toEqual({
+      confirmed: 0,
+      waiting: 0,
+      dropped: 0,
+      active: 0,
+    });
   });
 });
 

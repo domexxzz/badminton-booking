@@ -4,6 +4,7 @@ import { AnalyticsBookingTable, type BookingRowItem } from "@/components/admin/A
 import { AnalyticsCharts, type ChannelStat, type CourtStat, type TimeDataPoint } from "@/components/admin/AnalyticsCharts";
 import { AnalyticsKpiCards } from "@/components/admin/AnalyticsKpiCards";
 import { AnalyticsPeriodPicker } from "@/components/admin/AnalyticsPeriodPicker";
+import { countBookings } from "@/lib/admin/summary";
 import { BOOKING_RULES } from "@/lib/config";
 import { formatTime } from "@/lib/format";
 import { bangkokDate, formatHour, slotStart } from "@/lib/slots";
@@ -158,11 +159,10 @@ export default async function AnalyticsPage({
   // Calculate Overall KPIs
   const confirmedBookings = bookings.filter((b) => b.status === "confirmed");
   const totalRevenue = confirmedBookings.reduce((sum, b) => sum + b.amount, 0);
-  const totalCount = bookings.length;
-  const confirmedCount = confirmedBookings.length;
-  const pendingCount = bookings.filter(
-    (b) => b.status === "pending_payment" || b.status === "awaiting_review",
-  ).length;
+  // Cancelled and expired rows are reported on their own line, not folded into the total.
+  const counts = countBookings(bookings);
+  const confirmedCount = counts.confirmed;
+  const pendingCount = counts.waiting;
 
   const totalHours = confirmedBookings.reduce((sum, b) => {
     const dur = (Date.parse(b.endsAt) - Date.parse(b.startsAt)) / (3600 * 1000);
@@ -344,7 +344,8 @@ export default async function AnalyticsPage({
         revenue={totalRevenue}
         confirmedCount={confirmedCount}
         pendingCount={pendingCount}
-        totalCount={totalCount}
+        activeCount={counts.active}
+        droppedCount={counts.dropped}
         totalHours={totalHours}
         capacityHours={capacityHours}
         utilization={utilization}

@@ -18,6 +18,21 @@ export function confirmedRevenue(bookings: readonly BookingForSummary[]): number
   return bookings.filter((b) => b.status === "confirmed").reduce((sum, b) => sum + satang(b.amount), 0) / 100;
 }
 
+/** A booking that was cancelled or never paid for is not a booking the shop had. */
+const DROPPED_STATUSES = new Set(["cancelled", "expired"]);
+
+/**
+ * How many bookings a period really holds. `active` is what the shop counts as a
+ * booking — confirmed, or still on its way there. Cancelled and expired rows are
+ * reported separately instead of being folded into the total.
+ */
+export function countBookings(bookings: readonly { status: string }[]) {
+  const confirmed = bookings.filter((b) => b.status === "confirmed").length;
+  const waiting = bookings.filter((b) => OPEN_STATUSES.has(b.status)).length;
+  const dropped = bookings.filter((b) => DROPPED_STATUSES.has(b.status)).length;
+  return { confirmed, waiting, dropped, active: confirmed + waiting };
+}
+
 export function summarizeDay(bookings: readonly BookingForSummary[], courtCount: number) {
   const confirmed = bookings.filter((b) => b.status === "confirmed");
   const bookedHours = confirmed.reduce((sum, b) => sum + hoursOf(b), 0);

@@ -16,6 +16,7 @@ export function PartyRoomCard({ room, members, loggedIn, defaultName, myEntry, i
   const [selectedSlot, setSelectedSlot] = useState<number | null>(mine?.slot_no ?? null);
   const [team, setTeam] = useState<PartyTeam>(mine?.team ?? "A");
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<{ slot: number; team: PartyTeam } | null>(null);
   const [pending, startTransition] = useTransition();
   const occupied = new Map(members.map((m) => [m.slot_no, m]));
   const matches = buildPartyMatches(room.mode, members, room.starts_at, room.ends_at);
@@ -24,8 +25,9 @@ export function PartyRoomCard({ room, members, loggedIn, defaultName, myEntry, i
   function confirmJoin() {
     if (!selectedSlot) return setError("กรุณาเลือกสล็อตที่ว่าง");
     if (!name.trim()) return setError("กรุณาใส่ชื่อของคุณ");
-    if (myEntry) run(() => movePartySlot(myEntry, room.party_id, selectedSlot, team));
-    else run(() => joinParty(room.party_id, name, selectedSlot, team));
+    const success = () => setSaved({ slot: selectedSlot, team });
+    if (myEntry) run(() => movePartySlot(myEntry, room.party_id, selectedSlot, team), success);
+    else run(() => joinParty(room.party_id, name, selectedSlot, team), success);
   }
   return <section className="stack party-room-detail">
     <Link href="/queue?view=join" className="party-back">‹ <span>เข้าห้อง</span></Link>
@@ -43,5 +45,6 @@ export function PartyRoomCard({ room, members, loggedIn, defaultName, myEntry, i
       {myEntry && !isHost && <button type="button" className="btn btn-ghost btn-block" disabled={pending} onClick={() => confirm("ออกจากห้องนี้?") && run(() => leaveParty(myEntry, room.party_id), () => router.push("/queue?view=join"))}>ออกจากห้อง</button>}
     </>}
     {myEntry && <div className="party-schedule card"><h3>ตารางการแข่งขัน · เกมละ 15 นาที</h3>{matches.length === 0 ? <p className="muted">รอสมาชิกเพิ่ม แล้วระบบจะจัดคู่แข่งขันให้อัตโนมัติ</p> : <ol>{matches.map((match) => <li key={match.index}><span>{formatTime(match.startsAt)}</span><strong>{match.sideA.join(" + ")} <em>พบ</em> {match.sideB.join(" + ")}</strong></li>)}</ol>}</div>}
+    {saved && <div className="party-saved-overlay" role="dialog" aria-modal="true" aria-labelledby="party-saved-title"><div className="party-saved-modal"><div className="party-saved-check">✓</div><h2 id="party-saved-title">บันทึกแล้ว</h2><p>สล็อต {saved.slot} · ทีม {saved.team}</p><span>ข้อมูลการเข้าห้องของคุณเรียบร้อยแล้ว</span><button type="button" className="btn btn-block" onClick={() => setSaved(null)}>ตกลง</button></div></div>}
   </section>;
 }

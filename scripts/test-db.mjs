@@ -1,56 +1,9 @@
-// Runs the migrations in PGlite (in-process Postgres) with stub auth/storage
-// schemas and checks the booking rules end to end. 0002 (pg_cron) is skipped.
+// Checks the shop's database rules end to end against a throwaway Postgres.
+// The database itself (and the migration list) comes from scripts/lib/sandbox-db.mjs.
 // Usage: npm run test:db
-import { PGlite } from "@electric-sql/pglite";
-import { btree_gist } from "@electric-sql/pglite/contrib/btree_gist";
-import { readFileSync } from "node:fs";
+import { createSandboxDb, actAs } from "./lib/sandbox-db.mjs";
 
-const MIGRATIONS = [
-  "0001_init.sql",
-  "0003_slip_verification.sql",
-  "0004_bank_notifications.sql",
-  "0005_admin_bookings.sql",
-  "0006_line.sql",
-  "0007_round_amounts.sql",
-  "0008_half_hour_and_rules.sql",
-  "0009_booking_requests.sql",
-  "0010_manage_admins.sql",
-  "0011_venue_settings.sql",
-  "0012_multi_court_bookings.sql",
-  "0013_self_cancel_deadline.sql",
-  "0014_coach_terms.sql",
-  "0015_shop_contact.sql",
-  "0016_refund_bank_account.sql",
-  "0017_multi_slot_bookings.sql",
-  "0018_play_queue.sql",
-  "0019_coach_lessons.sql",
-  "0020_party_queue.sql",
-  "0021_party_join_flow.sql",
-  "0022_party_six_teams.sql",
-  "0023_party_slot_null_check.sql",
-  "0024_profile_avatar.sql",
-  "0025_party_winner_stays.sql",
-  "0026_sync_party_member_avatars.sql",
-  "0027_party_host_role.sql",
-  "0028_party_singles_winner_stays.sql",
-];
-const db = new PGlite({ extensions: { btree_gist } });
-
-// Minimal stand-ins for what Supabase provides.
-await db.exec(`
-  create role anon; create role authenticated; create role service_role;
-  create schema auth; create schema storage;
-  create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}', raw_app_meta_data jsonb default '{}');
-  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid', true), '')::uuid $$;
-  create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
-  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text);
-  alter table storage.objects enable row level security;
-  create function storage.foldername(name text) returns text[] language sql as $$ select string_to_array(name, '/') $$;
-  create publication supabase_realtime;
-`);
-for (const file of MIGRATIONS) {
-  await db.exec(readFileSync(new URL(`../supabase/migrations/${file}`, import.meta.url), "utf8"));
-}
+const db = await createSandboxDb();
 
 const U1 = "11111111-1111-1111-1111-111111111111";
 const U2 = "22222222-2222-2222-2222-222222222222";
@@ -58,7 +11,7 @@ const ADMIN = "33333333-3333-3333-3333-333333333333";
 await db.exec(`insert into auth.users (id, email) values ('${U1}','a@x.com'),('${U2}','b@x.com'),('${ADMIN}','admin@x.com');
   update profiles set is_admin = true where id = '${ADMIN}';`);
 
-const as = (uid) => db.exec(`select set_config('test.uid', '${uid}', false)`);
+const as = (uid) => actAs(db, uid);
 let failures = 0;
 const check = (name, ok, extra = "") => { console.log(`${ok ? "PASS" : "FAIL"} ${name} ${extra}`); if (!ok) failures++; };
 async function expectError(name, sql, code) {

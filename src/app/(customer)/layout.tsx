@@ -6,7 +6,7 @@ import { getSessionUser } from "@/lib/supabase/server";
 
 // Customer-facing shell. Nothing here points at the shop's admin area.
 export default async function CustomerLayout({ children }: { children: React.ReactNode }) {
-  const { user, displayName } = await getSessionUser();
+  const { user, displayName, avatarUrl } = await getSessionUser();
 
   return (
     <div className="app customer-app">
@@ -20,7 +20,12 @@ export default async function CustomerLayout({ children }: { children: React.Rea
               <strong>{displayName ?? "ผู้เล่น"}</strong>
             </div>
             <Link href="/me" className="avatar" aria-label="บัญชีของฉัน">
-              {(displayName ?? "ผ").trim().charAt(0)}
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="" className="avatar-img" />
+              ) : (
+                (displayName ?? "ผ").trim().charAt(0)
+              )}
             </Link>
           </>
         ) : (

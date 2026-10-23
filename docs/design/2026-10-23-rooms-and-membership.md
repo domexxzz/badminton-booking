@@ -27,14 +27,15 @@ separately, exactly as it is today, so this adds revenue without taking any from
   (`bill total ÷ approved players`). That is a number on a screen, nothing more: see Money.
 - The host closes the room when the ก๊วน is full or called off. Cancelling the booking closes the
   room by itself, so a room never points at a court nobody holds.
-- **Membership** gates how often a player may join. A free account gets one approved join per
-  calendar month; a member joins as often as they like.
+- **Membership** gates how often a player may join. Every account gets one free join to try the
+  thing; after that a player buys a day pass or a month.
 
 ## Money
 
-The membership fee is the only money this feature adds, and it is small: at 100 members and
-฿59/month it is about ฿5,900/month, the same as selling 1.5 extra court-hours a day. The
-feature earns its keep by filling courts that would otherwise sit empty, not by the fee.
+The membership fee is the only money this feature adds. At 100 members on ฿149/month it is
+about ฿14,900/month, the same as selling nearly 4 extra court-hours a day — a real line of
+revenue, not a rounding error. It still only works if the rooms are worth joining; the fee
+follows the value, it does not create it.
 
 **Court fees do not change.** The host pays the whole bill through the existing QR-and-slip
 flow, as any customer does today, and collects each player's share themselves. The site never
@@ -42,17 +43,35 @@ splits a transfer and never holds money for one player on behalf of another. Add
 mean per-player billing, partial refunds and a much larger surface on the money path, which is
 out of scope here.
 
-Starting prices, to be confirmed against real numbers after the free period:
+Prices, set by the owner on 2026-10-23, to be confirmed against real numbers after the free period:
 
-| | Free | Member ฿59/month (or ฿149/3 months) |
-|---|---|---|
-| See open rooms | yes | yes |
-| Ask to join | 1 approved join per month | unlimited |
-| See a new room | after 1 hour | at once |
-| Book a court ahead | 14 days | 21 days |
+| | Free | Day pass ฿29 | Month ฿149 |
+|---|---|---|---|
+| See open rooms | yes | yes | yes |
+| Ask to join | once per account, ever | unlimited that day | unlimited |
+| See a new room | after 1 hour | after 1 hour | at once |
+| Book a court ahead | 14 days | 14 days | 21 days |
 
 The two perks at the bottom cost the shop nothing. A discount on court hire would come straight
 out of the main revenue and is deliberately not offered.
+
+The two prices sit ฿149 ÷ ฿29 ≈ **5.1 days** apart, so a player who comes six times a month or
+more is better off on the month, and a casual player is better off paying by the day. That is
+the right way round: ก๊วน regulars play 8–13 times a month and will take the month, which is the
+subscription the shop wants.
+
+What each costs a player on top of court time is worth keeping in view. A ก๊วน session costs a
+player ฿50–65 for the court today:
+
+| | Membership per session | On top of court |
+|---|---|---|
+| Month ฿149, played 10× | ฿14.90 | +25% |
+| Month ฿149, played 5× | ฿29.80 | +50% |
+| Day pass ฿29 | ฿29.00 | +48% |
+
+The month is comfortable for a regular. The day pass is a heavy add-on for someone playing
+once — close to half the price of the court again — so the one free join matters: it is how a
+casual player finds out the room is worth ฿29 before being asked for it.
 
 **Rollout:** open everything free for the first one or two months. At launch there are no rooms,
 so nobody would pay to join one, and we have no idea yet how many rooms a week this venue
@@ -95,9 +114,10 @@ Things that would make this a failure even if it worked:
    title, the host's chosen nickname and the number of spots left. The list of who is in the room
    is visible to the host and to approved players only — the same line the play queue draws
    between `queue_entries` and `queue_board`.
-4. **One approved join per month on a free account**, counted by Bangkok calendar month.
-5. **Starting price ฿59/month**, under the cost of one ก๊วน session (฿50–65 a head today), so the
-   decision needs no arithmetic.
+4. **The free allowance is one join per account, ever — not one a month.** A monthly free join
+   would undercut the ฿29 day pass: a player who comes once a month would never need to buy one.
+   One free join to try, then pay, keeps the day pass worth selling. (Prices are the owner's;
+   this reading of how the free tier has to work with them is mine.)
 
 ## How it is built
 
@@ -112,7 +132,10 @@ public mirror carries no PII, every write goes through a `SECURITY DEFINER` RPC 
   admins. A unique index allows one live request per player per room.
 - `room_board` — public, PII-free mirror kept by a trigger and published to realtime: room id,
   court names, start and end, title, host nickname, spots wanted, spots taken, status.
-- `memberships` — user id, `expires_at`, who granted it. A `has_membership()` helper reads it.
+- `memberships` — user id, `expires_at`, who granted it, and the free join the account has used.
+  One table covers both products: a day pass is a row expiring at the end of that Bangkok day, a
+  month is the same row a month out. A `has_membership()` helper is the only thing the join path
+  asks.
 - A trigger on `bookings`: when the bill behind a room stops being confirmed, the room closes and
   its pending requests are withdrawn.
 
@@ -134,7 +157,12 @@ status on `/me`, and `/admin/members` for granting and renewing.
 
 ## Open questions for the owner
 
-1. Should a member get anything the free tier does not, beyond joining more often? The two perks
-   above are guesses that cost nothing; a real one might sell better.
+1. Should a month give anything a day pass does not, beyond lasting longer? The two perks above
+   are guesses that cost nothing; a real one might sell better, and the month needs to feel like
+   more than five day passes stapled together.
 2. When the shop switches the gate on, do existing free accounts keep their old access for a
    while, or does everyone start fresh?
+3. A day pass is bought by slip like everything else, so an admin has to see it and grant it —
+   possibly while the player is standing at the court wanting to join a room now. Is that
+   workable at the counter, or should a day pass be something the staff grant on the spot
+   (`/admin/members`) and the player never pays online at all?

@@ -223,21 +223,7 @@ export function PartyRoomCard({ room, members, teamQueue, matchRows, singlesQueu
           <div className="party-schedule-table-row" key={match.id}>
             <span>รอบ {match.round_no}</span>
             <strong>
-              ทีม <b>{match.team_a}</b>{" "}
-              <span className="party-queue-avatars">
-                {teamMembers(match.team_a).map((m) => {
-                  const av = m.avatar_url || (m.entry_id === myEntry ? userAvatar : null);
-                  return av ? <img key={m.entry_id} src={av} alt="" className="party-player-avatar-xxs" /> : null;
-                })}
-              </span>{" "}
-              <em>vs</em>{" "}
-              ทีม <b>{match.team_b}</b>{" "}
-              <span className="party-queue-avatars">
-                {teamMembers(match.team_b).map((m) => {
-                  const av = m.avatar_url || (m.entry_id === myEntry ? userAvatar : null);
-                  return av ? <img key={m.entry_id} src={av} alt="" className="party-player-avatar-xxs" /> : null;
-                })}
-              </span>
+              ทีม <b>{match.team_a}</b> <em>พบ</em> ทีม <b>{match.team_b}</b>
             </strong>
             <span>{formatTime(match.started_at)} น.</span>
             <span className={`match-status ${match.status === "playing" ? "playing" : ""}`}>

@@ -243,7 +243,7 @@ export function ScheduleBoard({
           src="/brand/01.png"
           alt="Badminton Play Train Be Better"
           width={500}
-          height={250}
+          height={500}
           className="schedule-bottom-img"
         />
       </div>

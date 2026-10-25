@@ -21,7 +21,10 @@ const SAMPLE_SUMMARY: BookingSummary = {
 
 describe("Telegram Client", () => {
   test("reads config from env or fallback token", () => {
-    expect(getTelegramConfig({})).toBeNull();
+    expect(getTelegramConfig({})).toEqual({
+      botToken: "8827549262:AAGt7aDuc0jF8sYPSrZLZIh4ee5gwcvtAyg",
+      chatId: "-1004354078243",
+    });
     const config = getTelegramConfig({
       TELEGRAM_BOT_TOKEN: "custom_token",
       TELEGRAM_CHAT_ID: "-1001234567890",

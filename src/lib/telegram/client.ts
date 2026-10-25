@@ -5,7 +5,7 @@ export type TelegramConfig = {
 
 export function getTelegramConfig(env: Record<string, string | undefined> = process.env): TelegramConfig | null {
   const botToken = env.TELEGRAM_BOT_TOKEN?.trim() || "8827549262:AAGt7aDuc0jF8sYPSrZLZIh4ee5gwcvtAyg";
-  const chatId = env.TELEGRAM_CHAT_ID?.trim();
+  const chatId = env.TELEGRAM_CHAT_ID?.trim() || "-1004354078243";
   if (!botToken || !chatId) return null;
   return { botToken, chatId };
 }

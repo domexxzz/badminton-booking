@@ -2,6 +2,7 @@
 // The database itself (and the migration list) comes from scripts/lib/sandbox-db.mjs.
 // Usage: npm run test:db
 import { createSandboxDb, actAs } from "./lib/sandbox-db.mjs";
+import { GUILD_COLORS, GUILD_EMBLEMS, GUILD_LEVEL_GRID } from "./lib/guild-rules.mjs";
 
 const db = await createSandboxDb();
 
@@ -1000,6 +1001,293 @@ check("the win and the loss are both on the scoreboard",
   (await db.query(`select losses, played from party_player_stats where party_id='${singles.party_id}' and entry_id='${singlesLoser}'`)).rows[0]?.losses === 1);
 check("the winner gained exactly what the loser lost",
   (await db.query(`select sum(rating_delta)::int total from party_player_stats where party_id='${singles.party_id}'`)).rows[0]?.total === 0);
+
+// ---- Guilds (0033) ----
+{
+  const one = async (sql) => (await db.query(sql)).rows[0];
+  const G_LEAD = "a0000000-0000-0000-0000-0000000000a1";
+  const G_OFF = "a0000000-0000-0000-0000-0000000000a2";
+  const G_MEM = "a0000000-0000-0000-0000-0000000000a3";
+  const G_HIDE = "a0000000-0000-0000-0000-0000000000a4";
+  const G_OUT = "a0000000-0000-0000-0000-0000000000a5";
+  const G_LATE = "a0000000-0000-0000-0000-0000000000a6";
+  await db.exec(`insert into auth.users (id, email, raw_user_meta_data) values
+    ('${G_LEAD}', 'g-lead@x.com', '{"display_name":"หัวกิลด์"}'),
+    ('${G_OFF}', 'g-off@x.com', '{"display_name":"รองกิลด์"}'),
+    ('${G_MEM}', 'g-mem@x.com', '{"display_name":"ลูกกิลด์"}'),
+    ('${G_HIDE}', 'g-hide@x.com', '{"display_name":"ไม่ออกชื่อ"}'),
+    ('${G_OUT}', 'g-out@x.com', '{"display_name":"คนนอก"}'),
+    ('${G_LATE}', 'g-late@x.com', '{"display_name":"มาทีหลัง"}')`);
+
+  const style = await one(`select emblems, colors from guild_style_options()`);
+  check("guild emblems and colours match scripts/lib/guild-rules.mjs",
+    JSON.stringify(style.emblems) === JSON.stringify(GUILD_EMBLEMS) && JSON.stringify(style.colors) === JSON.stringify(GUILD_COLORS));
+  const levels = await Promise.all(GUILD_LEVEL_GRID.map(async ([xp]) => (await one(`select guild_level(${xp}) l`)).l));
+  check("guild_level matches the shared level grid", GUILD_LEVEL_GRID.every(([, level], i) => levels[i] === level), JSON.stringify(levels));
+  check("anonymous visitors cannot create a guild",
+    !(await one(`select has_function_privilege('anon', 'public.create_guild(text,text,text,text,text,text)', 'execute') p`)).p);
+  check("players cannot hand out XP themselves",
+    !(await one(`select has_function_privilege('authenticated', 'public.award_guild_match_xp(uuid,uuid,uuid[],uuid[])', 'execute') p`)).p);
+
+  const create = (name, tag, policy = "approval", emblem = "'shuttle'") =>
+    `select create_guild('${name}', '${tag}', ${emblem}, '#2563eb', 'ก๊วนวันศุกร์', '${policy}') id`;
+  await as(G_LEAD);
+  await expectError("an emblem outside the list is refused", create("กิลด์ทดสอบ", "TT", "approval", "'unicorn'"), "INVALID_GUILD");
+  await expectError("a missing emblem is refused, not let through as null", create("กิลด์ทดสอบ", "TT", "approval", "null"), "INVALID_GUILD");
+  await expectError("a tag with symbols is refused", create("กิลด์ทดสอบ", "S!", "approval"), "INVALID_GUILD");
+  const sk = (await one(create("Shuttle Kings", "sk"))).id;
+  check("a guild is created with its leader and shows on the board",
+    (await one(`select member_count, tag, level from guild_board where guild_id='${sk}'`))?.member_count === 1 &&
+    (await one(`select tag from guild_board where guild_id='${sk}'`)).tag === "SK" &&
+    (await one(`select role from guild_member_board where guild_id='${sk}'`)).role === "leader");
+  const leadCard = await one(`select * from my_guild()`);
+  check("the leader sees the join code on their own card", leadCard.role === "leader" && /^[2-9B-DF-HJ-NP-TV-Z]{8}$/.test(leadCard.join_code));
+  await expectError("one player, one guild", create("Second Guild", "SG"), "ALREADY_IN_GUILD");
+
+  await as(G_OUT);
+  await expectError("guild names are unique whatever the case", create("shuttle kings", "XX"), "GUILD_NAME_TAKEN");
+  await expectError("guild tags are unique", create("Other Name", "SK"), "GUILD_TAG_TAKEN");
+  const owls = (await one(create("Night Owls", "NO", "open"))).id;
+
+  await as(G_MEM);
+  await expectError("an approval guild cannot be walked into", `select join_guild('${sk}')`, "GUILD_NEEDS_APPROVAL");
+  const request = (await one(`select request_join_guild('${sk}') id`)).id;
+  await expectError("one waiting request at a time", `select request_join_guild('${sk}')`, "GUILD_REQUEST_PENDING");
+  await expectError("an open guild takes no requests (just join)", `select request_join_guild('${owls}')`, "GUILD_NOT_FOUND");
+  await expectError("a player cannot approve themselves", `select decide_guild_request('${request}', true)`, "FORBIDDEN");
+  await as(G_LEAD);
+  const inbox = (await db.query(`select * from guild_requests('${sk}')`)).rows;
+  check("the leader sees who asked to join", inbox.length === 1 && inbox[0].name === "ลูกกิลด์");
+  await db.query(`select decide_guild_request('${request}', true)`);
+  check("an approved request makes a member",
+    (await one(`select count(*)::int n from guild_member_board where guild_id='${sk}'`)).n === 2);
+
+  await as(G_OFF);
+  await expectError("a wrong code does not open the door", `select join_guild_by_code('ZZZZZZ')`, "WRONG_GUILD_CODE");
+  await db.query(`select join_guild_by_code('${leadCard.join_code.toLowerCase()}')`);
+  check("the guild code works on its own, in any case",
+    (await one(`select role from my_guild()`)).role === "member" && (await one(`select join_code from my_guild()`)).join_code === null);
+  const offEntry = (await one(`select entry_id from my_guild()`)).entry_id;
+  await expectError("only the leader appoints officers", `select set_guild_officer('${offEntry}', true)`, "FORBIDDEN");
+  await as(G_LEAD);
+  await db.query(`select set_guild_officer('${offEntry}', true)`);
+  const leadEntry = leadCard.entry_id;
+  await as(G_OFF);
+  await expectError("an officer cannot remove the leader", `select kick_guild_member('${leadEntry}')`, "FORBIDDEN");
+  await expectError("an officer cannot hand over the guild", `select transfer_guild_leader('${offEntry}')`, "FORBIDDEN");
+
+  await as(G_HIDE);
+  await db.query(`select set_leaderboard_visibility(false)`);
+  await db.query(`select join_guild_by_code('${leadCard.join_code}')`);
+  const hidden = await one(`select name, player_key from guild_member_board b join guild_members m on m.id = b.entry_id where m.user_id = '${G_HIDE}'`);
+  check("someone off the ladder is listed without a name or handle", hidden.name === null && hidden.player_key === null);
+  check("the public guild boards never carry an account id",
+    (await one(`select count(*)::int n from guild_member_board b join auth.users u on u.id = b.player_key or u.id = b.entry_id`)).n === 0 &&
+    (await one(`select count(*)::int n from guild_board b join auth.users u on u.id = b.guild_id`)).n === 0);
+  await as(G_MEM);
+  await expectError("a member of one guild cannot join another", `select join_guild('${owls}')`, "ALREADY_IN_GUILD");
+
+  await as(G_LEAD);
+  await expectError("the leader hands over before leaving", `select leave_guild()`, "LEADER_MUST_TRANSFER");
+  await db.query(`select transfer_guild_leader('${offEntry}')`);
+  check("handing over keeps exactly one leader",
+    (await one(`select count(*)::int n from guild_members where guild_id='${sk}' and status='active' and role='leader'`)).n === 1 &&
+    (await one(`select role from my_guild()`)).role === "officer");
+
+  // Leaving starts a short cooldown, so nobody hops guilds to pad a season.
+  await as(G_LATE);
+  await db.query(`select join_guild('${owls}')`);
+  await db.query(`select leave_guild()`);
+  await expectError("a player who just left waits before joining again", `select join_guild('${owls}')`, "GUILD_COOLDOWN");
+  check("their card says until when", (await one(`select cooldown_until from my_guild()`)).cooldown_until !== null);
+  await db.exec(`update guild_members set joined_at = joined_at - interval '5 days', left_at = now() - interval '4 days' where user_id = '${G_LATE}'`);
+
+  // ---- Guild XP from a real ก๊วน night ----
+  await as(ADMIN);
+  await db.query(`select set_party_host('${G_OFF}', true)`);
+  await as(G_OFF);
+  const { rows: [{ t: guildNight }] } = await db.query(`select ((now() at time zone 'Asia/Bangkok')::date + 12 + time '18:00') at time zone 'Asia/Bangkok' as t`);
+  const night = await one(`select * from create_party_booking(3::smallint, '${new Date(guildNight).toISOString()}', 2, 'doubles', 'คืนกิลด์', 'รองกิลด์')`);
+  await db.query(`select tag_party_with_guild('${night.party_id}', true)`);
+  await db.exec(`update bookings set status = 'confirmed' where id = '${night.booking_id}'`);
+  check("a tagged room shows on its guild page", (await db.query(`select * from guild_upcoming_parties('${sk}')`)).rows.length === 1);
+  await db.exec(`update party_rooms set visibility = 'private' where id = '${night.party_id}'`);
+  check("a private room is not advertised on the guild page", (await db.query(`select * from guild_upcoming_parties('${sk}')`)).rows.length === 0);
+  await db.exec(`update party_rooms set visibility = 'public' where id = '${night.party_id}'`);
+  await as(G_OUT);
+  await expectError("only the host can tag a room", `select tag_party_with_guild('${night.party_id}', true)`, "PARTY_NOT_FOUND");
+  await as(G_LEAD);
+  await db.query(`select join_party('${night.party_id}', 'หัวกิลด์', 2::smallint, 'A'::party_team)`);
+  await as(G_MEM);
+  await db.query(`select join_party('${night.party_id}', 'ลูกกิลด์', 3::smallint, 'B'::party_team)`);
+  await as(G_HIDE);
+  await db.query(`select join_party('${night.party_id}', 'ไม่ออกชื่อ', 4::smallint, 'B'::party_team)`);
+  await as(G_OFF);
+  await db.query(`select advance_party_match('${night.party_id}', null)`);
+  await db.query(`select advance_party_match('${night.party_id}', 'A'::party_team)`);
+  const firstGame = (await one(`select total_xp from guild_board where guild_id='${sk}'`)).total_xp;
+  // 4 players × 10, the two winners × 5 (a ranked room), and +50 for four of one guild together.
+  check("one doubles game gives each player XP once, winners a bonus, and a rally night", firstGame === 100, `got ${firstGame}`);
+  await db.query(`select advance_party_match('${night.party_id}', 'B'::party_team)`);
+  check("the rally bonus is given once per room",
+    (await one(`select count(*)::int n from guild_xp_events where guild_id='${sk}' and source='rally'`)).n === 1 &&
+    (await one(`select total_xp from guild_board where guild_id='${sk}'`)).total_xp === 150);
+  check("a first rally earns its badge", (await one(`select count(*)::int n from guild_badges where guild_id='${sk}' and code='first_rally'`)).n === 1);
+
+  const leadInNight = (await one(`select id from party_members where party_id='${night.party_id}' and user_id='${G_LEAD}'`)).id;
+  const firstMatch = (await one(`select id from party_match_board where party_id='${night.party_id}' and round_no = 1`)).id;
+  const before = (await one(`select total_xp from guild_board where guild_id='${sk}'`)).total_xp;
+  await db.query(`select award_guild_match_xp('${night.party_id}', '${firstMatch}', array['${leadInNight}']::uuid[], array['${leadInNight}']::uuid[])`);
+  check("the same game never pays twice", (await one(`select total_xp from guild_board where guild_id='${sk}'`)).total_xp === before);
+  for (let i = 0; i < 20; i++) {
+    await db.query(`select award_guild_match_xp('${night.party_id}', gen_random_uuid(), array['${leadInNight}']::uuid[], array['${leadInNight}']::uuid[])`);
+  }
+  const leadToday = (await one(`select sum(xp)::int n from guild_xp_events where user_id='${G_LEAD}' and source in ('match','win')`)).n;
+  check("game XP stops at 150 a day per player", leadToday === 150, `got ${leadToday}`);
+  const memInNight = (await one(`select id from party_members where party_id='${night.party_id}' and user_id='${G_MEM}'`)).id;
+  await db.exec(`update party_rooms set scoring = 'casual' where id = '${night.party_id}'`);
+  const casualMatch = (await one(`select gen_random_uuid() id`)).id;
+  await db.query(`select award_guild_match_xp('${night.party_id}', '${casualMatch}', array['${memInNight}']::uuid[], array['${memInNight}']::uuid[])`);
+  check("a casual room gives game XP but no win bonus",
+    (await one(`select count(*)::int n from guild_xp_events where source_id='${casualMatch}' and source='match'`)).n === 1 &&
+    (await one(`select count(*)::int n from guild_xp_events where source_id='${casualMatch}' and source='win'`)).n === 0);
+  await db.exec(`update party_rooms set scoring = 'ranked' where id = '${night.party_id}'`);
+
+  // ---- Court time ----
+  const courtXp = async (user) => (await one(`select coalesce(sum(xp), 0)::int n from guild_xp_events where user_id='${user}' and source in ('court_hours','reversal')`)).n;
+  const pastBooking = async (user, court, hoursAgo, extra = "") => {
+    await as(user);
+    const { rows: [{ t: soon }] } = await db.query(`select ((now() at time zone 'Asia/Bangkok')::date + 5 + time '09:00') at time zone 'Asia/Bangkok' as t`);
+    const b = await one(`select * from create_booking(${court}::smallint, '${new Date(Date.parse(soon) + hoursAgo * 3600e3).toISOString()}', 1)`);
+    await db.exec(`update bookings set status = 'confirmed', hold_expires_at = null,
+      starts_at = date_trunc('hour', now()) - interval '${hoursAgo + 1} hours',
+      ends_at = date_trunc('hour', now()) - interval '${hoursAgo} hours' ${extra} where id = '${b.id}'`);
+    return b.id;
+  };
+  // Court time counts for the guild the player was in when the booking ended.
+  await db.exec(`update guild_members set joined_at = now() - interval '1 day' where user_id = '${G_MEM}' and status = 'active'`);
+  const played = await pastBooking(G_MEM, 1, 2);
+  const walkIn = await pastBooking(G_MEM, 2, 2, ", channel = 'phone', customer_name = 'ลูกค้าโทรมา'");
+  const unpaid = await pastBooking(G_MEM, 3, 3, ", pay_later = true, paid_at = null");
+  await db.query(`select award_guild_court_xp()`);
+  check("an hour played online gives 20 XP; phone bookings and unpaid pay-later do not", (await courtXp(G_MEM)) === 20, `got ${await courtXp(G_MEM)}`);
+  await db.query(`select award_guild_court_xp()`);
+  check("court time is counted once", (await courtXp(G_MEM)) === 20);
+  await db.exec(`update bookings set paid_at = now() where id = '${unpaid}'`);
+  await db.query(`select award_guild_court_xp()`);
+  check("pay-later court time counts once it is paid", (await courtXp(G_MEM)) === 40);
+  await db.exec(`update bookings set status = 'cancelled' where id = '${played}'`);
+  await db.query(`select award_guild_court_xp()`);
+  check("a booking cancelled afterwards takes its XP back", (await courtXp(G_MEM)) === 20);
+  const beforeJoin = await pastBooking(G_OUT, 4, 30);
+  await db.exec(`update guild_members set joined_at = now() - interval '1 hour' where user_id = '${G_OUT}' and status = 'active'`);
+  await db.query(`select award_guild_court_xp()`);
+  check("court time from before joining is not credited to the guild", (await courtXp(G_OUT)) === 0);
+  void walkIn; void beforeJoin;
+
+  await as(G_MEM);
+  const recent = (await db.query(`select * from guild_recent_xp('${sk}', 50)`)).rows;
+  check("recent XP names members, and someone off the ladder only as a member",
+    recent.some((r) => r.member_name === "ลูกกิลด์") && recent.some((r) => r.member_name === "สมาชิก") &&
+    recent.some((r) => r.source === "rally" && r.member_name === null));
+
+  // ---- Seasons ----
+  await db.exec(`update guild_xp_events set created_at = created_at - interval '40 days'`);
+  const closed = (await one(`select close_guild_season() n`)).n;
+  const result = await one(`select rank, xp from guild_season_results where guild_id='${sk}'`);
+  check("closing the season ranks the guilds and starts season XP again",
+    closed >= 1 && result?.rank === 1 && (await one(`select season_xp from guild_board where guild_id='${sk}'`)).season_xp === 0);
+  check("the season's winner keeps a badge",
+    (await one(`select count(*)::int n from guild_badges where guild_id='${sk}' and code like 'season_1_%'`)).n === 1);
+  check("closing again changes nothing", (await one(`select close_guild_season() n`)).n === 0);
+
+  // ---- Profile changes follow ----
+  await db.exec(`update profiles set display_name = 'ลูกกิลด์ใหม่' where id = '${G_MEM}'`);
+  check("a new display name shows in the member list",
+    (await one(`select count(*)::int n from guild_member_board where name = 'ลูกกิลด์ใหม่'`)).n === 1);
+
+  // ---- Reports, hiding and disbanding ----
+  await as(G_OUT);
+  await db.query(`select report_guild('${sk}', 'ชื่อไม่เหมาะสม')`);
+  await expectError("players cannot moderate guilds", `select moderate_guild('${sk}', 'hide')`, "FORBIDDEN");
+  await as(ADMIN);
+  check("the report reaches the admin queue", (await db.query(`select * from open_guild_reports()`)).rows.length === 1);
+  await db.query(`select moderate_guild('${sk}', 'hide', 'รอเปลี่ยนชื่อ')`);
+  check("a hidden guild leaves every board at once",
+    (await one(`select count(*)::int n from guild_board where guild_id='${sk}'`)).n === 0 &&
+    (await one(`select count(*)::int n from guild_member_board where guild_id='${sk}'`)).n === 0 &&
+    (await db.query(`select * from open_guild_reports()`)).rows.length === 0);
+  await as(G_LATE);
+  await expectError("a hidden guild cannot be joined", `select join_guild_by_code('${leadCard.join_code}')`, "WRONG_GUILD_CODE");
+  await as(ADMIN);
+  await db.query(`select admin_rename_guild('${sk}', 'Shuttle Kingdom', 'SKD')`);
+  await db.query(`select moderate_guild('${sk}', 'restore')`);
+  check("restoring brings the guild and its members back, under the new name",
+    (await one(`select name, member_count from guild_board where guild_id='${sk}'`))?.member_count === 4 &&
+    (await one(`select name from guild_board where guild_id='${sk}'`)).name === "Shuttle Kingdom");
+
+  await as(G_OUT);
+  await db.query(`select disband_guild('${owls}')`);
+  check("a disbanded guild is gone from the board and its members are free",
+    (await one(`select count(*)::int n from guild_board where guild_id='${owls}'`)).n === 0 &&
+    (await one(`select guild_id from my_guild()`)).guild_id === null &&
+    (await one(`select cooldown_until from my_guild()`)).cooldown_until === null);
+  await as(G_LATE);
+  const reuse = (await one(create("Night Owls", "NO", "open"))).id;
+  check("a disbanded guild's name and tag can be used again", Boolean(reuse));
+
+  // ---- Leaders who leave or vanish ----
+  await as(ADMIN);
+  await db.query(`select moderate_guild('${sk}', 'hide')`);
+  await as(G_OFF);
+  await expectError("a leader cannot close a guild an admin has hidden", `select disband_guild('${sk}')`, "GUILD_NOT_FOUND");
+  await as(ADMIN);
+  await db.query(`select moderate_guild('${sk}', 'restore')`);
+  await expectError("a moderation call without an action is refused", `select moderate_guild('${sk}', null)`, "INVALID_REPORT");
+
+  const SOLO = "a0000000-0000-0000-0000-0000000000a7";
+  const ASKER = "a0000000-0000-0000-0000-0000000000a8";
+  await db.exec(`insert into auth.users (id, email) values ('${SOLO}', 'solo@x.com'), ('${ASKER}', 'asker@x.com')`);
+  await as(SOLO);
+  const solo = (await one(create("Solo Club", "SOLO"))).id;
+  await as(ASKER);
+  await db.query(`select request_join_guild('${solo}')`);
+  await as(SOLO);
+  await db.query(`select leave_guild()`);
+  await as(ASKER);
+  check("a lone leader leaving closes the guild and settles waiting requests",
+    (await one(`select requested_guild_id from my_guild()`)).requested_guild_id === null &&
+    (await one(`select status from guild_join_requests where guild_id = '${solo}'`)).status === "rejected");
+
+  // Deleting accounts: two teammates' XP rows must not collide, and the guild keeps a leader.
+  const membersBefore = (await one(`select member_count from guild_board where guild_id='${sk}'`)).member_count;
+  await db.exec(`delete from auth.users where id in ('${G_MEM}', '${G_HIDE}')`);
+  check("deleting two teammates' accounts works and keeps the guild's XP",
+    (await one(`select member_count from guild_board where guild_id='${sk}'`)).member_count === membersBefore - 2 &&
+    (await one(`select count(*)::int n from guild_xp_events where guild_id='${sk}' and user_id is null and source = 'match'`)).n > 0);
+  await db.exec(`delete from auth.users where id = '${G_OFF}'`);
+  check("when a leader's account is deleted, the longest-serving officer takes over",
+    (await one(`select m.user_id from guild_members m where m.guild_id='${sk}' and m.status='active' and m.role='leader'`))?.user_id === G_LEAD);
+
+  // ---- The switch and the cap ----
+  await as(G_OUT);
+  await expectError("players cannot close guild creation", `select set_guild_creation(false)`, "FORBIDDEN");
+  await as(ADMIN);
+  await db.query(`select set_guild_creation(false)`);
+  await as(G_OUT);
+  await expectError("with creation closed nobody starts a guild", create("Closed Shop", "CS"), "GUILD_CREATION_CLOSED");
+  await as(ADMIN);
+  await db.query(`select set_guild_creation(true)`);
+
+  const fillers = Array.from({ length: 30 }, (_, i) => `a1000000-0000-0000-0000-${String(i).padStart(12, "0")}`);
+  await db.exec(`insert into auth.users (id, email) values ${fillers.map((id, i) => `('${id}', 'fill${i}@x.com')`).join(",")}`);
+  for (const id of fillers.slice(0, 29)) {
+    await as(id);
+    await db.query(`select join_guild('${reuse}')`);
+  }
+  await as(fillers[29]);
+  await expectError("a guild holds 30 members", `select join_guild('${reuse}')`, "GUILD_FULL");
+}
 
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);

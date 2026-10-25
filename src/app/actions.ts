@@ -5,7 +5,12 @@ import { redirect } from "next/navigation";
 import { BOOKING_RULES, SLIP_MAX_BYTES } from "@/lib/config";
 import { slotStart } from "@/lib/slots";
 import { friendlyError } from "@/lib/errors";
-import { notifyAfterSlip, notifyNewBooking, notifyPaymentReviewed } from "@/lib/line/notify-shop";
+import {
+  notifyAfterSlip,
+  notifyCancelledBooking,
+  notifyNewBooking,
+  notifyPaymentReviewed,
+} from "@/lib/line/notify-shop";
 import { safeNext } from "@/lib/safe-next";
 import { planAdminSlipUpload } from "@/lib/admin-slip";
 import { isSlipVerificationEnabled, verifyLatestSlip } from "@/lib/slip/verify-booking";
@@ -219,6 +224,7 @@ export async function cancelBooking(bookingId: string): Promise<ActionResult> {
   revalidatePath("/me");
   revalidatePath(`/bookings/${bookingId}`);
   revalidatePath("/admin");
+  await notifyCancelledBooking(bookingId);
   return { ok: true, data: null };
 }
 

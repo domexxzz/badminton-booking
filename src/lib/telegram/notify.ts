@@ -3,7 +3,14 @@ import { formatTime } from "@/lib/format";
 import type { BookingSummary } from "@/lib/line/messages";
 import { getServiceClient } from "@/lib/supabase/service";
 import { getTelegramConfig, sendTelegramMessage, sendTelegramPhoto, type TelegramSendOptions } from "./client";
-import { formatTelegramNewBooking, formatTelegramSlipReport, type TelegramBookingSummary } from "./messages";
+import {
+  formatTelegramCancelledBooking,
+  formatTelegramCancelRequest,
+  formatTelegramNewBooking,
+  formatTelegramRescheduleRequest,
+  formatTelegramSlipReport,
+  type TelegramBookingSummary,
+} from "./messages";
 
 async function loadBookingSummary(bookingId: string): Promise<TelegramBookingSummary | null> {
   const supabase = getServiceClient();
@@ -170,3 +177,98 @@ export async function notifyTelegramAfterSlip(
     console.error("Telegram slip report notification failed:", error);
   }
 }
+
+/** Pushes a booking request (cancel/refund or reschedule) notification to Telegram. Never throws. */
+export async function notifyTelegramBookingRequest(
+  bookingId: string,
+  kind: "reschedule" | "cancel",
+): Promise<void> {
+  try {
+    const supabase = getServiceClient();
+    if (!supabase) return;
+
+    const summary = await loadBookingSummary(bookingId);
+    if (!summary) return;
+
+    const config = getTelegramConfig();
+    const sendOptions: TelegramSendOptions = {
+      parseMode: "HTML",
+      chatId: summary.party ? config?.partyChatId : config?.chatId,
+      messageThreadId: summary.party ? config?.partyThreadId : undefined,
+    };
+
+    const { data: req } = await supabase
+      .from("booking_requests")
+      .select("refund_amount, reason, refund_account, refund_qr_path, new_court_id, new_starts_at, new_ends_at, courts:new_court_id(name)")
+      .eq("booking_id", bookingId)
+      .eq("kind", kind)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (kind === "cancel") {
+      const text = formatTelegramCancelRequest({
+        summary,
+        bookingId,
+        refundAmount: req?.refund_amount != null ? Number(req.refund_amount) : summary.amount,
+        reason: req?.reason,
+        refundAccount: req?.refund_account,
+      });
+
+      // If customer attached a refund QR image, send it as photo with caption
+      if (req?.refund_qr_path) {
+        try {
+          const { data: fileData, error: downloadError } = await supabase.storage
+            .from("refunds")
+            .download(req.refund_qr_path);
+
+          if (!downloadError && fileData) {
+            const sent = await sendTelegramPhoto(fileData, text, sendOptions);
+            if (sent) return;
+          }
+        } catch (qrErr) {
+          console.error("Failed to send refund QR photo to Telegram, falling back to text:", qrErr);
+        }
+      }
+
+      await sendTelegramMessage(text, sendOptions);
+      return;
+    }
+
+    if (kind === "reschedule") {
+      const newCourtName = (req?.courts as { name?: string } | null)?.name ?? null;
+      const text = formatTelegramRescheduleRequest({
+        summary,
+        bookingId,
+        newCourtName,
+        newStartsAt: req?.new_starts_at,
+        newEndsAt: req?.new_ends_at,
+        reason: req?.reason,
+      });
+      await sendTelegramMessage(text, sendOptions);
+    }
+  } catch (error) {
+    console.error("Telegram booking request notification failed:", error);
+  }
+}
+
+/** Pushes a direct booking cancellation alert to Telegram. Never throws. */
+export async function notifyTelegramCancelledBooking(bookingId: string): Promise<void> {
+  try {
+    const summary = await loadBookingSummary(bookingId);
+    if (!summary) return;
+
+    const config = getTelegramConfig();
+    const sendOptions: TelegramSendOptions = {
+      parseMode: "HTML",
+      chatId: summary.party ? config?.partyChatId : config?.chatId,
+      messageThreadId: summary.party ? config?.partyThreadId : undefined,
+    };
+
+    const text = formatTelegramCancelledBooking(summary, bookingId);
+    await sendTelegramMessage(text, sendOptions);
+  } catch (error) {
+    console.error("Telegram cancelled booking notification failed:", error);
+  }
+}
+

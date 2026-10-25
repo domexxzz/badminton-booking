@@ -15,7 +15,12 @@ import {
   type ShopEvent,
 } from "./messages";
 import { multicastText } from "./messaging";
-import { notifyTelegramAfterSlip, notifyTelegramNewBooking } from "@/lib/telegram/notify";
+import {
+  notifyTelegramAfterSlip,
+  notifyTelegramBookingRequest,
+  notifyTelegramCancelledBooking,
+  notifyTelegramNewBooking,
+} from "@/lib/telegram/notify";
 
 const DEFAULT_EVENTS = "confirmed,needs_review,unmatched,request,new_booking";
 
@@ -197,11 +202,29 @@ export async function notifyAfterTransfer(
 
 /** A customer asked to move or cancel a paid booking. */
 export async function notifyBookingRequest(bookingId: string, kind: "reschedule" | "cancel"): Promise<void> {
-  if (!enabled("request")) return;
-  const summary = await loadBookingSummary(bookingId);
-  if (!summary) return;
-  const title = kind === "cancel" ? "❌ ลูกค้ายกเลิกการจองแล้ว · รอโอนคืน" : "🙋 ขอเลื่อนการจอง";
-  await notifyAdmins(`${title}\n${summary.court} · ${sanitizeName(summary.customer)}\nดูที่หน้าแอดมิน หัวข้อ "คำขอ"`);
+  await Promise.allSettled([
+    (async () => {
+      if (!enabled("request")) return;
+      const summary = await loadBookingSummary(bookingId);
+      if (!summary) return;
+      const title = kind === "cancel" ? "❌ ลูกค้ายกเลิกการจองแล้ว · รอโอนคืน" : "🙋 ขอเลื่อนการจอง";
+      await notifyAdmins(`${title}\n${summary.court} · ${sanitizeName(summary.customer)}\nดูที่หน้าแอดมิน หัวข้อ "คำขอ"`);
+    })(),
+    notifyTelegramBookingRequest(bookingId, kind),
+  ]);
+}
+
+/** When a customer directly cancels an unpaid/pending booking. */
+export async function notifyCancelledBooking(bookingId: string): Promise<void> {
+  await Promise.allSettled([
+    (async () => {
+      if (!enabled("request")) return;
+      const summary = await loadBookingSummary(bookingId);
+      if (!summary) return;
+      await notifyAdmins(`🚫 ลูกค้ายกเลิกการจองคิว\n${summary.court} · ${sanitizeName(summary.customer)}\nปลดล็อกสนามแล้ว`);
+    })(),
+    notifyTelegramCancelledBooking(bookingId),
+  ]);
 }
 
 /** After an admin resolves a reschedule or cancel request. */

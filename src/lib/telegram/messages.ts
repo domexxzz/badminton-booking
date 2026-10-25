@@ -132,3 +132,138 @@ export function formatTelegramSlipReport(params: TelegramSlipReportParams): stri
 
   return text;
 }
+
+export type TelegramCancelRequestParams = {
+  summary: TelegramBookingSummary;
+  bookingId: string;
+  refundAmount?: number | null;
+  reason?: string | null;
+  refundAccount?: string | null;
+};
+
+/** Formats a cancel & refund request for Telegram admins. */
+export function formatTelegramCancelRequest(params: TelegramCancelRequestParams): string {
+  const { summary, refundAmount, reason, refundAccount } = params;
+  const customerName = escapeHtml(sanitizeName(summary.customer));
+  const courtName = escapeHtml(summary.court);
+  const amountToRefund = refundAmount != null ? refundAmount : summary.amount;
+
+  const multiBadge = summary.multiCourtCount && summary.multiCourtCount > 1
+    ? ` <i>(เหมา ${summary.multiCourtCount} สนาม)</i>`
+    : "";
+
+  let text = "";
+  if (summary.party) {
+    text +=
+      `🏸 <b>มีคำขอยกเลิกห้องก๊วน/ทีม (รอโอนเงินคืน)</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👥 <b>ชื่อก๊วน:</b> ${escapeHtml(summary.party.title)} (โดย ${escapeHtml(summary.party.hostName)})\n`;
+  } else {
+    text +=
+      `❌ <b>มีคำขอยกเลิกการจอง (รอโอนเงินคืน)</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 <b>ผู้จอง:</b> ${customerName}\n`;
+  }
+
+  text +=
+    `📍 <b>สนาม:</b> ${courtName}${multiBadge}\n` +
+    `⏰ <b>รอบเวลาที่จอง:</b> ${formatSlot(summary.startsAt, summary.endsAt)}\n` +
+    `💸 <b>ยอดเงินที่ต้องโอนคืน:</b> ${formatBaht(amountToRefund)}\n`;
+
+  if (reason) {
+    text += `📝 <b>เหตุผล:</b> ${escapeHtml(reason)}\n`;
+  }
+
+  if (refundAccount) {
+    text += `🏦 <b>บัญชีรับเงินคืน:</b> ${escapeHtml(refundAccount)}\n`;
+  }
+
+  text +=
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `🔗 <a href="${siteUrl()}/admin/requests">เปิดดูคำขอและจัดการโอนเงินคืนที่หลังร้าน</a>`;
+
+  return text;
+}
+
+export type TelegramRescheduleRequestParams = {
+  summary: TelegramBookingSummary;
+  bookingId: string;
+  newCourtName?: string | null;
+  newStartsAt?: string | null;
+  newEndsAt?: string | null;
+  reason?: string | null;
+};
+
+/** Formats a reschedule request alert for Telegram admins. */
+export function formatTelegramRescheduleRequest(params: TelegramRescheduleRequestParams): string {
+  const { summary, newCourtName, newStartsAt, newEndsAt, reason } = params;
+  const customerName = escapeHtml(sanitizeName(summary.customer));
+  const courtName = escapeHtml(summary.court);
+
+  let text = "";
+  if (summary.party) {
+    text +=
+      `🏸 <b>มีคำขอเลื่อนเวลาก๊วน/ทีม</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👥 <b>ชื่อก๊วน:</b> ${escapeHtml(summary.party.title)} (โดย ${escapeHtml(summary.party.hostName)})\n`;
+  } else {
+    text +=
+      `🔄 <b>มีคำขอเลื่อนเวลาการจอง</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 <b>ผู้จอง:</b> ${customerName}\n`;
+  }
+
+  text +=
+    `📍 <b>สนามเดิม:</b> ${courtName}\n` +
+    `⏰ <b>เวลาเดิม:</b> ${formatSlot(summary.startsAt, summary.endsAt)}\n`;
+
+  if (newStartsAt && newEndsAt) {
+    const courtPart = newCourtName ? `${escapeHtml(newCourtName)} · ` : "";
+    text += `🆕 <b>ขอเลื่อนเป็น:</b> ${courtPart}${formatSlot(newStartsAt, newEndsAt)}\n`;
+  }
+
+  if (reason) {
+    text += `📝 <b>เหตุผล:</b> ${escapeHtml(reason)}\n`;
+  }
+
+  text +=
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `🔗 <a href="${siteUrl()}/admin/requests">เปิดดูและอนุมัติคำขอที่ระบบหลังร้าน</a>`;
+
+  return text;
+}
+
+/** Formats a direct booking cancellation alert (unpaid hold released). */
+export function formatTelegramCancelledBooking(summary: TelegramBookingSummary, bookingId: string): string {
+  const customerName = escapeHtml(sanitizeName(summary.customer));
+  const courtName = escapeHtml(summary.court);
+
+  const multiBadge = summary.multiCourtCount && summary.multiCourtCount > 1
+    ? ` <i>(เหมา ${summary.multiCourtCount} สนาม)</i>`
+    : "";
+
+  let text = "";
+  if (summary.party) {
+    text +=
+      `🚫 <b>ยกเลิกการเปิดห้องก๊วน (ปลดล็อกสนามแล้ว)</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👥 <b>ชื่อก๊วน:</b> ${escapeHtml(summary.party.title)}\n` +
+      `👑 <b>หัวหน้าก๊วน:</b> ${escapeHtml(summary.party.hostName)}\n`;
+  } else {
+    text +=
+      `🚫 <b>ลูกค้ายกเลิกการจองคิว (ปลดล็อกสนามแล้ว)</b>\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 <b>ลูกค้า:</b> ${customerName}\n`;
+  }
+
+  text +=
+    `📍 <b>สนาม:</b> ${courtName}${multiBadge}\n` +
+    `⏰ <b>รอบเวลา:</b> ${formatSlot(summary.startsAt, summary.endsAt)}\n` +
+    `💰 <b>ยอดเงิน:</b> ${formatBaht(summary.amount)}\n` +
+    `ℹ️ <b>สถานะ:</b> ยกเลิกคิวแล้ว ปลดล็อกสนามว่างให้ลูกค้าท่านอื่นจองต่อได้\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `🔗 <a href="${siteUrl()}/admin">ดูผังสนามที่ระบบหลังร้าน</a>`;
+
+  return text;
+}
+

@@ -99,11 +99,49 @@ describe("formatTelegramDailySummary", () => {
     // Sorted by start time; names escaped; phones tappable.
     const list = text.slice(text.indexOf("รายชื่อลูกค้า"));
     expect(list.indexOf("18:00–20:00")).toBeLessThan(list.indexOf("20:00–21:00"));
-    expect(text).toContain("• 18:00–20:00 สนาม 1 · สมชาย &lt;VIP&gt; · <code>0812345678</code>");
-    expect(text).toContain("• 21:00–22:00 สนาม 1 · มานี · ไม่มีเบอร์ (รอตรวจสลิป)");
+    expect(text).toContain("• 18:00–20:00 สนาม 1 · สมชาย &lt;VIP&gt; · <code>0812345678</code> · ✅ ชำระแล้ว");
+    expect(text).toContain("• 21:00–22:00 สนาม 1 · มานี · ไม่มีเบอร์ · ⏳ รอตรวจสลิป");
     // Cancelled bookings are not people who are coming.
     expect(text).not.toContain("ยกเลิกแล้ว");
     expect(text).not.toContain("0800000000");
+  });
+
+  test("marks pay-later bookings as unpaid until paid, and keeps them out of revenue received", () => {
+    const text = formatTelegramDailySummary({
+      kind: "closing",
+      day: "2026-10-25",
+      courts: COURTS,
+      bookings: [
+        { ...b(1, "confirmed", 260, "18:00", "20:00"), customer: { name: "จ่ายแล้ว", phone: null } },
+        { ...b(1, "confirmed", 130, "20:00", "21:00"), pay_later: true, paid_at: null, customer: { name: "โค้ชเอ", phone: null } },
+        {
+          ...b(2, "confirmed", 195, "18:00", "19:30"),
+          pay_later: true,
+          paid_at: "2026-10-25T13:00:00Z",
+          customer: { name: "โค้ชบี", phone: null },
+        },
+      ],
+      pending: NO_PENDING,
+    });
+
+    expect(text).toContain("รายรับ:</b> ฿455 (ชำระแล้ว) · ค้างชำระ ฿130");
+    expect(text).toContain("โค้ชเอ · ไม่มีเบอร์ · 🕒 ยังไม่ชำระ (ชำระภายหลัง)");
+    expect(text).toContain("โค้ชบี · ไม่มีเบอร์ · ✅ ชำระแล้ว");
+    // Unpaid court time still counts as booked time.
+    expect(text).toContain("สนาม 1: 3 ชม. (18:00–21:00)");
+  });
+
+  test("leaves the outstanding amount out when nothing is owed", () => {
+    const text = formatTelegramDailySummary({
+      kind: "morning",
+      day: "2026-10-25",
+      courts: COURTS,
+      bookings: [b(1, "confirmed", 260, "18:00", "20:00")],
+      pending: NO_PENDING,
+    });
+
+    expect(text).toContain("รายรับ:</b> ฿260 (ชำระแล้ว)\n");
+    expect(text).not.toContain("ค้างชำระ");
   });
 
   test("caps a very long customer list so the message stays under Telegram's limit", () => {

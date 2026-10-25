@@ -284,7 +284,8 @@ async function loadDayBookings(day: string): Promise<DailySummaryBooking[] | nul
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("bookings")
-    .select("court_id, status, amount, starts_at, ends_at, user_id, customer_name, customer_phone")
+    // "*" like the admin board, so the summary still loads before the pay-later columns are migrated.
+    .select("*")
     .gte("starts_at", slotStart(day, 0))
     .lt("starts_at", slotStart(day, 24))
     .returns<
@@ -302,13 +303,19 @@ async function loadDayBookings(day: string): Promise<DailySummaryBooking[] | nul
     : { data: [] };
   const who = new Map((profiles ?? []).map((p) => [p.id, p]));
 
-  return data.map(({ user_id, customer_name, customer_phone, ...b }) => {
-    const profile = who.get(user_id);
+  return data.map((b) => {
+    const profile = who.get(b.user_id);
     return {
-      ...b,
+      court_id: b.court_id,
+      status: b.status,
+      amount: b.amount,
+      starts_at: b.starts_at,
+      ends_at: b.ends_at,
+      pay_later: b.pay_later,
+      paid_at: b.paid_at,
       customer: {
-        name: customer_name ?? profile?.display_name ?? null,
-        phone: customer_phone ?? profile?.phone ?? null,
+        name: b.customer_name ?? profile?.display_name ?? null,
+        phone: b.customer_phone ?? profile?.phone ?? null,
       },
     };
   });

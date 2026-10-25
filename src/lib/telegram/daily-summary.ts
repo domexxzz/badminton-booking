@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { countBookings, summarizeDay, type BookingForSummary } from "@/lib/admin/summary";
+import { confirmedRevenue, countBookings, summarizeDay, type BookingForSummary } from "@/lib/admin/summary";
 import { STATUS_LABEL, formatBaht, formatDayShort, formatTime } from "@/lib/format";
 import { sanitizeName } from "@/lib/line/messages";
 import { bangkokDate, slotStart } from "@/lib/slots";
@@ -10,6 +10,9 @@ export type DailySummaryKind = "morning" | "closing";
 export type DailySummaryBooking = BookingForSummary & {
   court_id: number;
   customer?: { name: string | null; phone: string | null };
+  /** Pay-later bookings are confirmed straight away; `paid_at` is set once the shop is paid. */
+  pay_later?: boolean;
+  paid_at?: string | null;
 };
 
 export type DailySummaryInput = {
@@ -28,7 +31,7 @@ const HOUR_MS = 60 * 60 * 1000;
 const CLOSING_LOOKBACK_MS = 6 * HOUR_MS;
 const DIVIDER = "━━━━━━━━━━━━━━━━━━━━";
 // Keeps a busy day's message well under Telegram's 4096-character limit.
-const MAX_CUSTOMER_LINES = 40;
+const MAX_CUSTOMER_LINES = 30;
 const ACTIVE_STATUSES = new Set(["confirmed", "pending_payment", "awaiting_review"]);
 
 /** Which Bangkok day a summary sent at `now` describes, and the day after it for a closing summary. */
@@ -60,6 +63,15 @@ function courtLine(name: string, bookings: readonly DailySummaryBooking[]): stri
   return `• ${escapeHtml(name)}: ${hoursLabel(hours)} (${times})`;
 }
 
+// Same rule as the admin board: a confirmed pay-later booking is owed until paid_at is set.
+const isUnpaid = (b: DailySummaryBooking) => b.status === "confirmed" && b.pay_later === true && !b.paid_at;
+
+function paymentLabel(b: DailySummaryBooking): string {
+  if (isUnpaid(b)) return "🕒 ยังไม่ชำระ (ชำระภายหลัง)";
+  if (b.status === "confirmed") return "✅ ชำระแล้ว";
+  return `⏳ ${STATUS_LABEL[b.status] ?? b.status}`;
+}
+
 /** Who is booked, by start time: confirmed and still-open bookings only. */
 function customerLines(courts: DailySummaryInput["courts"], bookings: readonly DailySummaryBooking[]): string | null {
   const courtName = new Map(courts.map((c) => [c.id, c.name]));
@@ -71,13 +83,19 @@ function customerLines(courts: DailySummaryInput["courts"], bookings: readonly D
   const lines = active.slice(0, MAX_CUSTOMER_LINES).map((b) => {
     const name = escapeHtml(sanitizeName(b.customer?.name ?? ""));
     const phone = b.customer?.phone ? `<code>${escapeHtml(b.customer.phone)}</code>` : "ไม่มีเบอร์";
-    const status = b.status === "confirmed" ? "" : ` (${STATUS_LABEL[b.status] ?? b.status})`;
     const court = escapeHtml(courtName.get(b.court_id) ?? "สนาม");
-    return `• ${formatTime(b.starts_at)}–${endLabel(b.ends_at)} ${court} · ${name} · ${phone}${status}`;
+    return `• ${formatTime(b.starts_at)}–${endLabel(b.ends_at)} ${court} · ${name} · ${phone} · ${paymentLabel(b)}`;
   });
   const hidden = active.length - lines.length;
   const more = hidden > 0 ? `\n…และอีก ${hidden} รายการ ดูที่หลังร้าน` : "";
   return `👥 <b>รายชื่อลูกค้า</b>\n${lines.join("\n")}${more}`;
+}
+
+/** Money received, and what pay-later customers still owe for the day. */
+function revenueLine(bookings: readonly DailySummaryBooking[]): string {
+  const received = confirmedRevenue(bookings.filter((b) => !isUnpaid(b)));
+  const owed = confirmedRevenue(bookings.filter(isUnpaid));
+  return `${formatBaht(received)} (ชำระแล้ว)${owed > 0 ? ` · ค้างชำระ ${formatBaht(owed)}` : ""}`;
 }
 
 function pendingLines({ awaitingReview, cancelRequests, rescheduleRequests }: DailySummaryInput["pending"]): string {
@@ -112,7 +130,7 @@ export function formatTelegramDailySummary(input: DailySummaryInput): string {
 
   const sections = [
     `${title}\n${DIVIDER}`,
-    `💰 <b>รายรับ:</b> ${formatBaht(summary.revenue)} (ยืนยันแล้ว)\n` +
+    `💰 <b>รายรับ:</b> ${revenueLine(bookings)}\n` +
       `📋 <b>การจอง:</b> ยืนยัน ${counts.confirmed} · รอชำระ/รอตรวจ ${counts.waiting} · ยกเลิก/หมดเวลา ${counts.dropped}\n` +
       `⏱️ <b>ใช้สนาม:</b> ${hoursLabel(summary.bookedHours)} (${summary.utilization}%)`,
     `🏸 <b>แยกรายสนาม</b>\n${courtLines}`,

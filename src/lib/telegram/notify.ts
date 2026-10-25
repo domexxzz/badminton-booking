@@ -2,7 +2,7 @@ import "server-only";
 import { formatTime } from "@/lib/format";
 import type { BookingSummary } from "@/lib/line/messages";
 import { getServiceClient } from "@/lib/supabase/service";
-import { sendTelegramMessage, sendTelegramPhoto } from "./client";
+import { getTelegramConfig, sendTelegramMessage, sendTelegramPhoto, type TelegramSendOptions } from "./client";
 import { formatTelegramNewBooking, formatTelegramSlipReport, type TelegramBookingSummary } from "./messages";
 
 async function loadBookingSummary(bookingId: string): Promise<TelegramBookingSummary | null> {
@@ -82,8 +82,16 @@ export async function notifyTelegramNewBooking(bookingId: string): Promise<void>
   try {
     const summary = await loadBookingSummary(bookingId);
     if (!summary) return;
+    const config = getTelegramConfig();
     const text = formatTelegramNewBooking(summary, bookingId);
-    await sendTelegramMessage(text, { parseMode: "HTML" });
+
+    const sendOptions: TelegramSendOptions = {
+      parseMode: "HTML",
+      chatId: summary.party ? config?.partyChatId : config?.chatId,
+      messageThreadId: summary.party ? config?.partyThreadId : undefined,
+    };
+
+    await sendTelegramMessage(text, sendOptions);
   } catch (error) {
     console.error("Telegram new booking notification failed:", error);
   }
@@ -133,6 +141,12 @@ export async function notifyTelegramAfterSlip(
     };
 
     const text = formatTelegramSlipReport(reportParams);
+    const config = getTelegramConfig();
+    const sendOptions: TelegramSendOptions = {
+      parseMode: "HTML",
+      chatId: summary.party ? config?.partyChatId : config?.chatId,
+      messageThreadId: summary.party ? config?.partyThreadId : undefined,
+    };
 
     // Try to send as photo with report caption if slip image is available
     if (payment?.slip_path) {
@@ -142,7 +156,7 @@ export async function notifyTelegramAfterSlip(
           .download(payment.slip_path);
 
         if (!downloadError && fileData) {
-          const sent = await sendTelegramPhoto(fileData, text, { parseMode: "HTML" });
+          const sent = await sendTelegramPhoto(fileData, text, sendOptions);
           if (sent) return;
         }
       } catch (photoErr) {
@@ -151,7 +165,7 @@ export async function notifyTelegramAfterSlip(
     }
 
     // Fallback: send as text message
-    await sendTelegramMessage(text, { parseMode: "HTML" });
+    await sendTelegramMessage(text, sendOptions);
   } catch (error) {
     console.error("Telegram slip report notification failed:", error);
   }

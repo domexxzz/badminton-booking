@@ -1,18 +1,36 @@
 export type TelegramConfig = {
   botToken: string;
   chatId: string;
+  partyChatId?: string;
+  partyThreadId?: number;
 };
 
 export function getTelegramConfig(env: Record<string, string | undefined> = process.env): TelegramConfig | null {
   const botToken = env.TELEGRAM_BOT_TOKEN?.trim() || "8827549262:AAGt7aDuc0jF8sYPSrZLZIh4ee5gwcvtAyg";
   const chatId = env.TELEGRAM_CHAT_ID?.trim() || "-1004354078243";
   if (!botToken || !chatId) return null;
-  return { botToken, chatId };
+
+  const partyChatId = env.TELEGRAM_PARTY_CHAT_ID?.trim() || chatId;
+  const rawPartyThread = env.TELEGRAM_PARTY_THREAD_ID?.trim() || "7";
+  const partyThreadId = rawPartyThread ? parseInt(rawPartyThread, 10) : undefined;
+
+  return {
+    botToken,
+    chatId,
+    partyChatId,
+    partyThreadId: Number.isInteger(partyThreadId) ? partyThreadId : undefined,
+  };
 }
+
+export type TelegramSendOptions = {
+  parseMode?: "HTML" | "MarkdownV2" | "Markdown";
+  chatId?: string;
+  messageThreadId?: number;
+};
 
 export async function sendTelegramMessage(
   text: string,
-  options?: { parseMode?: "HTML" | "MarkdownV2" | "Markdown" },
+  options?: TelegramSendOptions,
   fetchImpl: typeof fetch = fetch,
 ): Promise<boolean> {
   const config = getTelegramConfig();
@@ -20,12 +38,14 @@ export async function sendTelegramMessage(
 
   try {
     const url = `https://api.telegram.org/bot${config.botToken}/sendMessage`;
+    const targetChatId = options?.chatId || config.chatId;
     const body: Record<string, unknown> = {
-      chat_id: config.chatId,
+      chat_id: targetChatId,
       text,
       disable_web_page_preview: true,
     };
     if (options?.parseMode) body.parse_mode = options.parseMode;
+    if (options?.messageThreadId != null) body.message_thread_id = options.messageThreadId;
 
     const res = await fetchImpl(url, {
       method: "POST",
@@ -48,7 +68,7 @@ export async function sendTelegramMessage(
 export async function sendTelegramPhoto(
   photo: Blob | Buffer | Uint8Array,
   caption?: string,
-  options?: { parseMode?: "HTML" | "MarkdownV2" | "Markdown" },
+  options?: TelegramSendOptions,
   fetchImpl: typeof fetch = fetch,
 ): Promise<boolean> {
   const config = getTelegramConfig();
@@ -56,8 +76,12 @@ export async function sendTelegramPhoto(
 
   try {
     const url = `https://api.telegram.org/bot${config.botToken}/sendPhoto`;
+    const targetChatId = options?.chatId || config.chatId;
     const form = new FormData();
-    form.append("chat_id", config.chatId);
+    form.append("chat_id", targetChatId);
+    if (options?.messageThreadId != null) {
+      form.append("message_thread_id", String(options.messageThreadId));
+    }
 
     const blob = photo instanceof Blob ? photo : new Blob([photo as any]);
     form.append("photo", blob, "slip.jpg");

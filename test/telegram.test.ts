@@ -24,22 +24,27 @@ describe("Telegram Client", () => {
     expect(getTelegramConfig({})).toEqual({
       botToken: "8827549262:AAGt7aDuc0jF8sYPSrZLZIh4ee5gwcvtAyg",
       chatId: "-1004354078243",
+      partyChatId: "-1004354078243",
+      partyThreadId: 7,
     });
     const config = getTelegramConfig({
       TELEGRAM_BOT_TOKEN: "custom_token",
       TELEGRAM_CHAT_ID: "-1001234567890",
+      TELEGRAM_PARTY_THREAD_ID: "7",
     });
     expect(config).toEqual({
       botToken: "custom_token",
       chatId: "-1001234567890",
+      partyChatId: "-1001234567890",
+      partyThreadId: 7,
     });
   });
 
-  test("sendTelegramMessage posts JSON to telegram sendMessage endpoint", async () => {
+  test("sendTelegramMessage posts JSON to telegram sendMessage endpoint with optional thread_id", async () => {
     const fetchImpl = jsonResponse(200, { ok: true, result: { message_id: 123 } });
     process.env.TELEGRAM_CHAT_ID = "-100999";
 
-    const ok = await sendTelegramMessage("สวัสดี", { parseMode: "HTML" }, fetchImpl);
+    const ok = await sendTelegramMessage("สวัสดี", { parseMode: "HTML", messageThreadId: 7 }, fetchImpl);
     expect(ok).toBe(true);
 
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
@@ -49,22 +54,25 @@ describe("Telegram Client", () => {
 
     const body = JSON.parse(init.body as string);
     expect(body.chat_id).toBe("-100999");
+    expect(body.message_thread_id).toBe(7);
     expect(body.text).toBe("สวัสดี");
     expect(body.parse_mode).toBe("HTML");
   });
 
-  test("sendTelegramPhoto posts FormData to telegram sendPhoto endpoint", async () => {
+  test("sendTelegramPhoto posts FormData to telegram sendPhoto endpoint with optional thread_id", async () => {
     const fetchImpl = jsonResponse(200, { ok: true, result: { message_id: 124 } });
     process.env.TELEGRAM_CHAT_ID = "-100999";
 
     const dummyBlob = new Blob(["image data"], { type: "image/jpeg" });
-    const ok = await sendTelegramPhoto(dummyBlob, "คำบรรยาย", { parseMode: "HTML" }, fetchImpl);
+    const ok = await sendTelegramPhoto(dummyBlob, "คำบรรยาย", { parseMode: "HTML", messageThreadId: 7 }, fetchImpl);
     expect(ok).toBe(true);
 
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toContain("/sendPhoto");
     expect(init.method).toBe("POST");
     expect(init.body).toBeInstanceOf(FormData);
+    const formData = init.body as FormData;
+    expect(formData.get("message_thread_id")).toBe("7");
   });
 });
 

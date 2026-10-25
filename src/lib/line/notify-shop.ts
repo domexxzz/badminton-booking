@@ -15,6 +15,7 @@ import {
   type ShopEvent,
 } from "./messages";
 import { multicastText } from "./messaging";
+import { notifyTelegramAfterSlip, notifyTelegramNewBooking } from "@/lib/telegram/notify";
 
 const DEFAULT_EVENTS = "confirmed,needs_review,unmatched,request,new_booking";
 
@@ -123,36 +124,46 @@ async function loadBookingSummary(bookingId: string): Promise<BookingSummary | n
 
 /** When a customer makes a new booking (pending payment hold). */
 export async function notifyNewBooking(bookingId: string): Promise<void> {
-  if (!enabled("new_booking")) return;
-  const summary = await loadBookingSummary(bookingId);
-  if (!summary) return;
-  await notifyAdmins(newBookingAlertText(summary));
+  await Promise.allSettled([
+    (async () => {
+      if (!enabled("new_booking")) return;
+      const summary = await loadBookingSummary(bookingId);
+      if (!summary) return;
+      await notifyAdmins(newBookingAlertText(summary));
+    })(),
+    notifyTelegramNewBooking(bookingId),
+  ]);
 }
 
 /** After a customer submits a slip: tell the shop it was confirmed, or that it needs a look, and update customer. */
 export async function notifyAfterSlip(bookingId: string, verifyStatus: string | null): Promise<void> {
   if (verifyStatus === "skipped") return;
-  const event: ShopEvent = verifyStatus === "verified" ? "confirmed" : "needs_review";
-  if (!enabled(event)) return;
-  const summary = await loadBookingSummary(bookingId);
-  if (!summary) return;
+  await Promise.allSettled([
+    (async () => {
+      const event: ShopEvent = verifyStatus === "verified" ? "confirmed" : "needs_review";
+      if (!enabled(event)) return;
+      const summary = await loadBookingSummary(bookingId);
+      if (!summary) return;
 
-  if (event === "confirmed") {
-    await notifyAdmins(bookingConfirmedText(summary));
-    await notifyCustomer(summary.userId, customerBookingConfirmedText(summary, bookingId));
-    return;
-  }
+      if (event === "confirmed") {
+        await notifyAdmins(bookingConfirmedText(summary));
+        await notifyCustomer(summary.userId, customerBookingConfirmedText(summary, bookingId));
+        return;
+      }
 
-  const { data } = await getServiceClient()!
-    .from("payments")
-    .select("verify_reasons")
-    .eq("booking_id", bookingId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+      const { data } = await getServiceClient()!
+        .from("payments")
+        .select("verify_reasons")
+        .eq("booking_id", bookingId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-  await notifyAdmins(slipNeedsReviewText(summary, (data?.verify_reasons as string[] | undefined) ?? []));
-  await notifyCustomer(summary.userId, customerSlipSubmittedText(summary));
+      await notifyAdmins(slipNeedsReviewText(summary, (data?.verify_reasons as string[] | undefined) ?? []));
+      await notifyCustomer(summary.userId, customerSlipSubmittedText(summary));
+    })(),
+    notifyTelegramAfterSlip(bookingId, verifyStatus),
+  ]);
 }
 
 /** After an admin reviews a payment slip. */

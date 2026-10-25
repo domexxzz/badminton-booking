@@ -13,7 +13,8 @@
     "sandbox": "node scripts/sandbox.mjs",
     "rehearse": "node scripts/rehearse-release.mjs",
     "build:release-sql": "node scripts/build-release-sql.mjs",
-    "seed:demo": "node scripts/seed-demo.mjs"
+    "seed:demo": "node scripts/seed-demo.mjs",
+    "telegram:id": "node scripts/get-telegram-chat-id.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",

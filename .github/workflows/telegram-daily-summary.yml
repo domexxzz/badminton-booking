@@ -1,0 +1,33 @@
+# Asks the site to post the daily summary to the shop's Telegram group.
+# Needs the repository secret CRON_SECRET, with the same value set as CRON_SECRET on Render.
+# GitHub may start scheduled runs a few minutes late.
+name: Telegram daily summary
+
+on:
+  schedule:
+    - cron: "0 1 * * *"   # 08:00 Bangkok: morning summary of today
+    - cron: "15 17 * * *" # 00:15 Bangkok: closing summary of the day that just ended
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: "Which summary to send"
+        type: choice
+        options: [morning, closing]
+        default: morning
+
+permissions: {}
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Post summary
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://badminton-booking-ihw1.onrender.com' }}
+          KIND: ${{ inputs.kind || (github.event.schedule == '0 1 * * *' && 'morning' || 'closing') }}
+        run: |
+          curl --fail-with-body --silent --show-error --retry 3 --retry-delay 20 --retry-all-errors \
+            -X POST "$SITE_URL/api/telegram/daily-summary?kind=$KIND" \
+            -H "Authorization: Bearer $CRON_SECRET"

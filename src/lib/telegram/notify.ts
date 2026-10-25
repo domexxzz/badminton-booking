@@ -2,7 +2,14 @@ import "server-only";
 import { formatTime } from "@/lib/format";
 import type { BookingSummary } from "@/lib/line/messages";
 import { getServiceClient } from "@/lib/supabase/service";
+import { slotStart } from "@/lib/slots";
 import { getTelegramConfig, sendTelegramMessage, sendTelegramPhoto, type TelegramSendOptions } from "./client";
+import {
+  formatTelegramDailySummary,
+  summaryDays,
+  type DailySummaryBooking,
+  type DailySummaryKind,
+} from "./daily-summary";
 import {
   formatTelegramCancelledBooking,
   formatTelegramCancelRequest,
@@ -272,3 +279,56 @@ export async function notifyTelegramCancelledBooking(bookingId: string): Promise
   }
 }
 
+async function loadDayBookings(day: string): Promise<DailySummaryBooking[] | null> {
+  const supabase = getServiceClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("court_id, status, amount, starts_at, ends_at")
+    .gte("starts_at", slotStart(day, 0))
+    .lt("starts_at", slotStart(day, 24))
+    .returns<DailySummaryBooking[]>();
+  if (error) {
+    console.error(`Daily summary: loading bookings for ${day} failed:`, error);
+    return null;
+  }
+  return data;
+}
+
+/** Sends the morning or closing daily summary to the shop's Telegram group. Returns whether it was sent. */
+export async function sendTelegramDailySummary(kind: DailySummaryKind, now: Date = new Date()): Promise<boolean> {
+  try {
+    const supabase = getServiceClient();
+    if (!supabase) return false;
+    const { day, nextDay } = summaryDays(kind, now);
+
+    const [courts, bookings, nextDayBookings, awaitingReview, requests] = await Promise.all([
+      supabase.from("courts").select("id, name").eq("is_active", true).order("id"),
+      loadDayBookings(day),
+      nextDay ? loadDayBookings(nextDay) : Promise.resolve(null),
+      supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "awaiting_review"),
+      supabase.from("booking_requests").select("kind").eq("status", "pending"),
+    ]);
+    if (courts.error || !bookings || awaitingReview.error || requests.error || (nextDay && !nextDayBookings)) {
+      console.error("Daily summary: loading data failed:", courts.error ?? awaitingReview.error ?? requests.error);
+      return false;
+    }
+
+    const text = formatTelegramDailySummary({
+      kind,
+      day,
+      courts: courts.data,
+      bookings,
+      pending: {
+        awaitingReview: awaitingReview.count ?? 0,
+        cancelRequests: requests.data.filter((r) => r.kind === "cancel").length,
+        rescheduleRequests: requests.data.filter((r) => r.kind === "reschedule").length,
+      },
+      nextDay: nextDay && nextDayBookings ? { day: nextDay, bookings: nextDayBookings } : undefined,
+    });
+    return await sendTelegramMessage(text, { parseMode: "HTML" });
+  } catch (error) {
+    console.error("Telegram daily summary failed:", error);
+    return false;
+  }
+}

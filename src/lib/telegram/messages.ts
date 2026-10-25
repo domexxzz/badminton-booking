@@ -1,4 +1,4 @@
-import { CHANNEL_LABEL, formatBaht, formatSlot } from "@/lib/format";
+import { CHANNEL_LABEL, formatBaht, formatDate, formatSlot } from "@/lib/format";
 import type { BookingSummary } from "@/lib/line/messages";
 import { sanitizeName } from "@/lib/line/messages";
 
@@ -63,6 +63,21 @@ export function formatTelegramNewBooking(b: TelegramBookingSummary, bookingId: s
   );
 }
 
+const slipTimeFmt = new Intl.DateTimeFormat("th-TH", {
+  timeZone: "Asia/Bangkok",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+// Slip times arrive as UTC ISO strings; show them in Bangkok time (seconds help match bank records).
+function formatSlipDate(slipDate: string): string {
+  const date = new Date(slipDate);
+  if (Number.isNaN(date.getTime())) return slipDate;
+  return `${formatDate(slipDate)} · ${slipTimeFmt.format(date)} น.`;
+}
+
 export type TelegramSlipReportParams = {
   summary: TelegramBookingSummary;
   bookingId: string;
@@ -115,7 +130,7 @@ export function formatTelegramSlipReport(params: TelegramSlipReportParams): stri
   }
 
   if (slipDate) {
-    text += `🕒 <b>เวลาโอนตามสลิป:</b> ${escapeHtml(slipDate)}\n`;
+    text += `🕒 <b>เวลาโอนตามสลิป:</b> ${escapeHtml(formatSlipDate(slipDate))}\n`;
   }
 
   if (transRef) {

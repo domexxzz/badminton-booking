@@ -111,6 +111,29 @@ describe("Telegram Message Formatting", () => {
     expect(text).toContain("20261025TEST1234");
   });
 
+  test("shows the slip transfer time in Bangkok time, not UTC", () => {
+    const text = formatTelegramSlipReport({
+      summary: SAMPLE_SUMMARY,
+      bookingId: "b-3",
+      verifyStatus: "verified",
+      slipDate: "2026-10-25T13:50:26+00:00",
+    });
+
+    expect(text).toMatch(/เวลาโอนตามสลิป:<\/b> \S+ 25 ต\.ค\. · 20:50:26 น\./);
+    expect(text).not.toContain("+00:00");
+  });
+
+  test("keeps an unparseable slip time as written", () => {
+    const text = formatTelegramSlipReport({
+      summary: SAMPLE_SUMMARY,
+      bookingId: "b-4",
+      verifyStatus: "verified",
+      slipDate: "25 ต.ค. 2569 18:30 น.",
+    });
+
+    expect(text).toContain("เวลาโอนตามสลิป:</b> 25 ต.ค. 2569 18:30 น.");
+  });
+
   test("formats slip report for unverified / needs review slip with reasons", () => {
     const text = formatTelegramSlipReport({
       summary: SAMPLE_SUMMARY,

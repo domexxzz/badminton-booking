@@ -18,11 +18,18 @@ export function isSlipVerificationEnabled(): boolean {
 }
 
 function toRecord(result: ProviderResult, payment: PendingPayment): CheckRecord {
+  const envReceiver = receiverFromEnv(process.env);
+  const receiverNames =
+    envReceiver.receiverNames.length > 0
+      ? envReceiver.receiverNames
+      : ["อัครเนย์", "akkanay", "อัครเนย์ ลาน้ำเที่ยง", "นาย อัครเนย์ ลาน้ำเที่ยง"];
+
   return buildCheckRecord(result, {
     amountBaht: Number(payment.amount ?? payment.bookings!.amount),
     bookingCreatedAt: payment.bookings!.created_at,
     now: new Date(),
-    ...receiverFromEnv(process.env),
+    ...envReceiver,
+    receiverNames,
   });
 }
 
@@ -63,61 +70,28 @@ export async function verifyLatestSlip(bookingId: string): Promise<string | null
 
     const check = toRecord(result, payment);
 
-    // Record check outcome directly to the payment record without auto-confirming or auto-rejecting,
-    // so the booking always stays in "awaiting_review" and appears on the admin review page
-    // for the owner to manually review and approve/reject.
-    // Try to update verification fields. If a duplicate trans_ref error occurs, handle it gracefully.
-    let updateError: any = null;
-    try {
-      const { error } = await supabase
-        .from("payments")
-        .update({
-          verify_status: check.status,
-          verify_reasons: check.reasons,
-          slip_amount: check.amount ?? null,
-          slip_date: check.date ?? null,
-          trans_ref: check.transRef ?? null,
-          verify_raw: check.raw ?? null,
-          verified_at: new Date().toISOString(),
-        })
-        .eq("id", payment.id);
-      updateError = error;
-    } catch (e) {
-      updateError = e;
-    }
+    // Call record_slip_check RPC:
+    // If check.status == "verified", this updates payment status to 'approved'
+    // and booking status to 'confirmed' automatically!
+    const statusForRpc =
+      check.status === "verified" || check.status === "mismatch" || check.status === "unreadable" || check.status === "error"
+        ? check.status
+        : "mismatch";
 
-    if (updateError) {
-      // Duplicate trans_ref error (unique constraint violation)
-      if (updateError?.code === "23505" || String(updateError?.message ?? "").includes("payments_trans_ref_uniq")) {
-        const duplicateReasons = [
-          ...(check.reasons ?? []),
-          "สลิปนี้ถูกใช้กับการจองอื่นแล้ว",
-        ];
-        const { error: dupErr } = await supabase
-          .from("payments")
-          .update({
-            verify_status: "duplicate",
-            verify_reasons: duplicateReasons,
-            slip_amount: check.amount ?? null,
-            slip_date: check.date ?? null,
-            // keep existing trans_ref unchanged
-            verify_raw: check.raw ?? null,
-            verified_at: new Date().toISOString(),
-          })
-          .eq("id", payment.id);
-        if (dupErr) {
-          console.error("Failed to record duplicate slip status:", dupErr);
-          throw dupErr;
-        }
-        return "duplicate";
-      }
-      console.error("Failed to update payment verify status:", updateError);
-      throw updateError;
-    }
-
-    return check.status;
+    const { data: recorded, error: recordError } = await supabase.rpc("record_slip_check", {
+      p_payment_id: payment.id,
+      p_status: statusForRpc,
+      p_reasons: check.reasons,
+      p_trans_ref: check.transRef ?? null,
+      p_slip_amount: check.amount ?? null,
+      p_slip_date: check.date ?? null,
+      p_raw: check.raw ?? null,
+    });
+    if (recordError) throw recordError;
+    return recorded as string;
   } catch (error) {
     console.error(`Slip verification failed for booking ${bookingId}:`, error);
     return null;
   }
 }
+

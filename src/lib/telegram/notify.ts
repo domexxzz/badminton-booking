@@ -284,15 +284,34 @@ async function loadDayBookings(day: string): Promise<DailySummaryBooking[] | nul
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("bookings")
-    .select("court_id, status, amount, starts_at, ends_at")
+    .select("court_id, status, amount, starts_at, ends_at, user_id, customer_name, customer_phone")
     .gte("starts_at", slotStart(day, 0))
     .lt("starts_at", slotStart(day, 24))
-    .returns<DailySummaryBooking[]>();
+    .returns<
+      (DailySummaryBooking & { user_id: string; customer_name: string | null; customer_phone: string | null })[]
+    >();
   if (error) {
     console.error(`Daily summary: loading bookings for ${day} failed:`, error);
     return null;
   }
-  return data;
+
+  // Online bookings carry the customer's profile; phone/LINE/walk-in carry customer_name.
+  const userIds = [...new Set(data.filter((b) => !b.customer_name).map((b) => b.user_id))];
+  const { data: profiles } = userIds.length
+    ? await supabase.from("profiles").select("id, display_name, phone").in("id", userIds)
+    : { data: [] };
+  const who = new Map((profiles ?? []).map((p) => [p.id, p]));
+
+  return data.map(({ user_id, customer_name, customer_phone, ...b }) => {
+    const profile = who.get(user_id);
+    return {
+      ...b,
+      customer: {
+        name: customer_name ?? profile?.display_name ?? null,
+        phone: customer_phone ?? profile?.phone ?? null,
+      },
+    };
+  });
 }
 
 /** Sends the morning or closing daily summary to the shop's Telegram group. Returns whether it was sent. */

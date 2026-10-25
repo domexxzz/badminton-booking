@@ -1,12 +1,16 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { countBookings, summarizeDay, type BookingForSummary } from "@/lib/admin/summary";
-import { formatBaht, formatDayShort, formatTime } from "@/lib/format";
+import { STATUS_LABEL, formatBaht, formatDayShort, formatTime } from "@/lib/format";
+import { sanitizeName } from "@/lib/line/messages";
 import { bangkokDate, slotStart } from "@/lib/slots";
 import { escapeHtml, siteUrl } from "./messages";
 
 export type DailySummaryKind = "morning" | "closing";
 
-export type DailySummaryBooking = BookingForSummary & { court_id: number };
+export type DailySummaryBooking = BookingForSummary & {
+  court_id: number;
+  customer?: { name: string | null; phone: string | null };
+};
 
 export type DailySummaryInput = {
   kind: DailySummaryKind;
@@ -23,6 +27,9 @@ const HOUR_MS = 60 * 60 * 1000;
 // A closing summary sent before 06:00 is about the day that just ended.
 const CLOSING_LOOKBACK_MS = 6 * HOUR_MS;
 const DIVIDER = "━━━━━━━━━━━━━━━━━━━━";
+// Keeps a busy day's message well under Telegram's 4096-character limit.
+const MAX_CUSTOMER_LINES = 40;
+const ACTIVE_STATUSES = new Set(["confirmed", "pending_payment", "awaiting_review"]);
 
 /** Which Bangkok day a summary sent at `now` describes, and the day after it for a closing summary. */
 export function summaryDays(kind: DailySummaryKind, now: Date): { day: string; nextDay: string | null } {
@@ -51,6 +58,26 @@ function courtLine(name: string, bookings: readonly DailySummaryBooking[]): stri
   const hours = sorted.reduce((sum, b) => sum + (Date.parse(b.ends_at) - Date.parse(b.starts_at)) / HOUR_MS, 0);
   const times = ranges.map((r) => `${formatTime(r.start)}–${endLabel(r.end)}`).join(", ");
   return `• ${escapeHtml(name)}: ${hoursLabel(hours)} (${times})`;
+}
+
+/** Who is booked, by start time: confirmed and still-open bookings only. */
+function customerLines(courts: DailySummaryInput["courts"], bookings: readonly DailySummaryBooking[]): string | null {
+  const courtName = new Map(courts.map((c) => [c.id, c.name]));
+  const active = bookings
+    .filter((b) => ACTIVE_STATUSES.has(b.status))
+    .toSorted((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at) || a.court_id - b.court_id);
+  if (active.length === 0) return null;
+
+  const lines = active.slice(0, MAX_CUSTOMER_LINES).map((b) => {
+    const name = escapeHtml(sanitizeName(b.customer?.name ?? ""));
+    const phone = b.customer?.phone ? `<code>${escapeHtml(b.customer.phone)}</code>` : "ไม่มีเบอร์";
+    const status = b.status === "confirmed" ? "" : ` (${STATUS_LABEL[b.status] ?? b.status})`;
+    const court = escapeHtml(courtName.get(b.court_id) ?? "สนาม");
+    return `• ${formatTime(b.starts_at)}–${endLabel(b.ends_at)} ${court} · ${name} · ${phone}${status}`;
+  });
+  const hidden = active.length - lines.length;
+  const more = hidden > 0 ? `\n…และอีก ${hidden} รายการ ดูที่หลังร้าน` : "";
+  return `👥 <b>รายชื่อลูกค้า</b>\n${lines.join("\n")}${more}`;
 }
 
 function pendingLines({ awaitingReview, cancelRequests, rescheduleRequests }: DailySummaryInput["pending"]): string {
@@ -89,6 +116,7 @@ export function formatTelegramDailySummary(input: DailySummaryInput): string {
       `📋 <b>การจอง:</b> ยืนยัน ${counts.confirmed} · รอชำระ/รอตรวจ ${counts.waiting} · ยกเลิก/หมดเวลา ${counts.dropped}\n` +
       `⏱️ <b>ใช้สนาม:</b> ${hoursLabel(summary.bookedHours)} (${summary.utilization}%)`,
     `🏸 <b>แยกรายสนาม</b>\n${courtLines}`,
+    customerLines(courts, bookings),
     `🛎️ <b>งานค้างของแอดมิน</b>\n${pendingLines(pending)}`,
     nextDay ? nextDayLine(nextDay.day, nextDay.bookings, courts.length) : null,
     `${DIVIDER}\n🔗 <a href="${siteUrl()}/admin">เปิดระบบหลังร้าน</a>`,

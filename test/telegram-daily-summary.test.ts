@@ -81,6 +81,42 @@ describe("formatTelegramDailySummary", () => {
     expect(text).not.toContain("จองไว้แล้วสำหรับ");
   });
 
+  test("lists each active booking with time, court, name and phone", () => {
+    const text = formatTelegramDailySummary({
+      kind: "morning",
+      day: "2026-10-25",
+      courts: COURTS,
+      bookings: [
+        { ...b(2, "confirmed", 130, "20:00", "21:00"), customer: { name: "สมหญิง", phone: "0899999999" } },
+        { ...b(1, "confirmed", 260, "18:00", "20:00"), customer: { name: "สมชาย <VIP>", phone: "0812345678" } },
+        { ...b(1, "awaiting_review", 130, "21:00", "22:00"), customer: { name: "มานี", phone: null } },
+        { ...b(2, "cancelled", 130, "09:00", "10:00"), customer: { name: "ยกเลิกแล้ว", phone: "0800000000" } },
+      ],
+      pending: NO_PENDING,
+    });
+
+    expect(text).toContain("👥 <b>รายชื่อลูกค้า</b>");
+    // Sorted by start time; names escaped; phones tappable.
+    const list = text.slice(text.indexOf("รายชื่อลูกค้า"));
+    expect(list.indexOf("18:00–20:00")).toBeLessThan(list.indexOf("20:00–21:00"));
+    expect(text).toContain("• 18:00–20:00 สนาม 1 · สมชาย &lt;VIP&gt; · <code>0812345678</code>");
+    expect(text).toContain("• 21:00–22:00 สนาม 1 · มานี · ไม่มีเบอร์ (รอตรวจสลิป)");
+    // Cancelled bookings are not people who are coming.
+    expect(text).not.toContain("ยกเลิกแล้ว");
+    expect(text).not.toContain("0800000000");
+  });
+
+  test("caps a very long customer list so the message stays under Telegram's limit", () => {
+    const many = Array.from({ length: 80 }, (_, i) => ({
+      ...b(1, "confirmed", 65, "09:00", "09:30"),
+      customer: { name: `ลูกค้า ${i}`, phone: "0812345678" },
+    }));
+    const text = formatTelegramDailySummary({ kind: "morning", day: "2026-10-25", courts: COURTS, bookings: many, pending: NO_PENDING });
+
+    expect(text.length).toBeLessThan(4096);
+    expect(text).toMatch(/และอีก \d+ รายการ ดูที่หลังร้าน/);
+  });
+
   test("shows a closing at midnight as 24:00 and escapes court names", () => {
     const text = formatTelegramDailySummary({
       kind: "morning",

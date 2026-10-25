@@ -41,3 +41,13 @@ services:
         sync: false
       - key: LINE_LOGIN_CHANNEL_SECRET
         sync: false
+      # Telegram alerts for the shop group. Without the bot token and chat ID, alerts are skipped.
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      # Party bookings: defaults to TELEGRAM_CHAT_ID and its party topic.
+      - key: TELEGRAM_PARTY_CHAT_ID
+        sync: false
+      - key: TELEGRAM_PARTY_THREAD_ID
+        sync: false

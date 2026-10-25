@@ -3,9 +3,9 @@ import { formatTime } from "@/lib/format";
 import type { BookingSummary } from "@/lib/line/messages";
 import { getServiceClient } from "@/lib/supabase/service";
 import { sendTelegramMessage, sendTelegramPhoto } from "./client";
-import { formatTelegramNewBooking, formatTelegramSlipReport } from "./messages";
+import { formatTelegramNewBooking, formatTelegramSlipReport, type TelegramBookingSummary } from "./messages";
 
-async function loadBookingSummary(bookingId: string): Promise<BookingSummary | null> {
+async function loadBookingSummary(bookingId: string): Promise<TelegramBookingSummary | null> {
   const supabase = getServiceClient();
   if (!supabase) return null;
   const { data: b } = await supabase
@@ -26,6 +26,8 @@ async function loadBookingSummary(bookingId: string): Promise<BookingSummary | n
 
   let courtName = b.courts?.name ?? "สนาม";
   let totalAmount = Number(b.amount);
+  let multiCourtCount: number | undefined = undefined;
+
   if (b.group_id) {
     const { data: groupList } = await supabase
       .from("bookings")
@@ -33,6 +35,7 @@ async function loadBookingSummary(bookingId: string): Promise<BookingSummary | n
       .eq("group_id", b.group_id)
       .order("court_id");
     if (groupList && groupList.length > 1) {
+      multiCourtCount = groupList.length;
       const allSameSlot = groupList.every(
         (item) => item.starts_at === b.starts_at && item.ends_at === b.ends_at,
       );
@@ -53,6 +56,14 @@ async function loadBookingSummary(bookingId: string): Promise<BookingSummary | n
   }
 
   const { data: profile } = await supabase.from("profiles").select("display_name").eq("id", b.user_id).maybeSingle();
+
+  // Check if booking is linked to a party/team room
+  const { data: party } = await supabase
+    .from("party_rooms")
+    .select("id, title, mode, host_name")
+    .eq("booking_id", bookingId)
+    .maybeSingle();
+
   return {
     court: courtName,
     startsAt: b.starts_at,
@@ -61,6 +72,8 @@ async function loadBookingSummary(bookingId: string): Promise<BookingSummary | n
     customer: b.customer_name ?? profile?.display_name ?? "ลูกค้า",
     channel: b.channel,
     userId: b.user_id,
+    party: party ? { id: party.id, title: party.title, mode: party.mode, hostName: party.host_name } : null,
+    multiCourtCount,
   };
 }
 

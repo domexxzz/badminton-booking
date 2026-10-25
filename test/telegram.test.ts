@@ -113,4 +113,39 @@ describe("Telegram Message Formatting", () => {
     expect(text).toContain("ยอดเงินในสลิป (฿200) ไม่ตรงกับยอดจอง (฿300)");
     expect(text).toContain("โอนก่อนเวลาเริ่มจอง");
   });
+
+  test("formats party/team room booking alert with host and mode", () => {
+    const text = formatTelegramNewBooking(
+      {
+        ...SAMPLE_SUMMARY,
+        party: {
+          id: "party-xyz",
+          title: "ก๊วนมือใหม่ตีขำๆ <บุฟเฟต์>",
+          mode: "doubles",
+          hostName: "โค้ชโดม",
+        },
+      },
+      "booking-456",
+    );
+
+    expect(text).toContain("มีการเปิดห้องก๊วน/ทีมใหม่! (รอชำระเงิน)");
+    expect(text).toContain("ก๊วนมือใหม่ตีขำๆ &lt;บุฟเฟต์&gt;");
+    expect(text).toContain("โค้ชโดม (ประเภทคู่ (Doubles))");
+    expect(text).toContain("/queue/party-xyz");
+  });
+
+  test("formats multi-court booking badge when multiple courts are booked together", () => {
+    const text = formatTelegramNewBooking(
+      {
+        ...SAMPLE_SUMMARY,
+        court: "สนาม 1, สนาม 2",
+        multiCourtCount: 2,
+        amount: 600,
+      },
+      "booking-789",
+    );
+
+    expect(text).toContain("สนาม 1, สนาม 2 <i>(เหมา 2 สนาม)</i>");
+    expect(text).toContain("฿600");
+  });
 });

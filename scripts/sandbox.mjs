@@ -504,6 +504,99 @@ expect("เจ้าของลบเองแล้วหายจากฟี
   (await one(`select status from community_posts where id = '${post.id}'`)).status === "removed");
 await refused("ลบโพสต์ของคนอื่นไม่ได้", `select delete_community_comment('${comment.id}')`, "POST_NOT_FOUND");
 
+// ---------------------------------------------------------------------------
+head("12. กิลด์ 3 กลุ่ม เล่นจริง 4 สัปดาห์ แล้วปิดซีซั่น (migration 0033)");
+const GUILDS = [
+  { name: "สายฟ้าแลบ", tag: "BOLT", emblem: "bolt", games: 6 },
+  { name: "นกฮูกราตรี", tag: "OWL", emblem: "eagle", games: 4 },
+  { name: "เสือซุ่ม", tag: "TGR", emblem: "tiger", games: 2 },
+];
+const guildPlayers = GUILDS.map((_, g) =>
+  Array.from({ length: 4 }, (_, i) => ({ id: `dddddddd-0000-0000-000${g}-00000000000${i}`, name: `${GUILDS[g].tag}-${i + 1}` })),
+);
+await db.exec(`insert into auth.users (id, email, raw_user_meta_data) values ${guildPlayers
+  .flat()
+  .map((p) => `('${p.id}', '${p.id}@sandbox.test', '{"display_name":"${p.name}"}')`)
+  .join(",")}`);
+await as(ADMIN);
+for (const p of guildPlayers.flat()) await db.query(`select set_party_host('${p.id}', true)`);
+
+for (const [g, guild] of GUILDS.entries()) {
+  const [leader, ...rest] = guildPlayers[g];
+  await as(leader.id);
+  guild.id = (await one(`select create_guild('${guild.name}', '${guild.tag}', '${guild.emblem}', '#2563eb', 'ก๊วนประจำ', 'code') id`)).id;
+  const { join_code: code } = await one(`select join_code from my_guild()`);
+  for (const p of rest) {
+    await as(p.id);
+    await db.query(`select join_guild_by_code('${code}')`);
+  }
+}
+line(`   สร้างกิลด์ ${GUILDS.map((g) => `[${g.tag}] ${g.name}`).join(" · ")} กลุ่มละ 4 คน (เข้าด้วยรหัสเชิญ)`);
+
+// One doubles night a week per guild, each week hosted by a different member.
+for (let week = 0; week < 4; week++) {
+  for (const [g, guild] of GUILDS.entries()) {
+    const members = guildPlayers[g];
+    const host = members[week];
+    await as(host.id);
+    const { t } = await one(
+      `select ((now() at time zone 'Asia/Bangkok')::date + ${2 + week} + time '18:00') at time zone 'Asia/Bangkok' as t`,
+    );
+    const nightRoom = await one(
+      `select * from create_party_booking(${g + 1}::smallint, '${new Date(t).toISOString()}', 2, 'doubles', 'คืน ${guild.tag}', '${host.name}')`,
+    );
+    await db.query(`select tag_party_with_guild('${nightRoom.party_id}', true)`);
+    await db.exec(`update bookings set status = 'confirmed' where id = '${nightRoom.booking_id}'`);
+    const others = members.filter((m) => m !== host);
+    const seats = [[2, "A"], [3, "B"], [4, "B"]];
+    for (const [i, p] of others.entries()) {
+      await as(p.id);
+      await db.query(`select join_party('${nightRoom.party_id}', '${p.name}', ${seats[i][0]}::smallint, '${seats[i][1]}'::party_team)`);
+    }
+    await as(host.id);
+    await db.query(`select advance_party_match('${nightRoom.party_id}', null)`);
+    for (let n = 0; n < guild.games; n++) {
+      await db.query(`select advance_party_match('${nightRoom.party_id}', '${n % 2 ? "B" : "A"}'::party_team)`);
+    }
+  }
+  // This script plays every night in a few seconds, but the daily XP cap counts real days.
+  // Date each week's XP to a week of last month, as if the nights had really been weeks apart.
+  await db.exec(`update guild_xp_events
+    set created_at = (date_trunc('month', now() at time zone 'Asia/Bangkok') - interval '1 month'
+                      + interval '${week * 7} days' + interval '19 hours') at time zone 'Asia/Bangkok'
+    where created_at > now() - interval '1 hour'`);
+}
+const guildTable = await all(`select tag, level, total_xp, member_count from guild_board order by total_xp desc`);
+for (const r of guildTable) line(`   [${r.tag}] เลเวล ${r.level} · XP ${r.total_xp} · สมาชิก ${r.member_count}`);
+// BOLT: 4 nights × (6 games × (4 × 10 + 2 × 5) + 50 rally) = 1,400
+expect("กิลด์ที่เล่นเยอะได้ XP ตามตาราง (BOLT 4 คืน × 6 เกม = 1,400 XP)", guildTable[0].tag === "BOLT" && guildTable[0].total_xp === 1400);
+expect("อันดับเรียงตามการเล่นจริง BOLT > OWL > TGR", guildTable.map((r) => r.tag).join(">") === "BOLT>OWL>TGR");
+expect("คืนรวมพลได้โบนัสคืนละครั้ง (4 คืน = 4 ครั้งต่อกิลด์)",
+  (await one(`select count(*)::int n from guild_xp_events where guild_id = '${GUILDS[0].id}' and source = 'rally'`)).n === 4);
+expect("ตารางกิลด์สาธารณะไม่มี user id",
+  (await one(`select count(*)::int n from guild_member_board b join auth.users u on u.id = b.player_key or u.id = b.entry_id`)).n === 0);
+
+// A player moves guilds: what they earned stays where they earned it.
+const mover = guildPlayers[2][3];
+const tgrBefore = (await one(`select total_xp from guild_board where guild_id = '${GUILDS[2].id}'`)).total_xp;
+await as(mover.id);
+await db.query(`select leave_guild()`);
+await refused("ย้ายกิลด์ทันทีไม่ได้ ต้องรอ 3 วัน", `select join_guild('${GUILDS[0].id}', '${(await one(`select join_code from guilds where id = '${GUILDS[0].id}'`)).join_code}')`, "GUILD_COOLDOWN");
+expect("XP ที่ทำให้กิลด์เดิมยังอยู่กับกิลด์เดิม",
+  (await one(`select total_xp from guild_board where guild_id = '${GUILDS[2].id}'`)).total_xp === tgrBefore);
+
+// Month end: those nights were last month, so closing the season ranks them.
+await db.query(`select close_guild_season()`);
+const results = await all(
+  `select g.tag, r.rank, r.xp from guild_season_results r join guilds g on g.id = r.guild_id order by r.rank`,
+);
+line(`   ผลซีซั่น: ${results.map((r) => `#${r.rank} [${r.tag}] ${r.xp} XP`).join(" · ")}`);
+expect("ปิดซีซั่นแล้วได้อันดับ 1-3 และเหรียญ 🥇🥈🥉",
+  results.length === 3 && (await one(`select count(*)::int n from guild_badges where code like 'season_%'`)).n === 3);
+expect("ซีซั่นใหม่ XP ซีซั่นเริ่มที่ 0 แต่เลเวลยังอยู่",
+  (await one(`select max(season_xp)::int n from guild_board`)).n === 0 &&
+  (await one(`select level from guild_board where guild_id = '${GUILDS[0].id}'`)).level === 4);
+
 line();
 line(problems ? `พบปัญหา ${problems} จุด` : "ผ่านทั้งหมด — กฎใหม่ทำงานอย่างที่ออกแบบไว้ บนฐานข้อมูลใช้แล้วทิ้ง");
 line("ฐานข้อมูลนี้หายไปพร้อมกับการจบสคริปต์ ไม่มีอะไรค้างอยู่ที่ไหน");

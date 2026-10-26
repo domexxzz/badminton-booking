@@ -158,6 +158,7 @@ export function BookingForm({
   function changeDate(next: string) {
     setDate(next);
     setHour(null);
+    setAwaitingEnd(false);
     setError(null);
   }
 
@@ -170,6 +171,30 @@ export function BookingForm({
     setActiveCourtId(courtId);
     setHour(h);
     setHours(avail >= 1 ? 1 : 0.5);
+  }
+
+  // Like a hotel calendar: the first tap is the start, the next tap later in the day is the
+  // end. A tap after that starts a new choice. One tap alone still books the default hour.
+  const [awaitingEnd, setAwaitingEnd] = useState(false);
+
+  function tapSlot(h: number) {
+    if (hour !== null && awaitingEnd && h > hour) {
+      const tooLong = h + slotStep - hour > BOOKING_RULES.maxHours;
+      if (!selectRange(hour, h)) {
+        setError("ช่วงนี้ไม่มีสนามว่างต่อเนื่องตลอด ลองเลือกเวลาจบที่เร็วขึ้น");
+        return;
+      }
+      setAwaitingEnd(false);
+      // selectRange caps the stretch at the longest booking allowed; say so.
+      if (tooLong) setError(`จองต่อเนื่องได้สูงสุด ${BOOKING_RULES.maxHours} ชม. เลือกให้ ${BOOKING_RULES.maxHours} ชม. แล้ว`);
+      return;
+    }
+    if (hour !== null && awaitingEnd && h === hour) {
+      setAwaitingEnd(false);
+      return;
+    }
+    pickTime(h);
+    setAwaitingEnd(true);
   }
 
   // Dragging across the grid picks one continuous stretch of time. On a phone the drag
@@ -233,7 +258,10 @@ export function BookingForm({
   }
 
   function endDrag() {
-    if (dragRef.current?.moved) suppressClickRef.current = true;
+    if (dragRef.current?.moved) {
+      suppressClickRef.current = true;
+      setAwaitingEnd(false);
+    }
     dragRef.current = null;
   }
 
@@ -417,7 +445,7 @@ export function BookingForm({
                     suppressClickRef.current = false;
                     return;
                   }
-                  pickTime(h);
+                  tapSlot(h);
                 }}
               >
                 <span className="hour-slot-time">
@@ -428,7 +456,17 @@ export function BookingForm({
                     <span key={c.id} className={`court-dot ${freeIds.has(c.id) ? "free" : "taken"}`} />
                   ))}
                 </span>
-                <span className="hour-slot-note">{free.length > 0 ? `ว่าง ${free.length} สนาม` : "เต็ม"}</span>
+                <span className="hour-slot-note">
+                  {isSelected
+                    ? awaitingEnd
+                      ? "เริ่ม · แตะเวลาจบ"
+                      : "เริ่ม"
+                    : hour !== null && hours > slotStep && h === hour + hours - slotStep
+                    ? "จบ"
+                    : free.length > 0
+                    ? `ว่าง ${free.length} สนาม`
+                    : "เต็ม"}
+                </span>
               </button>
             );
           })}
@@ -437,8 +475,10 @@ export function BookingForm({
         {loaded && (
           <p className="booking-drag-hint">
             {hour === null
-              ? "แตะเวลาเริ่ม แล้วลากช่องที่เลือกไปต่อเพื่อเล่นนานขึ้น"
-              : "ลากช่องสีเขียวเพื่อเพิ่มหรือลดเวลา"}
+              ? "แตะเวลาเริ่ม แล้วแตะอีกช่องเป็นเวลาจบ (หรือลากก็ได้)"
+              : awaitingEnd
+              ? "แตะช่องเวลาจบ หรือกดจองได้เลยถ้าเล่นช่วงเดียว"
+              : "แตะช่องอื่นเพื่อเลือกใหม่ หรือลากช่องสีเขียวเพื่อปรับเวลา"}
           </p>
         )}
 

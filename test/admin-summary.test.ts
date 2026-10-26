@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { confirmedRevenue, countBookings, monthBounds, summarizeDay } from "../src/lib/admin/summary";
+import { confirmedRevenue, countBookings, monthBounds, owedAmount, summarizeDay } from "../src/lib/admin/summary";
 
 const b = (status: string, amount: number | string, from: string, to: string) => ({
   status,
@@ -36,7 +36,29 @@ describe("summarizeDay", () => {
       ],
       4,
     );
-    expect(summary).toEqual({ revenue: 650, confirmedCount: 2, waitingCount: 2, bookedHours: 5, utilization: 9 });
+    expect(summary).toEqual({ revenue: 650, owed: 0, confirmedCount: 2, waitingCount: 2, bookedHours: 5, utilization: 9 });
+  });
+});
+
+describe("money owed by pay-later bookings", () => {
+  const owed = { ...b("confirmed", 130, "17", "18"), pay_later: true, paid_at: null };
+  const settled = { ...b("confirmed", 260, "18", "20"), pay_later: true, paid_at: "2026-10-20T13:00:00Z" };
+  const paid = b("confirmed", 195, "20", "21");
+
+  test("revenue counts money received, not a pay-later bill still owed", () => {
+    expect(confirmedRevenue([owed, settled, paid])).toBe(455);
+  });
+
+  test("owedAmount adds up what pay-later customers still owe", () => {
+    expect(owedAmount([owed, settled, paid, { ...owed, amount: 65.5 }])).toBe(195.5);
+    expect(owedAmount([paid])).toBe(0);
+  });
+
+  test("a day's summary keeps owed money out of revenue but its court time in", () => {
+    const summary = summarizeDay([owed, paid], 4);
+    expect(summary.revenue).toBe(195);
+    expect(summary.owed).toBe(130);
+    expect(summary.bookedHours).toBe(2);
   });
 });
 

@@ -1,7 +1,9 @@
 import { describe, expect, test, vi } from "vitest";
 import {
+  chunk,
   createDailySummaryHandler,
   formatTelegramDailySummary,
+  slipCaption,
   summaryDays,
   type DailySummaryBooking,
 } from "../src/lib/telegram/daily-summary";
@@ -144,6 +146,18 @@ describe("formatTelegramDailySummary", () => {
     expect(text).not.toContain("ค้างชำระ");
   });
 
+  test("says how many transfer slips follow the morning summary", () => {
+    const text = formatTelegramDailySummary({
+      kind: "morning",
+      day: "2026-10-25",
+      courts: COURTS,
+      bookings: [b(1, "confirmed", 260, "18:00", "20:00")],
+      pending: NO_PENDING,
+      slipCount: 3,
+    });
+    expect(text).toContain("🧾 สลิปโอนเงิน 3 ใบ ส่งตามมาด้านล่าง");
+  });
+
   test("caps a very long customer list so the message stays under Telegram's limit", () => {
     const many = Array.from({ length: 80 }, (_, i) => ({
       ...b(1, "confirmed", 65, "09:00", "09:30"),
@@ -165,6 +179,35 @@ describe("formatTelegramDailySummary", () => {
     });
 
     expect(text).toContain("สนาม &lt;VIP&gt;: 1 ชม. (23:00–24:00)");
+  });
+});
+
+describe("slipCaption", () => {
+  const base = {
+    courtName: "สนาม 2",
+    startsAt: "2026-10-26T18:00:00+07:00",
+    endsAt: "2026-10-26T20:00:00+07:00",
+    customer: "สมชาย",
+    amount: 260,
+  };
+
+  test("names the booking and says the slip passed the automatic check", () => {
+    expect(slipCaption({ ...base, verifyStatus: "verified", paymentStatus: "submitted" })).toBe(
+      "สนาม 2 · 18:00–20:00 · สมชาย · ฿260 · ✅ ตรวจผ่านอัตโนมัติ",
+    );
+  });
+
+  test("says when an admin approved it, rejected it, or it still needs a look", () => {
+    expect(slipCaption({ ...base, verifyStatus: "mismatch", paymentStatus: "approved" })).toContain("✅ แอดมินอนุมัติ");
+    expect(slipCaption({ ...base, verifyStatus: "verified", paymentStatus: "rejected" })).toContain("❌ ไม่ผ่าน");
+    expect(slipCaption({ ...base, verifyStatus: "mismatch", paymentStatus: "submitted" })).toContain("⚠️ รอตรวจ");
+  });
+});
+
+describe("chunk", () => {
+  test("splits a list into albums of at most 10", () => {
+    expect(chunk(Array.from({ length: 23 }, (_, i) => i), 10).map((c) => c.length)).toEqual([10, 10, 3]);
+    expect(chunk([], 10)).toEqual([]);
   });
 });
 

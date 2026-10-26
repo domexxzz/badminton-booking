@@ -8,6 +8,7 @@ import { escapeHtml, siteUrl } from "./messages";
 export type DailySummaryKind = "morning" | "closing";
 
 export type DailySummaryBooking = BookingForSummary & {
+  id?: string;
   court_id: number;
   customer?: { name: string | null; phone: string | null };
   /** Pay-later bookings are confirmed straight away; `paid_at` is set once the shop is paid. */
@@ -24,6 +25,8 @@ export type DailySummaryInput = {
   pending: { awaitingReview: number; cancelRequests: number; rescheduleRequests: number };
   /** Closing summary only: what is already booked for the following day. */
   nextDay?: { day: string; bookings: readonly DailySummaryBooking[] };
+  /** Transfer slips sent as photos right after this message. */
+  slipCount?: number;
 };
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -118,9 +121,41 @@ function nextDayLine(day: string, bookings: readonly DailySummaryBooking[], cour
   return `📅 <b>จองไว้แล้วสำหรับ ${formatDayShort(day)}:</b> ${parts.join(" · ")}`;
 }
 
+/** Caption under one transfer slip photo. Plain text: Telegram albums mix badly with HTML captions. */
+export function slipCaption(slip: {
+  courtName: string;
+  startsAt: string;
+  endsAt: string;
+  customer: string | null;
+  amount: number | string;
+  verifyStatus: string | null;
+  paymentStatus: string | null;
+}): string {
+  const result =
+    slip.paymentStatus === "approved"
+      ? "✅ แอดมินอนุมัติ"
+      : slip.paymentStatus === "rejected"
+      ? "❌ ไม่ผ่าน"
+      : slip.verifyStatus === "verified"
+      ? "✅ ตรวจผ่านอัตโนมัติ"
+      : "⚠️ รอตรวจ";
+  return [
+    slip.courtName,
+    `${formatTime(slip.startsAt)}–${endLabel(slip.endsAt)}`,
+    sanitizeName(slip.customer ?? ""),
+    formatBaht(Number(slip.amount)),
+    result,
+  ].join(" · ");
+}
+
+/** Splits a list into groups of at most `size` (Telegram albums hold 10 photos). */
+export function chunk<T>(items: readonly T[], size: number): T[][] {
+  return Array.from({ length: Math.ceil(items.length / size) }, (_, i) => items.slice(i * size, (i + 1) * size));
+}
+
 /** Formats the morning or closing daily summary for the shop's Telegram group. */
 export function formatTelegramDailySummary(input: DailySummaryInput): string {
-  const { kind, day, courts, bookings, pending, nextDay } = input;
+  const { kind, day, courts, bookings, pending, nextDay, slipCount = 0 } = input;
   const summary = summarizeDay(bookings, courts.length);
   const counts = countBookings(bookings);
 
@@ -135,6 +170,7 @@ export function formatTelegramDailySummary(input: DailySummaryInput): string {
       `⏱️ <b>ใช้สนาม:</b> ${hoursLabel(summary.bookedHours)} (${summary.utilization}%)`,
     `🏸 <b>แยกรายสนาม</b>\n${courtLines}`,
     customerLines(courts, bookings),
+    slipCount > 0 ? `🧾 สลิปโอนเงิน ${slipCount} ใบ ส่งตามมาด้านล่าง` : null,
     `🛎️ <b>งานค้างของแอดมิน</b>\n${pendingLines(pending)}`,
     nextDay ? nextDayLine(nextDay.day, nextDay.bookings, courts.length) : null,
     `${DIVIDER}\n🔗 <a href="${siteUrl()}/admin">เปิดระบบหลังร้าน</a>`,

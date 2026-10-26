@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { getTelegramConfig, sendTelegramMessage, sendTelegramPhoto } from "../src/lib/telegram/client";
+import { getTelegramConfig, sendTelegramMediaGroup, sendTelegramMessage, sendTelegramPhoto } from "../src/lib/telegram/client";
 import {
   escapeHtml,
   formatTelegramCancelledBooking,
@@ -76,6 +76,39 @@ describe("Telegram Client", () => {
     expect(init.body).toBeInstanceOf(FormData);
     const formData = init.body as FormData;
     expect(formData.get("message_thread_id")).toBe("7");
+  });
+
+  test("sendTelegramMediaGroup posts an album with one attachment and caption per photo", async () => {
+    const fetchImpl = jsonResponse(200, { ok: true, result: [] });
+    process.env.TELEGRAM_CHAT_ID = "-100999";
+
+    const photo = () => new Blob(["image data"], { type: "image/jpeg" });
+    const ok = await sendTelegramMediaGroup(
+      [
+        { photo: photo(), caption: "สลิป 1" },
+        { photo: photo(), caption: "สลิป 2" },
+      ],
+      undefined,
+      fetchImpl,
+    );
+    expect(ok).toBe(true);
+
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toContain("/sendMediaGroup");
+    const form = init.body as FormData;
+    expect(JSON.parse(String(form.get("media")))).toEqual([
+      { type: "photo", media: "attach://photo0", caption: "สลิป 1" },
+      { type: "photo", media: "attach://photo1", caption: "สลิป 2" },
+    ]);
+    expect(form.get("photo0")).toBeInstanceOf(Blob);
+    expect(form.get("photo1")).toBeInstanceOf(Blob);
+  });
+
+  test("sendTelegramMediaGroup refuses more than 10 photos, Telegram's album limit", async () => {
+    const fetchImpl = jsonResponse(200, { ok: true });
+    const many = Array.from({ length: 11 }, () => ({ photo: new Blob(["x"]) }));
+    expect(await sendTelegramMediaGroup(many, undefined, fetchImpl)).toBe(false);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
 

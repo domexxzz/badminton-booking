@@ -50,3 +50,10 @@ export const STATUS_LABEL: Record<string, string> = {
   cancelled: "ยกเลิก",
   expired: "หมดเวลาชำระ",
 };
+
+/** A length of time in hours as Thai: "2 ชม. 30 นาที", "1 ชม.", "30 นาที". */
+export function formatDuration(hours: number): string {
+  const whole = Math.floor(hours);
+  const minutes = Math.round((hours - whole) * 60);
+  return [whole > 0 ? `${whole} ชม.` : null, minutes > 0 ? `${minutes} นาที` : null].filter(Boolean).join(" ");
+}

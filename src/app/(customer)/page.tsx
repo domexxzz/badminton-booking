@@ -1,5 +1,6 @@
 import { HomeClientView } from "@/components/HomeClientView";
 import { ShopContactCard } from "@/components/ShopContactCard";
+import { VenueCard } from "@/components/VenueCard";
 import { getPublicCourts, getPublicVenueHours } from "@/lib/public-data";
 import { bangkokDate, slotStart, type Occupancy } from "@/lib/slots";
 import { getSessionUser } from "@/lib/supabase/server";
@@ -38,6 +39,7 @@ export default async function HomePage() {
         closeHour={closeHour}
       />
       <ShopContactCard />
+      <VenueCard />
     </>
   );
 }

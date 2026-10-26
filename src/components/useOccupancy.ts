@@ -13,6 +13,8 @@ export function useOccupancy(date: string) {
   const [occupancy, setOccupancy] = useState<Occupancy[]>([]);
   const [live, setLive] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // The date whose snapshot has arrived: until it matches `date`, the list is not that day's yet.
+  const [loadedDate, setLoadedDate] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = getBrowserClient();
@@ -51,6 +53,7 @@ export function useOccupancy(date: string) {
       }
       setLoadError(null);
       setOccupancy(pending.reduce(applyOccupancyChange, data as Occupancy[]));
+      setLoadedDate(date);
     }
 
     return () => {
@@ -60,5 +63,5 @@ export function useOccupancy(date: string) {
     };
   }, [date]);
 
-  return { occupancy, live, loadError };
+  return { occupancy, live, loadError, loaded: loadedDate === date };
 }

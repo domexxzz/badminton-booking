@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarIcon, CourtIcon, HomeIcon, QueueIcon, UserIcon } from "./icons";
+import { ChatIcon, CourtIcon, HomeIcon, QueueIcon, UserIcon } from "./icons";
 
+// Five tabs is the most a phone bar holds. The day's schedule moved off the bar: the booking
+// page already shows free courts per hour and links to the full schedule.
 const TABS = [
   { href: "/", label: "หน้าแรก", Icon: HomeIcon },
-  { href: "/schedule", label: "ตารางคิว", Icon: CalendarIcon },
+  { href: "/community", label: "คอมมูนิตี้", Icon: ChatIcon },
   { href: "/book", label: "จองสนาม", Icon: CourtIcon },
   { href: "/queue", label: "คิวก๊วน", Icon: QueueIcon },
   { href: "/me", label: "ของฉัน", Icon: UserIcon },

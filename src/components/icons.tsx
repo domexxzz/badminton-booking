@@ -43,6 +43,14 @@ export const CourtIcon = (p: IconProps) => (
   </Svg>
 );
 
+/** Two speech bubbles: the community feed. */
+export const ChatIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h8A2.5 2.5 0 0 1 17 5.5v5a2.5 2.5 0 0 1-2.5 2.5H9l-3.5 3v-3H6.5A2.5 2.5 0 0 1 4 10.5z" />
+    <path d="M17 8h.5A2.5 2.5 0 0 1 20 10.5v5a2.5 2.5 0 0 1-2.5 2.5h-.5v3l-3.5-3h-3A2.5 2.5 0 0 1 8 15.5V15" />
+  </Svg>
+);
+
 export const UserIcon = (p: IconProps) => (
   <Svg {...p}>
     <circle cx="12" cy="8" r="4" />

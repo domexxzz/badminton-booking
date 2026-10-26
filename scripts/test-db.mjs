@@ -1001,6 +1001,32 @@ check("the win and the loss are both on the scoreboard",
 check("the winner gained exactly what the loser lost",
   (await db.query(`select sum(rating_delta)::int total from party_player_stats where party_id='${singles.party_id}'`)).rows[0]?.total === 0);
 
+// ---- Admin bookings that are owed (0034) ----
+{
+  const one = async (sql) => (await db.query(sql)).rows[0];
+  const { rows: [{ t: owedAt }] } = await db.query(
+    `select ((now() at time zone 'Asia/Bangkok')::date + 6 + time '09:00') at time zone 'Asia/Bangkok' as t`);
+  const at = (h) => new Date(Date.parse(owedAt) + h * 3600e3).toISOString();
+  await as(ADMIN);
+  const phone = await one(`select * from admin_create_booking(1::smallint, '${at(0)}', 2, 'phone', 'ก๊วนประจำ', '0812345678', '[จองประจำ]')`);
+  check("an admin booking starts out paid", phone.status === "confirmed" && phone.pay_later === false);
+  await as(U1);
+  await expectError("a customer cannot mark a booking owed", `select admin_mark_booking_unpaid('${phone.id}')`, "FORBIDDEN");
+  await as(ADMIN);
+  await db.query(`select admin_mark_booking_unpaid('${phone.id}')`);
+  const owed = await one(`select pay_later, paid_at from bookings where id = '${phone.id}'`);
+  check("marking it owed puts it on the unpaid list", owed.pay_later === true && owed.paid_at === null);
+  await db.query(`select mark_booking_paid('${phone.id}')`);
+  check("settling it later records when it was paid",
+    (await one(`select paid_at from bookings where id = '${phone.id}'`)).paid_at !== null);
+  await as(U1);
+  const online = await one(`select * from create_booking(2::smallint, '${at(3)}', 1)`);
+  await db.exec(`update bookings set status = 'confirmed', hold_expires_at = null where id = '${online.id}'`);
+  await as(ADMIN);
+  await expectError("a customer's own online booking can never be switched to owed",
+    `select admin_mark_booking_unpaid('${online.id}')`, "BOOKING_NOT_FOUND");
+}
+
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);
 

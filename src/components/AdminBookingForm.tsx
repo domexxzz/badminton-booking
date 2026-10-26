@@ -21,6 +21,7 @@ const emptyForm = (date: string, courtId: number): AdminBookingInput => ({
   name: "",
   phone: "",
   note: "",
+  paid: true,
 });
 
 export function AdminBookingForm({
@@ -39,6 +40,7 @@ export function AdminBookingForm({
   const [cartItems, setCartItems] = useState<AdminCartItem[]>([]);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
+  const [createdUnpaid, setCreatedUnpaid] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const maxHours = Math.max(0.5, closeHour - form.hour);
@@ -119,11 +121,20 @@ export function AdminBookingForm({
         setMessage({ ok: false, text: result.error });
         return;
       }
-      setMessage({
-        ok: true,
-        text: `บันทึกการจองของ ${form.name.trim()} (${effectiveItems.length} รายการ · ${formatBaht(totalAmount)}) แล้ว`,
-      });
+      const summary = `${form.name.trim()} (${effectiveItems.length} รายการ · ${formatBaht(totalAmount)})`;
+      setMessage(
+        result.data.unpaidNotSaved
+          ? {
+              ok: false,
+              text: `บันทึกการจองของ ${summary} แล้ว แต่ยังตั้งเป็น "ค้างชำระ" ไม่สำเร็จ ตอนนี้ระบบถือว่าจ่ายแล้ว กรุณาแจ้งโดม`,
+            }
+          : {
+              ok: true,
+              text: `บันทึกการจองของ ${summary} แล้ว · ${form.paid === false ? "🕒 ค้างชำระ (ดูที่ตารางสนาม)" : "✅ ชำระแล้ว"}`,
+            },
+      );
       setCreatedBookingId(result.data.id);
+      setCreatedUnpaid(form.paid === false && !result.data.unpaidNotSaved);
       setCartItems([]);
       setForm(emptyForm(form.date, form.courtId));
       router.refresh();
@@ -302,9 +313,39 @@ export function AdminBookingForm({
         </label>
       </div>
 
+      <div className="field">
+        <span>การชำระเงิน</span>
+        <div role="radiogroup" aria-label="การชำระเงิน" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={form.paid !== false}
+            className={`chip ${form.paid !== false ? "selected" : "free"}`}
+            onClick={() => update({ paid: true })}
+          >
+            ✅ ชำระแล้ว
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={form.paid === false}
+            className={`chip ${form.paid === false ? "selected" : "free"}`}
+            onClick={() => update({ paid: false })}
+          >
+            🕒 ยังไม่ชำระ (เก็บทีหลัง)
+          </button>
+        </div>
+        {form.paid === false && (
+          <span className="muted" style={{ fontSize: 12 }}>
+            จะขึ้นในรายการ “ค้างชำระ” ที่หน้าตารางสนาม พอได้รับเงินแล้วกด “รับเงินแล้ว” ที่นั่น
+          </span>
+        )}
+      </div>
+
       <div className="row">
         <span className="muted">
-          รวม {effectiveItems.length} รายการ · ราคา {formatBaht(totalAmount)} · ยืนยันทันที
+          รวม {effectiveItems.length} รายการ · ราคา {formatBaht(totalAmount)} · ยืนยันทันที ·{" "}
+          {form.paid === false ? "🕒 ค้างชำระ" : "✅ ชำระแล้ว"}
         </span>
         <button className="btn" type="submit" disabled={pending}>
           {pending ? "กำลังบันทึก…" : `บันทึกการจอง (${formatBaht(totalAmount)})`}
@@ -312,7 +353,7 @@ export function AdminBookingForm({
       </div>
       {message && <p className={message.ok ? "muted" : "error"}>{message.text}</p>}
 
-      {createdBookingId && (
+      {createdBookingId && !createdUnpaid && (
         <div className="stack" style={{ gap: 10, borderTop: "1px dashed var(--border)", paddingTop: 12 }}>
           <h3 style={{ margin: 0, fontSize: 15 }}>💳 ลูกค้าจ่ายเงินด้วย? แนบสลิปได้เลย</h3>
           <span className="muted" style={{ fontSize: 13 }}>

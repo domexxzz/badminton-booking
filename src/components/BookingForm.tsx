@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { createBooking } from "@/app/actions";
 import { BOOKING_RULES } from "@/lib/config";
-import { formatBaht, formatDayShort } from "@/lib/format";
+import { formatBaht, formatDayShort, formatDuration } from "@/lib/format";
 import {
   formatHour,
   getVenueStatus,
@@ -172,6 +172,71 @@ export function BookingForm({
     setHours(avail >= 1 ? 1 : 0.5);
   }
 
+  // Dragging across the grid picks one continuous stretch of time. On a phone the drag
+  // starts on the block already chosen, so a swipe anywhere else still scrolls the page;
+  // with a mouse it can start on any free slot.
+  const gridRef = useRef<HTMLDivElement>(null);
+  // anchor = the end of the stretch that stays put; null until the first move shows the direction.
+  const dragRef = useRef<{
+    anchor: number | null;
+    origin: number;
+    first: number;
+    lastSlot: number;
+    last: number;
+    moved: boolean;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
+
+  /** Selects [a, b] (slot starts, either order) if one court is free for all of it. */
+  function selectRange(a: number, b: number): boolean {
+    const start = Math.min(a, b);
+    const length = Math.min(Math.max(a, b) + slotStep - start, BOOKING_RULES.maxHours);
+    const fits = (courtId: number) => getAvailableHoursForCourt(courtId, date, start) >= length;
+    const courtId = fits(activeCourtId) ? activeCourtId : courts.find((c) => fits(c.id))?.id;
+    if (courtId === undefined) return false;
+    setError(null);
+    setActiveCourtId(courtId);
+    setHour(start);
+    setHours(length);
+    return true;
+  }
+
+  function startDrag(e: React.PointerEvent, h: number) {
+    const inSelection = hour !== null && h >= hour && h < hour + hours;
+    if (e.pointerType !== "mouse" && !inSelection) return;
+    if (!inSelection && !selectRange(h, h)) return;
+    const first = inSelection ? (hour as number) : h;
+    const lastSlot = inSelection ? (hour as number) + hours - slotStep : h;
+    dragRef.current = { anchor: inSelection ? null : h, origin: h, first, lastSlot, last: h, moved: false };
+    try {
+      gridRef.current?.setPointerCapture(e.pointerId);
+    } catch {
+      // The pointer is already gone (a very quick tap): nothing to follow.
+    }
+  }
+
+  function moveDrag(e: React.PointerEvent) {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-slot]");
+    const h = el ? Number(el.dataset.slot) : NaN;
+    if (Number.isNaN(h) || h === drag.last) return;
+    drag.last = h;
+    // Grabbing the last slot moves the end; pulling the first slot back moves the start;
+    // anything else moves the end, so "tap a time, then drag on" always lengthens.
+    if (drag.anchor === null) {
+      const grabbedEnd = drag.origin === drag.lastSlot && drag.lastSlot !== drag.first;
+      drag.anchor = !grabbedEnd && h < drag.origin && drag.origin === drag.first ? drag.lastSlot : drag.first;
+    }
+    // A stretch with no court free all the way is skipped: the last good one stays chosen.
+    if (selectRange(drag.anchor, h)) drag.moved = true;
+  }
+
+  function endDrag() {
+    if (dragRef.current?.moved) suppressClickRef.current = true;
+    dragRef.current = null;
+  }
+
   function selectCourt(courtId: number) {
     setActiveCourtId(courtId);
     setError(null);
@@ -277,9 +342,15 @@ export function BookingForm({
       <section className="card stack booking-picker-card" aria-labelledby="pick-time-title">
         <div className="booking-section-title">
           <span id="pick-time-title">เลือกเวลา</span>
-          <span className="booking-slot-legend">
-            <span className="court-dot free" aria-hidden="true" /> = สนามว่าง
-          </span>
+          {hour !== null ? (
+            <span className="booking-duration-badge" aria-live="polite">
+              ⏱ {formatDuration(hours)} · {formatHour(hour)}–{formatHour(hour + hours)}
+            </span>
+          ) : (
+            <span className="booking-slot-legend">
+              <span className="court-dot free" aria-hidden="true" /> = สนามว่าง
+            </span>
+          )}
         </div>
 
         {date === dates[0] && venueStatus.isTodayClosed && (
@@ -303,7 +374,14 @@ export function BookingForm({
 
         {loadError && <p className="error">{loadError}</p>}
 
-        <div className={`hour-slot-grid ${halfHourStarts ? "half-hours" : ""}`} aria-busy={!loaded}>
+        <div
+          ref={gridRef}
+          className={`hour-slot-grid ${halfHourStarts ? "half-hours" : ""}`}
+          aria-busy={!loaded}
+          onPointerMove={moveDrag}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+        >
           {slots.map((h) => {
             // Until the day's bookings arrive, say so instead of showing every court as free.
             if (!loaded) {
@@ -331,7 +409,16 @@ export function BookingForm({
                 aria-label={`${formatHour(h)} ถึง ${formatHour(h + slotStep)} ${
                   free.length > 0 ? `ว่าง ${free.length} สนาม` : "เต็ม"
                 }`}
-                onClick={() => pickTime(h)}
+                data-slot={h}
+                onPointerDown={(e) => startDrag(e, h)}
+                onClick={() => {
+                  // The click that ends a drag must not shrink the stretch back to one slot.
+                  if (suppressClickRef.current) {
+                    suppressClickRef.current = false;
+                    return;
+                  }
+                  pickTime(h);
+                }}
               >
                 <span className="hour-slot-time">
                   {formatHour(h)} – {formatHour(h + slotStep)}
@@ -346,6 +433,14 @@ export function BookingForm({
             );
           })}
         </div>
+
+        {loaded && (
+          <p className="booking-drag-hint">
+            {hour === null
+              ? "แตะเวลาเริ่ม แล้วลากช่องที่เลือกไปต่อเพื่อเล่นนานขึ้น"
+              : "ลากช่องสีเขียวเพื่อเพิ่มหรือลดเวลา"}
+          </p>
+        )}
 
         <details className="booking-more" open={halfHourStarts || undefined}>
           <summary>ตัวเลือกเพิ่มเติม</summary>

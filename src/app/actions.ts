@@ -296,11 +296,37 @@ export type AdminBookingInput = {
   name: string;
   phone: string;
   note: string;
+  /** false = the customer pays later; the booking goes on the board's "ค้างชำระ" list. */
+  paid?: boolean;
 };
 
 const CHANNELS = new Set(["phone", "line", "walk_in"]);
 
-export async function adminCreateBooking(input: AdminBookingInput): Promise<ActionResult<{ id: string }>> {
+/**
+ * Creates the admin's booking, then marks the whole bill as owed when it is not paid yet.
+ * If marking fails (for instance before migration 0034 is run) the booking still stands,
+ * and `unpaidNotSaved` tells the admin to mark it by hand.
+ */
+export async function adminCreateBooking(
+  input: AdminBookingInput,
+): Promise<ActionResult<{ id: string; unpaidNotSaved?: boolean }>> {
+  if (input.paid !== undefined && typeof input.paid !== "boolean") {
+    return { ok: false, error: "ข้อมูลการจองไม่ครบหรือไม่ถูกต้อง" };
+  }
+  const created = await createAdminBookingRows(input);
+  if (!created.ok || input.paid !== false) return created;
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_mark_booking_unpaid", { p_booking_id: created.data.id });
+  if (error) {
+    console.error("Marking an admin booking unpaid failed:", error);
+    return { ok: true, data: { id: created.data.id, unpaidNotSaved: true } };
+  }
+  revalidatePath("/admin");
+  return created;
+}
+
+async function createAdminBookingRows(input: AdminBookingInput): Promise<ActionResult<{ id: string }>> {
   const { courtId, date, hour, hours, items, channel, name, phone, note } = input;
   const normalizedItems: AdminBookingItemInput[] =
     Array.isArray(items) && items.length > 0

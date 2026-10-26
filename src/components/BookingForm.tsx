@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createBooking } from "@/app/actions";
@@ -14,6 +15,7 @@ import {
   upcomingDates,
 } from "@/lib/slots";
 import { DatePills } from "./DatePills";
+import { CalendarIcon } from "./icons";
 import { useOccupancy } from "./useOccupancy";
 
 type Court = { id: number; name: string; price_per_hour: number };
@@ -365,6 +367,12 @@ export function BookingForm({
       </ol>
 
       <DatePills dates={dates} value={date} onChange={changeDate} />
+
+      <Link href={`/schedule?date=${date}`} className="booking-schedule-link">
+        <CalendarIcon size={18} />
+        <span>ดูตารางคิวทั้งวัน · ใครจองสนามไหนช่วงไหน</span>
+        <span aria-hidden="true">›</span>
+      </Link>
 
       {/* Step 1: a time, with how many courts are free at it */}
       <section className="card stack booking-picker-card" aria-labelledby="pick-time-title">

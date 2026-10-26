@@ -6,7 +6,6 @@ import { createBooking } from "@/app/actions";
 import { BOOKING_RULES } from "@/lib/config";
 import { formatBaht, formatDayShort } from "@/lib/format";
 import {
-  cellState,
   formatHour,
   getVenueStatus,
   maxBookableHours,
@@ -15,7 +14,6 @@ import {
   upcomingDates,
 } from "@/lib/slots";
 import { DatePills } from "./DatePills";
-import { CourtArt } from "./CourtArt";
 import { useOccupancy } from "./useOccupancy";
 
 type Court = { id: number; name: string; price_per_hour: number };
@@ -30,6 +28,11 @@ export type CartItem = {
 };
 
 const CLOCK_TICK_MS = 30_000;
+const MAX_CART_ITEMS = 8;
+const DURATIONS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4];
+const STEPS = ["เลือกเวลา", "เลือกสนาม", "ยืนยัน"] as const;
+
+const durationLabel = (h: number) => (h === 0.5 ? "30 นาที" : `${h} ชม.`);
 
 export function BookingForm({
   courts,
@@ -66,10 +69,12 @@ export function BookingForm({
   });
   const [hour, setHour] = useState<number | null>(initial.hour ?? null);
   const [hours, setHours] = useState(1);
+  // Half-hour starts are still bookable, just not in the first grid a customer sees.
+  const [halfHourStarts, setHalfHourStarts] = useState(() => initial.hour !== undefined && initial.hour % 1 !== 0);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const { occupancy } = useOccupancy(date);
+  const { occupancy, loaded, loadError } = useOccupancy(date);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), CLOCK_TICK_MS);
@@ -110,9 +115,7 @@ export function BookingForm({
   const [payLater, setPayLater] = useState(false);
   const [agreedTotal, setAgreedTotal] = useState("");
 
-  const activeCourt = courts.find((c) => c.id === activeCourtId) ?? courts[0];
-
-  // Current pending selection (not yet clicked "+ เพิ่มลงในรายการจอง")
+  // Current pending selection (not yet added with "เพิ่มลงรายการ")
   const pendingDraftItem: CartItem | null =
     hour !== null && maxHours >= hours
       ? {
@@ -137,6 +140,7 @@ export function BookingForm({
 
   const total = effectiveItems.reduce((sum, item) => sum + itemPrice(item), 0);
   const agreedValue = isCoach && agreedTotal.trim() !== "" ? Number(agreedTotal) : null;
+  const payable = agreedValue ?? total;
 
   // Courts that are completely free for the currently selected [hour, hour + hours] window
   const freeCourtsForCurrentWindow =
@@ -144,10 +148,28 @@ export function BookingForm({
       ? courts.filter((c) => getAvailableHoursForCourt(c.id, date, hour) >= hours)
       : [];
 
+  // The time grid: hourly by default, every half hour when asked for.
+  const slotStep = halfHourStarts ? 0.5 : 1;
+  const slots = openingSlots(slotStep, openHour, closeHour);
+  const freeCourtsAt = (h: number) => courts.filter((c) => getAvailableHoursForCourt(c.id, date, h) >= slotStep);
+
+  const currentStep = effectiveItems.length === 0 ? 1 : hour !== null ? 2 : 3;
+
   function changeDate(next: string) {
     setDate(next);
     setHour(null);
     setError(null);
+  }
+
+  function pickTime(h: number) {
+    setError(null);
+    // Keep the court the customer already had if it is free; otherwise the first free one.
+    const keep = getAvailableHoursForCourt(activeCourtId, date, h) >= slotStep;
+    const courtId = keep ? activeCourtId : (freeCourtsAt(h)[0]?.id ?? activeCourtId);
+    const avail = getAvailableHoursForCourt(courtId, date, h);
+    setActiveCourtId(courtId);
+    setHour(h);
+    setHours(avail >= 1 ? 1 : 0.5);
   }
 
   function selectCourt(courtId: number) {
@@ -165,32 +187,16 @@ export function BookingForm({
 
   function addCurrentToCart() {
     if (hour === null) {
-      setError("กรุณาเลือกเวลาเริ่มต้นก่อนเพิ่มลงในรายการจอง");
+      setError("กรุณาเลือกเวลาก่อนเพิ่มลงรายการ");
       return;
     }
-    if (cartItems.length >= 8) {
-      setError("เพิ่มรายการได้สูงสุด 8 รายการต่อบิล");
+    if (cartItems.length >= MAX_CART_ITEMS) {
+      setError(`เพิ่มรายการได้สูงสุด ${MAX_CART_ITEMS} รายการต่อบิล`);
       return;
     }
-    const newItem: CartItem = {
-      key: `${date}-${activeCourtId}-${hour}`,
-      courtId: activeCourtId,
-      date,
-      hour,
-      hours,
-    };
-    const nextCart = [...cartItems, newItem];
-    setCartItems(nextCart);
+    setCartItems([...cartItems, { key: `${date}-${activeCourtId}-${hour}`, courtId: activeCourtId, date, hour, hours }]);
     setHour(null);
     setError(null);
-
-    // Automatically move activeCourtId to the next court so the user can pick the next court's time right away
-    const otherCourt = courts.find(
-      (c) => c.id !== activeCourtId && !nextCart.some((item) => item.courtId === c.id && item.date === date),
-    );
-    if (otherCourt) {
-      setActiveCourtId(otherCourt.id);
-    }
   }
 
   function addAllFreeCourtsForCurrentWindow() {
@@ -202,8 +208,7 @@ export function BookingForm({
       hour,
       hours,
     }));
-    const combined = [...cartItems, ...toAdd].slice(0, 8);
-    setCartItems(combined);
+    setCartItems([...cartItems, ...toAdd].slice(0, MAX_CART_ITEMS));
     setHour(null);
     setError(null);
   }
@@ -246,311 +251,311 @@ export function BookingForm({
     });
   }
 
+  const courtName = (id: number) => courts.find((c) => c.id === id)?.name ?? `สนาม ${id}`;
+  const itemLine = (item: CartItem) =>
+    `${courtName(item.courtId)} · ${formatDayShort(item.date)} · ${formatHour(item.hour)}–${formatHour(item.hour + item.hours)}`;
+  const totalHours = effectiveItems.reduce((sum, item) => sum + item.hours, 0);
+
   return (
-    <div className="stack booking-cart-page">
-      {/* Top Date Selector */}
+    <div className="stack booking-cart-page time-first-booking">
+      <ol className="booking-steps" aria-label="ขั้นตอนการจอง">
+        {STEPS.map((label, i) => {
+          const n = i + 1;
+          const state = n < currentStep ? "done" : n === currentStep ? "current" : "todo";
+          return (
+            <li key={label} className={`booking-step ${state}`} aria-current={state === "current" ? "step" : undefined}>
+              <span className="booking-step-dot">{state === "done" ? "✓" : n}</span>
+              <span className="booking-step-label">{label}</span>
+            </li>
+          );
+        })}
+      </ol>
+
       <DatePills dates={dates} value={date} onChange={changeDate} />
 
-      {/* Step 1: Select Court, Start Time, Duration & Add to Cart */}
-      <section className="card stack booking-picker-card">
-        <div className="field">
-          <span className="booking-section-title">เลือกสนามและเวลาที่ต้องการ</span>
-          <div className="booking-court-scroller" role="tablist" aria-label="เลือกสนาม">
+      {/* Step 1: a time, with how many courts are free at it */}
+      <section className="card stack booking-picker-card" aria-labelledby="pick-time-title">
+        <div className="booking-section-title">
+          <span id="pick-time-title">เลือกเวลา</span>
+          <span className="booking-slot-legend">
+            <span className="court-dot free" aria-hidden="true" /> = สนามว่าง
+          </span>
+        </div>
+
+        {date === dates[0] && venueStatus.isTodayClosed && (
+          <div className="card closed-notice-card">
+            <strong>🌙 วันนี้สนามปิดบริการแล้ว (รอบสุดท้าย {formatHour(closeHour)} น.)</strong>
+            <span className="muted" style={{ fontSize: 13 }}>
+              กรุณาเลือกวันถัดไปเพื่อเลือกช่วงเวลาที่ต้องการจอง
+            </span>
+            {dates[1] && (
+              <button
+                type="button"
+                className="btn btn-sm btn-book-tomorrow"
+                style={{ width: "fit-content" }}
+                onClick={() => changeDate(dates[1])}
+              >
+                📅 ไปที่วันพรุ่งนี้
+              </button>
+            )}
+          </div>
+        )}
+
+        {loadError && <p className="error">{loadError}</p>}
+
+        <div className={`hour-slot-grid ${halfHourStarts ? "half-hours" : ""}`} aria-busy={!loaded}>
+          {slots.map((h) => {
+            // Until the day's bookings arrive, say so instead of showing every court as free.
+            if (!loaded) {
+              return (
+                <div key={h} className="hour-slot loading" aria-hidden="true">
+                  <span className="hour-slot-time">
+                    {formatHour(h)} – {formatHour(h + slotStep)}
+                  </span>
+                  <span className="hour-slot-note">กำลังเช็กสนามว่าง…</span>
+                </div>
+              );
+            }
+            const free = freeCourtsAt(h);
+            const freeIds = new Set(free.map((c) => c.id));
+            const isSelected = h === hour;
+            const inRange = hour !== null && h > hour && h < hour + hours;
+            const disabled = free.length === 0 && !isSelected && !inRange;
+            return (
+              <button
+                key={h}
+                type="button"
+                className={`hour-slot ${isSelected ? "selected" : inRange ? "in-range" : disabled ? "full" : "free"}`}
+                disabled={disabled}
+                aria-pressed={isSelected || inRange}
+                aria-label={`${formatHour(h)} ถึง ${formatHour(h + slotStep)} ${
+                  free.length > 0 ? `ว่าง ${free.length} สนาม` : "เต็ม"
+                }`}
+                onClick={() => pickTime(h)}
+              >
+                <span className="hour-slot-time">
+                  {formatHour(h)} – {formatHour(h + slotStep)}
+                </span>
+                <span className="hour-slot-dots" aria-hidden="true">
+                  {courts.map((c) => (
+                    <span key={c.id} className={`court-dot ${freeIds.has(c.id) ? "free" : "taken"}`} />
+                  ))}
+                </span>
+                <span className="hour-slot-note">{free.length > 0 ? `ว่าง ${free.length} สนาม` : "เต็ม"}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <details className="booking-more" open={halfHourStarts || undefined}>
+          <summary>ตัวเลือกเพิ่มเติม</summary>
+          <label className="booking-more-option">
+            <input
+              type="checkbox"
+              checked={halfHourStarts}
+              onChange={(e) => {
+                setHalfHourStarts(e.target.checked);
+                setHour(null);
+              }}
+            />
+            <span>แสดงเวลาเริ่มทุก 30 นาที (เช่น 13:30)</span>
+          </label>
+        </details>
+      </section>
+
+      {/* Step 2: which court, and for how long */}
+      {hour !== null && (
+        <section className="card stack booking-picker-card" aria-labelledby="pick-court-title">
+          <div className="booking-section-title">
+            <span id="pick-court-title">เลือกสนาม</span>
+            <span className="badge confirmed" style={{ fontSize: 12.5, fontWeight: 600 }}>
+              {formatHour(hour)} – {formatHour(hour + hours)} น.
+            </span>
+          </div>
+
+          <div className="court-pick-grid" role="radiogroup" aria-label="เลือกสนาม">
             {courts.map((c) => {
+              const avail = getAvailableHoursForCourt(c.id, date, hour);
               const isSelected = c.id === activeCourtId;
-              const inCartCount = cartItems.filter((item) => item.courtId === c.id && item.date === date).length;
               return (
                 <button
                   key={c.id}
                   type="button"
-                  role="tab"
-                  aria-selected={isSelected}
-                  className={`booking-court-horiz-card ${isSelected ? "selected" : ""}`}
+                  role="radio"
+                  aria-checked={isSelected}
+                  className={`court-pick ${isSelected ? "selected" : avail > 0 ? "free" : "taken"}`}
+                  disabled={avail === 0}
                   onClick={() => selectCourt(c.id)}
                 >
-                  <div className="booking-court-horiz-thumb">
-                    <CourtArt label={c.name} />
-                  </div>
-                  <div className="booking-court-horiz-info">
-                    <strong>
-                      {c.name} ({c.price_per_hour}฿/ชม.)
-                    </strong>
-                    <span>
-                      {inCartCount > 0
-                        ? `✓ เลือกไว้ในรายการแล้ว ${inCartCount} รอบ`
-                        : "เลือกเวลาด้านล่างเพื่อเพิ่มในรายการ"}
-                    </span>
-                  </div>
+                  <strong>{c.name}</strong>
+                  <span>{avail > 0 ? `${c.price_per_hour}฿/ชม.` : "ไม่ว่างช่วงนี้"}</span>
                 </button>
               );
             })}
           </div>
-        </div>
 
-        <div className="field">
-          <div className="row" style={{ marginBottom: 2 }}>
-            <span className="booking-section-title">เลือกเวลาเริ่มต้น</span>
-            {hour !== null && (
-              <span className="badge confirmed" style={{ fontSize: 12.5, fontWeight: 600 }}>
-                {activeCourt?.name} · {formatHour(hour)} – {formatHour(hour + hours)} น.
-              </span>
-            )}
-          </div>
-
-          {date === dates[0] && venueStatus.isTodayClosed && (
-            <div className="card closed-notice-card" style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 18 }}>🌙</span>
-                <strong>วันนี้สนามปิดบริการแล้ว (รอบสุดท้าย {formatHour(closeHour)} น.)</strong>
-              </div>
-              <span className="muted" style={{ fontSize: 13 }}>
-                กรุณาเลือกวันถัดไปเพื่อเลือกช่วงเวลาที่ต้องการจอง
-              </span>
-              {dates[1] && (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-book-tomorrow"
-                  style={{ marginTop: 4, width: "fit-content" }}
-                  onClick={() => changeDate(dates[1])}
-                >
-                  📅 ไปที่วันพรุ่งนี้
-                </button>
-              )}
+          <div className="field">
+            <span className="booking-section-sub">เล่นนานเท่าไร</span>
+            <div className="duration-scroller">
+              {DURATIONS.map((h) => {
+                const isSelected = h === hours;
+                const isAvailable = h <= maxHours;
+                return (
+                  <button
+                    key={h}
+                    type="button"
+                    className={`chip duration-chip ${isSelected ? "selected" : isAvailable ? "free" : "unavailable"}`}
+                    disabled={!isAvailable}
+                    onClick={() => setHours(h)}
+                  >
+                    <span className="duration-title">{durationLabel(h)}</span>
+                    <span className="duration-sub">เลิก {formatHour(hour + h)}</span>
+                  </button>
+                );
+              })}
             </div>
-          )}
-
-          <div className="chip-grid">
-            {openingSlots(0.5, openHour, closeHour).map((h) => {
-              const inCart = isSlotInCart(activeCourtId, date, h);
-              const state = cellState(activeCourtId, date, h, occupancy, now);
-              const free = state === "free" && !inCart;
-              const inRange = hour !== null && h > hour && h < hour + hours;
-              const isSelected = h === hour;
-              const cls = isSelected
-                ? "selected"
-                : inRange
-                ? "in-range"
-                : inCart
-                ? "in-cart"
-                : free
-                ? "free"
-                : "unavailable";
-              return (
-                <button
-                  key={h}
-                  type="button"
-                  className={`chip time-slot ${cls}`}
-                  disabled={!free && !isSelected && !inRange}
-                  aria-pressed={isSelected || inRange}
-                  aria-label={`รอบ ${formatHour(h)} ถึง ${formatHour(h + 0.5)} ${
-                    inCart ? "อยู่ในรายการจองแล้ว" : free ? "ว่าง" : "ไม่ว่าง"
-                  }`}
-                  onClick={() => {
-                    setError(null);
-                    setHour(h);
-                    const avail = getAvailableHoursForCourt(activeCourtId, date, h);
-                    setHours(avail >= 1 ? 1 : 0.5);
-                  }}
-                >
-                  <span className="chip-time-start">{formatHour(h)}</span>
-                  <span className="chip-time-end">
-                    {inCart ? "✓ ในรายการ" : free ? `– ${formatHour(h + 0.5)}` : "🔒 ล็อกแล้ว"}
-                  </span>
-                </button>
-              );
-            })}
           </div>
-        </div>
 
-        <div className="field">
-          <div className="row" style={{ marginBottom: 2 }}>
-            <span className="booking-section-title">ระยะเวลา</span>
-            {hour !== null && (
-              <span className="muted" style={{ fontSize: 12 }}>
-                เล่นถึง {formatHour(hour + hours)} น.
-              </span>
+          <div className="booking-add-actions">
+            <button type="button" className="booking-add-more-btn" onClick={addCurrentToCart}>
+              ＋ เพิ่มลงรายการ แล้วเลือกสนาม/เวลาอื่นต่อ
+            </button>
+            {freeCourtsForCurrentWindow.length > 1 && (
+              <button type="button" className="booking-add-all-courts-btn" onClick={addAllFreeCourtsForCurrentWindow}>
+                ⚡ จองทุกสนามที่ว่างช่วงนี้ ({freeCourtsForCurrentWindow.length} สนาม)
+              </button>
             )}
           </div>
-          <div className="hours-grid">
-            {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4].map((h) => {
-              const isSelected = h === hours && hour !== null;
-              const isAvailable = hour !== null && h <= maxHours;
-              const endHourStr = hour !== null ? formatHour(hour + h) : null;
-              return (
-                <button
-                  key={h}
-                  type="button"
-                  className={`chip duration-chip ${
-                    isSelected ? "selected" : isAvailable ? "free" : "unavailable"
-                  }`}
-                  disabled={hour === null || !isAvailable}
-                  onClick={() => setHours(h)}
-                >
-                  <span className="duration-title">{h === 0.5 ? "30 นาที" : `${h} ชม.`}</span>
-                  {endHourStr && <span className="duration-sub">เลิก {endHourStr}</span>}
-                </button>
-              );
-            })}
+        </section>
+      )}
+
+      {/* Step 3: what will be booked */}
+      {(effectiveItems.length > 0 || isCoach) && (
+        <section className="card stack booking-cart-summary-card" aria-live="polite">
+          <div className="row">
+            <h2 className="booking-section-title" style={{ margin: 0 }}>
+              รายการจอง ({effectiveItems.length})
+            </h2>
+            {cartItems.length > 1 && (
+              <button
+                type="button"
+                className="link-btn"
+                style={{ fontSize: 12.5, color: "var(--danger)" }}
+                onClick={() => setCartItems([])}
+              >
+                ล้างทั้งหมด
+              </button>
+            )}
           </div>
-        </div>
 
-        {/* Add to Booking List Button */}
-        <div className="booking-add-actions">
-          <button
-            type="button"
-            className="btn btn-block booking-add-cart-btn"
-            disabled={hour === null}
-            onClick={addCurrentToCart}
-          >
-            <span style={{ fontSize: 20, fontWeight: 400, lineHeight: 1 }}>＋</span>
-            <span>เพิ่มลงในรายการจอง ({activeCourt?.name ?? "สนาม"})</span>
-          </button>
-
-          {hour !== null && freeCourtsForCurrentWindow.length > 1 && (
-            <button
-              type="button"
-              className="booking-add-all-courts-btn"
-              onClick={addAllFreeCourtsForCurrentWindow}
-            >
-              ⚡ เลือกเวลาเดียวกัน ({formatHour(hour)}–{formatHour(hour + hours)}) ทั้ง{" "}
-              {freeCourtsForCurrentWindow.length} 
-            </button>
-          )}
-        </div>
-      </section>
-
-      {/* Step 2: Booking Cart List & Total Summary */}
-      <section className="card stack booking-cart-summary-card" aria-live="polite">
-        <div className="row" style={{ marginBottom: 2 }}>
-          <h2 className="booking-section-title" style={{ margin: 0 }}>
-            รายการจองของคุณ ({effectiveItems.length} สนาม)
-          </h2>
-          {cartItems.length > 1 && (
-            <button
-              type="button"
-              className="link-btn"
-              style={{ fontSize: 12.5, color: "var(--danger)" }}
-              onClick={() => setCartItems([])}
-            >
-              ล้างทั้งหมด
-            </button>
-          )}
-        </div>
-
-        {effectiveItems.length === 0 ? (
-          <div className="booking-cart-empty">
-            เลือกเวลาด้านบน แล้วกดปุ่ม <strong>“＋ เพิ่มลงในรายการจอง”</strong> เพื่อเพิ่มสนามได้เลย
-          </div>
-        ) : (
-          <div className="booking-cart-list">
-            {effectiveItems.map((item) => {
-              const courtObj = courts.find((c) => c.id === item.courtId);
-              const price = itemPrice(item);
-              const durationLabel = item.hours === 0.5 ? "30 นาที" : `${item.hours} ชม.`;
-              return (
+          {effectiveItems.length > 0 && (
+            <div className="booking-cart-list">
+              {effectiveItems.map((item) => (
                 <div key={item.key} className="booking-cart-item">
                   <div className="booking-cart-item-text">
-                    <strong>{courtObj?.name ?? `สนาม ${item.courtId}`}</strong>
+                    <strong>{courtName(item.courtId)}</strong>
                     <span>
                       {" · "}
-                      {formatDayShort(item.date)}
-                      {" · "}
-                      {formatHour(item.hour)} - {formatHour(item.hour + item.hours)} ({durationLabel})
-                      {" · "}
-                      <strong>{price}฿</strong>
+                      {formatDayShort(item.date)} · {formatHour(item.hour)} - {formatHour(item.hour + item.hours)} (
+                      {durationLabel(item.hours)}) · <strong>{itemPrice(item)}฿</strong>
                     </span>
                   </div>
                   <button
                     type="button"
                     className="booking-cart-remove-btn"
                     onClick={() => removeItem(item.key)}
-                    aria-label={`ลบ ${courtObj?.name ?? "สนาม"} เวลา ${formatHour(item.hour)}`}
+                    aria-label={`ลบ ${courtName(item.courtId)} เวลา ${formatHour(item.hour)}`}
                     title="ลบรายการนี้"
                   >
-                    <svg
-                      width="17"
-                      height="17"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                       <path d="M9 3h6a1 1 0 0 1 1 1v1h4a1 1 0 1 1 0 2h-1v12a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V7H4a1 1 0 1 1 0-2h4V4a1 1 0 0 1 1-1Zm1 4a1 1 0 0 0-1 1v9a1 1 0 1 0 2 0V8a1 1 0 0 0-1-1Zm4 0a1 1 0 0 0-1 1v9a1 1 0 1 0 2 0V8a1 1 0 0 0-1-1Z" />
                     </svg>
                   </button>
                 </div>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="summary-line" style={{ marginTop: 4 }}>
-          <span className="muted">
-            ผู้จอง: {isLoggedIn ? (bookerName ?? "บัญชีของคุณ") : "ยังไม่ได้เข้าสู่ระบบ"}
-          </span>
-          <strong style={{ fontWeight: 600 }}>
-            {isLoggedIn ? (bookerName ?? "ผู้เล่น") : "–"}
-          </strong>
-        </div>
-
-        <div className="summary-total">
-          <span>รวมทั้งหมด</span>
-          <span>{effectiveItems.length === 0 ? "0 บาท" : `${(agreedValue ?? total).toLocaleString("th-TH")} บาท`}</span>
-        </div>
-
-        {isCoach && effectiveItems.length > 0 && (
-          <div className="coach-terms stack" style={{ gap: 8 }}>
-            <span className="muted" style={{ fontSize: 13, fontWeight: 600 }}>
-              🏅 ตัวเลือกสำหรับโค้ช
-            </span>
-            <div className="hours" role="radiogroup" aria-label="วิธีชำระเงิน" style={{ display: "flex", gap: 6 }}>
-              <button
-                type="button"
-                className={`chip ${!payLater ? "selected" : "free"}`}
-                aria-pressed={!payLater}
-                onClick={() => setPayLater(false)}
-              >
-                ชำระทันที
-              </button>
-              <button
-                type="button"
-                className={`chip ${payLater ? "selected" : "free"}`}
-                aria-pressed={payLater}
-                onClick={() => setPayLater(true)}
-              >
-                ชำระภายหลัง
-              </button>
+              ))}
             </div>
-            <label className="field">
-              <span>ยอดตามที่ตกลงกับร้าน (เว้นว่าง = ราคาปกติ {formatBaht(total)})</span>
-              <input
-                id="coach-agreed-total"
-                type="text"
-                inputMode="numeric"
-                placeholder={String(total)}
-                value={agreedTotal}
-                onChange={(e) => setAgreedTotal(e.target.value.replace(/[^0-9]/g, ""))}
-              />
-            </label>
+          )}
+
+          <div className="summary-line">
+            <span className="muted">ผู้จอง</span>
+            <strong style={{ fontWeight: 600 }}>
+              {isLoggedIn ? (bookerName ?? "บัญชีของคุณ") : "ยังไม่ได้เข้าสู่ระบบ"}
+            </strong>
           </div>
-        )}
 
-        {error && <p className="error">{error}</p>}
+          {isCoach && effectiveItems.length > 0 && (
+            <div className="coach-terms stack" style={{ gap: 8 }}>
+              <span className="muted" style={{ fontSize: 13, fontWeight: 600 }}>
+                🏅 ตัวเลือกสำหรับโค้ช
+              </span>
+              <div className="hours" role="radiogroup" aria-label="วิธีชำระเงิน" style={{ display: "flex", gap: 6 }}>
+                <button
+                  type="button"
+                  className={`chip ${!payLater ? "selected" : "free"}`}
+                  aria-pressed={!payLater}
+                  onClick={() => setPayLater(false)}
+                >
+                  ชำระทันที
+                </button>
+                <button
+                  type="button"
+                  className={`chip ${payLater ? "selected" : "free"}`}
+                  aria-pressed={payLater}
+                  onClick={() => setPayLater(true)}
+                >
+                  ชำระภายหลัง
+                </button>
+              </div>
+              <label className="field">
+                <span>ยอดตามที่ตกลงกับร้าน (เว้นว่าง = ราคาปกติ {formatBaht(total)})</span>
+                <input
+                  id="coach-agreed-total"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder={String(total)}
+                  value={agreedTotal}
+                  onChange={(e) => setAgreedTotal(e.target.value.replace(/[^0-9]/g, ""))}
+                />
+              </label>
+            </div>
+          )}
+        </section>
+      )}
 
-        <button
-          className="btn btn-block"
-          type="button"
-          onClick={book}
-          disabled={effectiveItems.length === 0 || pending}
-        >
-          {pending
-            ? "กำลังจอง…"
-            : isLoggedIn
-            ? isCoach && payLater
-              ? `จองและชำระภายหลัง (${(agreedValue ?? total).toLocaleString("th-TH")}฿)`
-              : `จองและชำระเงิน (${(agreedValue ?? total).toLocaleString("th-TH")}฿)`
-            : "เข้าสู่ระบบเพื่อจอง"}
-        </button>
-      </section>
+      {/* Always in reach: what is chosen, the price, and one button */}
+      <div className="booking-sticky-bar" aria-live="polite">
+        {error && <p className="error booking-sticky-error">{error}</p>}
+        <div className="booking-sticky-row">
+          <div className="booking-sticky-summary">
+            {effectiveItems.length === 0 ? (
+              <span className="muted">เลือกเวลาที่ต้องการด้านบน</span>
+            ) : effectiveItems.length === 1 ? (
+              <span className="booking-sticky-line">{itemLine(effectiveItems[0])}</span>
+            ) : (
+              <span className="booking-sticky-line">
+                {effectiveItems.length} รายการ · รวม {totalHours} ชม.
+              </span>
+            )}
+            {effectiveItems.length > 0 && (
+              <strong className="booking-sticky-total">{payable.toLocaleString("th-TH")} บาท</strong>
+            )}
+          </div>
+          <button
+            className="btn booking-sticky-btn"
+            type="button"
+            onClick={book}
+            disabled={effectiveItems.length === 0 || pending}
+          >
+            {pending
+              ? "กำลังจอง…"
+              : !isLoggedIn
+              ? "เข้าสู่ระบบเพื่อจอง"
+              : isCoach && payLater
+              ? "จองและชำระภายหลัง"
+              : "จองเลย"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

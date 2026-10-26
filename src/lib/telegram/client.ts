@@ -107,3 +107,45 @@ export async function sendTelegramPhoto(
     return false;
   }
 }
+
+export type TelegramAlbumPhoto = { photo: Blob | Buffer | Uint8Array; caption?: string };
+
+/** Sends up to 10 photos as one album (sendMediaGroup). Returns false, sending nothing, for more. */
+export async function sendTelegramMediaGroup(
+  photos: TelegramAlbumPhoto[],
+  options?: TelegramSendOptions,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
+  const config = getTelegramConfig();
+  if (!config || photos.length === 0 || photos.length > 10) return false;
+
+  try {
+    const url = `https://api.telegram.org/bot${config.botToken}/sendMediaGroup`;
+    const form = new FormData();
+    form.append("chat_id", options?.chatId || config.chatId);
+    if (options?.messageThreadId != null) {
+      form.append("message_thread_id", String(options.messageThreadId));
+    }
+    const media = photos.map((p, i) => ({
+      type: "photo",
+      media: `attach://photo${i}`,
+      ...(p.caption ? { caption: p.caption } : {}),
+    }));
+    form.append("media", JSON.stringify(media));
+    photos.forEach((p, i) => {
+      const blob = p.photo instanceof Blob ? p.photo : new Blob([p.photo as any]);
+      form.append(`photo${i}`, blob, `slip${i}.jpg`);
+    });
+
+    const res = await fetchImpl(url, { method: "POST", body: form });
+    if (!res.ok) {
+      const err = await res.text().catch(() => "");
+      console.error(`Telegram sendMediaGroup failed [${res.status}]:`, err);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error("Telegram sendMediaGroup error:", error);
+    return false;
+  }
+}

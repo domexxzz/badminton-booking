@@ -3,13 +3,24 @@ import { formatTime } from "@/lib/format";
 import type { BookingSummary } from "@/lib/line/messages";
 import { getServiceClient } from "@/lib/supabase/service";
 import { slotStart } from "@/lib/slots";
-import { getTelegramConfig, sendTelegramMessage, sendTelegramPhoto, type TelegramSendOptions } from "./client";
 import {
+  getTelegramConfig,
+  sendTelegramMediaGroup,
+  sendTelegramMessage,
+  sendTelegramPhoto,
+  type TelegramAlbumPhoto,
+  type TelegramSendOptions,
+} from "./client";
+import {
+  chunk,
   formatTelegramDailySummary,
+  slipCaption,
   summaryDays,
   type DailySummaryBooking,
   type DailySummaryKind,
 } from "./daily-summary";
+
+const TELEGRAM_ALBUM_MAX = 10;
 import {
   formatTelegramCancelledBooking,
   formatTelegramCancelRequest,
@@ -306,6 +317,7 @@ async function loadDayBookings(day: string): Promise<DailySummaryBooking[] | nul
   return data.map((b) => {
     const profile = who.get(b.user_id);
     return {
+      id: b.id,
       court_id: b.court_id,
       status: b.status,
       amount: b.amount,
@@ -319,6 +331,60 @@ async function loadDayBookings(day: string): Promise<DailySummaryBooking[] | nul
       },
     };
   });
+}
+
+const ACTIVE_FOR_SLIPS = new Set(["confirmed", "awaiting_review", "pending_payment"]);
+
+/** The latest transfer slip of each of the day's bookings, downloaded and captioned. Never throws. */
+async function loadDaySlips(
+  bookings: readonly DailySummaryBooking[],
+  courts: readonly { id: number; name: string }[],
+): Promise<TelegramAlbumPhoto[]> {
+  try {
+    const supabase = getServiceClient();
+    const active = bookings.filter((b) => b.id && ACTIVE_FOR_SLIPS.has(b.status));
+    if (!supabase || active.length === 0) return [];
+    const { data: payments, error } = await supabase
+      .from("payments")
+      .select("booking_id, amount, slip_path, status, verify_status, created_at")
+      .in("booking_id", active.map((b) => b.id as string))
+      .order("created_at", { ascending: false });
+    if (error || !payments) {
+      console.error("Daily summary: loading slips failed:", error);
+      return [];
+    }
+
+    const latest = new Map<string, (typeof payments)[number]>();
+    for (const p of payments) if (p.slip_path && !latest.has(p.booking_id)) latest.set(p.booking_id, p);
+    const courtName = new Map(courts.map((c) => [c.id, c.name]));
+
+    const photos: TelegramAlbumPhoto[] = [];
+    for (const b of active.toSorted((x, y) => Date.parse(x.starts_at) - Date.parse(y.starts_at))) {
+      const p = latest.get(b.id as string);
+      if (!p) continue;
+      const { data: file, error: downloadError } = await supabase.storage.from("slips").download(p.slip_path);
+      if (downloadError || !file) {
+        console.error(`Daily summary: slip for booking ${b.id} could not be downloaded:`, downloadError);
+        continue;
+      }
+      photos.push({
+        photo: file,
+        caption: slipCaption({
+          courtName: courtName.get(b.court_id) ?? "สนาม",
+          startsAt: b.starts_at,
+          endsAt: b.ends_at,
+          customer: b.customer?.name ?? null,
+          amount: p.amount ?? b.amount,
+          verifyStatus: p.verify_status,
+          paymentStatus: p.status,
+        }),
+      });
+    }
+    return photos;
+  } catch (error) {
+    console.error("Daily summary: slips failed:", error);
+    return [];
+  }
 }
 
 /** Sends the morning or closing daily summary to the shop's Telegram group. Returns whether it was sent. */
@@ -340,6 +406,9 @@ export async function sendTelegramDailySummary(kind: DailySummaryKind, now: Date
       return false;
     }
 
+    // Morning only: the day's slips, so the shop can see who paid before they arrive.
+    const slips = kind === "morning" ? await loadDaySlips(bookings, courts.data) : [];
+
     const text = formatTelegramDailySummary({
       kind,
       day,
@@ -351,8 +420,17 @@ export async function sendTelegramDailySummary(kind: DailySummaryKind, now: Date
         rescheduleRequests: requests.data.filter((r) => r.kind === "reschedule").length,
       },
       nextDay: nextDay && nextDayBookings ? { day: nextDay, bookings: nextDayBookings } : undefined,
+      slipCount: slips.length,
     });
-    return await sendTelegramMessage(text, { parseMode: "HTML" });
+    const sent = await sendTelegramMessage(text, { parseMode: "HTML" });
+    // The summary is what counts: a failed album is logged, not reported as a failed run,
+    // so the scheduler's retry never sends the summary twice.
+    if (sent) {
+      for (const album of chunk(slips, TELEGRAM_ALBUM_MAX)) {
+        if (!(await sendTelegramMediaGroup(album))) console.error("Daily summary: a slip album was not sent");
+      }
+    }
+    return sent;
   } catch (error) {
     console.error("Telegram daily summary failed:", error);
     return false;

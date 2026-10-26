@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { getTelegramConfig, sendTelegramMessage, sendTelegramPhoto } from "../src/lib/telegram/client";
 import {
   escapeHtml,
@@ -23,13 +23,18 @@ const SAMPLE_SUMMARY: BookingSummary = {
 };
 
 describe("Telegram Client", () => {
-  test("reads config from env or fallback token", () => {
-    expect(getTelegramConfig({})).toEqual({
-      botToken: "8827549262:AAGt7aDuc0jF8sYPSrZLZIh4ee5gwcvtAyg",
-      chatId: "-1004354078243",
-      partyChatId: "-1004354078243",
-      partyThreadId: 7,
-    });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  test("returns null when bot token or chat id is missing, so alerts are skipped", () => {
+    expect(getTelegramConfig({})).toBeNull();
+    expect(getTelegramConfig({ TELEGRAM_BOT_TOKEN: "test_token" })).toBeNull();
+    expect(getTelegramConfig({ TELEGRAM_CHAT_ID: "-1001234567890" })).toBeNull();
+    expect(getTelegramConfig({ TELEGRAM_BOT_TOKEN: "  ", TELEGRAM_CHAT_ID: "-1001234567890" })).toBeNull();
+  });
+
+  test("reads config from env", () => {
     const config = getTelegramConfig({
       TELEGRAM_BOT_TOKEN: "custom_token",
       TELEGRAM_CHAT_ID: "-1001234567890",
@@ -43,9 +48,19 @@ describe("Telegram Client", () => {
     });
   });
 
+  test("sendTelegramMessage skips the request when Telegram is not configured", async () => {
+    const fetchImpl = jsonResponse(200, { ok: true });
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "");
+    vi.stubEnv("TELEGRAM_CHAT_ID", "");
+
+    expect(await sendTelegramMessage("สวัสดี", undefined, fetchImpl)).toBe(false);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   test("sendTelegramMessage posts JSON to telegram sendMessage endpoint with optional thread_id", async () => {
     const fetchImpl = jsonResponse(200, { ok: true, result: { message_id: 123 } });
-    process.env.TELEGRAM_CHAT_ID = "-100999";
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "test_token");
+    vi.stubEnv("TELEGRAM_CHAT_ID", "-100999");
 
     const ok = await sendTelegramMessage("สวัสดี", { parseMode: "HTML", messageThreadId: 7 }, fetchImpl);
     expect(ok).toBe(true);
@@ -64,7 +79,8 @@ describe("Telegram Client", () => {
 
   test("sendTelegramPhoto posts FormData to telegram sendPhoto endpoint with optional thread_id", async () => {
     const fetchImpl = jsonResponse(200, { ok: true, result: { message_id: 124 } });
-    process.env.TELEGRAM_CHAT_ID = "-100999";
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "test_token");
+    vi.stubEnv("TELEGRAM_CHAT_ID", "-100999");
 
     const dummyBlob = new Blob(["image data"], { type: "image/jpeg" });
     const ok = await sendTelegramPhoto(dummyBlob, "คำบรรยาย", { parseMode: "HTML", messageThreadId: 7 }, fetchImpl);

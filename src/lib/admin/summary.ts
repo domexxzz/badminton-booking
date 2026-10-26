@@ -5,6 +5,9 @@ export type BookingForSummary = {
   amount: number | string;
   starts_at: string;
   ends_at: string;
+  /** Pay-later bookings are confirmed straight away and owed until paid_at is set. */
+  pay_later?: boolean | null;
+  paid_at?: string | null;
 };
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -13,9 +16,22 @@ const OPEN_STATUSES = new Set(["pending_payment", "awaiting_review"]);
 const hoursOf = (b: BookingForSummary) => (Date.parse(b.ends_at) - Date.parse(b.starts_at)) / HOUR_MS;
 const satang = (amount: number | string) => Math.round(Number(amount) * 100);
 
-/** Revenue counts confirmed bookings only, by the day they are played. */
+/** A confirmed pay-later booking the shop has not been paid for yet (same rule as the board). */
+export const isOwed = (b: BookingForSummary) => b.status === "confirmed" && b.pay_later === true && !b.paid_at;
+
+/**
+ * Revenue is money received: confirmed bookings, by the day they are played, leaving out
+ * pay-later bills still owed (they count once an admin marks them paid).
+ */
 export function confirmedRevenue(bookings: readonly BookingForSummary[]): number {
-  return bookings.filter((b) => b.status === "confirmed").reduce((sum, b) => sum + satang(b.amount), 0) / 100;
+  return (
+    bookings.filter((b) => b.status === "confirmed" && !isOwed(b)).reduce((sum, b) => sum + satang(b.amount), 0) / 100
+  );
+}
+
+/** What pay-later customers still owe. */
+export function owedAmount(bookings: readonly BookingForSummary[]): number {
+  return bookings.filter(isOwed).reduce((sum, b) => sum + satang(b.amount), 0) / 100;
 }
 
 /** A booking that was cancelled or never paid for is not a booking the shop had. */
@@ -39,6 +55,7 @@ export function summarizeDay(bookings: readonly BookingForSummary[], courtCount:
   const capacityHours = courtCount * (BOOKING_RULES.closeHour - BOOKING_RULES.openHour);
   return {
     revenue: confirmedRevenue(bookings),
+    owed: owedAmount(bookings),
     confirmedCount: confirmed.length,
     waitingCount: bookings.filter((b) => OPEN_STATUSES.has(b.status)).length,
     bookedHours,

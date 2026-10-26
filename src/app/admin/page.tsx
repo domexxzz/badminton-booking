@@ -21,6 +21,8 @@ type Booking = {
   customer_name: string | null;
   customer_phone: string | null;
   admin_note: string | null;
+  pay_later?: boolean | null;
+  paid_at?: string | null;
   payments: { source: string; status: string }[];
 };
 
@@ -38,7 +40,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
     supabase
       .from("bookings")
       .select(
-        "id, user_id, court_id, starts_at, ends_at, amount, status, channel, customer_name, customer_phone, admin_note, payments(source, status)",
+        "id, user_id, court_id, starts_at, ends_at, amount, status, channel, customer_name, customer_phone, admin_note, pay_later, paid_at, payments(source, status)",
       )
       .in("status", ACTIVE)
       .gte("starts_at", slotStart(date, 0))
@@ -47,7 +49,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
       .returns<Booking[]>(),
     supabase
       .from("bookings")
-      .select("status, amount, starts_at, ends_at")
+      .select("status, amount, starts_at, ends_at, pay_later, paid_at")
       .eq("status", "confirmed")
       .gte("starts_at", slotStart(month.start, 0))
       .lt("starts_at", slotStart(month.next, 0)),
@@ -84,7 +86,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
         <div className="card kpi">
           <span className="label">รายรับ{date === today ? "วันนี้" : "วันนั้น"}</span>
           <span className="value">{formatBaht(summary.revenue)}</span>
-          <span className="sub">จากการจองที่ยืนยันแล้ว</span>
+          <span className="sub">{summary.owed > 0 ? `รับแล้ว · ค้างชำระอีก ${formatBaht(summary.owed)}` : "จากการจองที่ยืนยันแล้ว"}</span>
         </div>
         <div className="card kpi">
           <span className="label">รายรับเดือน{monthName}</span>

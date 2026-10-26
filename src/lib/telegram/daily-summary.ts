@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { confirmedRevenue, countBookings, summarizeDay, type BookingForSummary } from "@/lib/admin/summary";
+import { confirmedRevenue, countBookings, owedAmount, summarizeDay, type BookingForSummary } from "@/lib/admin/summary";
 import { STATUS_LABEL, formatBaht, formatDayShort, formatTime } from "@/lib/format";
 import { sanitizeName } from "@/lib/line/messages";
 import { bangkokDate, slotStart } from "@/lib/slots";
@@ -96,8 +96,8 @@ function customerLines(courts: DailySummaryInput["courts"], bookings: readonly D
 
 /** Money received, and what pay-later customers still owe for the day. */
 function revenueLine(bookings: readonly DailySummaryBooking[]): string {
-  const received = confirmedRevenue(bookings.filter((b) => !isUnpaid(b)));
-  const owed = confirmedRevenue(bookings.filter(isUnpaid));
+  const received = confirmedRevenue(bookings);
+  const owed = owedAmount(bookings);
   return `${formatBaht(received)} (ชำระแล้ว)${owed > 0 ? ` · ค้างชำระ ${formatBaht(owed)}` : ""}`;
 }
 

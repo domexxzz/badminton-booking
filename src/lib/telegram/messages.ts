@@ -9,7 +9,7 @@ export function escapeHtml(text: string): string {
     .replace(/>/g, "&gt;");
 }
 
-const siteUrl = () =>
+export const siteUrl = () =>
   (process.env.NEXT_PUBLIC_SITE_URL ?? "https://badminton-booking-ihw1.onrender.com").replace(/\/$/, "");
 
 export type TelegramBookingSummary = BookingSummary & {

@@ -41,3 +41,6 @@ services:
         sync: false
       - key: LINE_LOGIN_CHANNEL_SECRET
         sync: false
+      # Daily Telegram summary: same value as the GitHub repository secret CRON_SECRET.
+      - key: CRON_SECRET
+        sync: false

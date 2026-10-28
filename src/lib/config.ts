@@ -1,12 +1,13 @@
-// Keep in sync with the constants in public.create_booking() (supabase/migrations/0008_half_hour_and_rules.sql).
+// Keep customer-facing limits in sync with the latest booking migration.
 export const BOOKING_RULES = {
   venueName: "แบดมินตัน@สินธานี",
   openHour: 9,
   closeHour: 23,
   stepMinutes: 30,
   minHours: 0.5,
-  maxHours: 4,
-  maxDaysAhead: 14,
+  // The venue's opening/closing hours and occupied slots are the real limit.
+  maxHours: 24,
+  maxDaysAhead: 7,
   holdMinutes: 5,
   // NOT the price anyone is charged. Every bill is computed from courts.price_per_hour in
   // the database (live: ฿130/hour), by create_booking() and friends, and every page shows

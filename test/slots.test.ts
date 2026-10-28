@@ -85,8 +85,8 @@ describe("maxBookableHours", () => {
     expect(maxBookableHours(1, DATE, 21, [], NOW)).toBe(2);
   });
 
-  test("caps at the max duration", () => {
-    expect(maxBookableHours(1, DATE, 10, [], NOW)).toBe(4);
+  test("allows a continuous booking until closing time", () => {
+    expect(maxBookableHours(1, DATE, 10, [], NOW)).toBe(13);
   });
 
   test("is zero for a taken slot", () => {

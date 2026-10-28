@@ -52,6 +52,21 @@ check("half-hour booking starts at :30 and costs 75 THB", halfHourBk.status === 
 await db.query(`select cancel_booking('${halfHourBk.id}')`);
 await as(U2);
 await expectError("past start", `select create_booking(4::smallint, date_trunc('hour', now()) - interval '1 day', 1)`, "START_IN_PAST");
+await expectError("customers cannot book more than 7 days ahead",
+  `select create_booking(4::smallint, date_trunc('hour', now()) + interval '8 days', 1)`, "TOO_FAR_AHEAD");
+const LONG_BOOKER = "10101010-1010-1010-1010-101010101010";
+await db.exec(`insert into auth.users (id, email) values ('${LONG_BOOKER}', 'long-booking@x.com')`);
+await as(LONG_BOOKER);
+const { rows: [{ long_start: longStart }] } = await db.query(
+  `select ((now() at time zone 'Asia/Bangkok')::date + 3 + time '09:00') at time zone 'Asia/Bangkok' as long_start`,
+);
+const longBooking = (await db.query(`select * from create_cart_booking(
+  jsonb_build_array(jsonb_build_object('court_id', 1, 'starts_at', '${new Date(longStart).toISOString()}', 'hours', 8)),
+  false, null
+)`)).rows[0];
+check("customers may book more than 4 hours when the court stays open and free",
+  Number((new Date(longBooking.ends_at) - new Date(longBooking.starts_at)) / 3600000) === 8);
+await db.query(`select cancel_booking('${longBooking.id}')`);
 
 // Expiry frees the slot
 await db.exec(`update bookings set hold_expires_at = now() - interval '1 minute' where id = '${b3.id}'`);
@@ -547,7 +562,7 @@ check("admin saves the shop contact (phone digits only)",
 // ---- Optional QR or bank account for refunds (0016) ----
 const refundUser = "abababab-abab-abab-abab-abababababab";
 await db.exec(`insert into auth.users (id, email) values ('${refundUser}', 'refund-test@example.invalid')`);
-const accountBooking = await paidBooking(refundUser, 1, at(24 * 7), 1);
+const accountBooking = await paidBooking(refundUser, 1, at(24 * 5), 1);
 await as(refundUser);
 await expectError("refund rejects neither QR nor account",
   `select request_cancel('${accountBooking.id}', null, null, null)`, "REFUND_DETAILS_REQUIRED");
@@ -582,7 +597,7 @@ await db.query(`select resolve_request('${accountRequest.id}', true, null, '${re
 check("admin can finish account refund with audit and slip",
   (await db.query(`select * from booking_requests where id = '${accountRequest.id}'`)).rows[0].resolved_by === ADMIN);
 
-const bothBooking = await paidBooking(refundUser, 2, at(24 * 7), 1);
+const bothBooking = await paidBooking(refundUser, 2, at(24 * 5), 1);
 await as(refundUser);
 await expectError("invalid attached QR cannot bypass validation with an account",
   `select request_cancel('${bothBooking.id}', 'invalid.png', null, '0000000000')`, "INVALID_QR");
@@ -825,7 +840,7 @@ await db.exec(`insert into auth.users (id, email, raw_user_meta_data) values
   ('${PARTY_HOST}', 'party-host@x.com', '{"display_name":"หัวห้อง"}'),
   ('${PARTY_GUEST}', 'party-guest@x.com', '{"display_name":"แขกหนึ่ง"}'),
   ('${PARTY_GUEST2}', 'party-guest2@x.com', '{"display_name":"แขกสอง"}')`);
-const { rows: [{ party_at: partyAt }] } = await db.query(`select ((now() at time zone 'Asia/Bangkok')::date + 10 + time '18:00') at time zone 'Asia/Bangkok' as party_at`);
+const { rows: [{ party_at: partyAt }] } = await db.query(`select ((now() at time zone 'Asia/Bangkok')::date + 5 + time '18:00') at time zone 'Asia/Bangkok' as party_at`);
 // Since 0027 only an admin or a designated host may open a room (can_host_party).
 await as(ADMIN);
 await db.query(`select set_party_host('${PARTY_HOST}', true)`);

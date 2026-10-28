@@ -4,7 +4,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { BrandPromo } from "@/components/BrandPromo";
-import { CourtArt } from "@/components/CourtArt";
 import { CourtRules } from "@/components/CourtRules";
 import {
   CalendarGridIcon,
@@ -290,32 +289,6 @@ export function HomeClientView({
             </tbody>
           </table>
         )}
-      </section>
-
-      {/* Our Courts */}
-      <section>
-        <div className="section-head">
-          <h2>สนามของเรา</h2>
-        </div>
-        <div className="court-cards">
-          {courts.map((c) => (
-            <div key={c.id} className="court-card">
-              <CourtArt label={c.name} />
-              <strong>{c.name}</strong>
-              <span className="price">{formatBaht(c.price_per_hour)}/ชม.</span>
-              <Link
-                href={
-                  status.isOpen
-                    ? `/book?court=${c.id}`
-                    : `/book?court=${c.id}&${targetDateParam}`
-                }
-                className="btn btn-sm btn-block"
-              >
-                {status.isOpen ? "จองสนามนี้" : "จองวันพรุ่งนี้"}
-              </Link>
-            </div>
-          ))}
-        </div>
       </section>
 
       <CourtRules />

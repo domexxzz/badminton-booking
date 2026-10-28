@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { createBooking } from "@/app/actions";
 import { BOOKING_RULES } from "@/lib/config";
 import { formatBaht, formatDayShort, formatDuration } from "@/lib/format";
 import {
+  cellState,
   formatHour,
   getVenueStatus,
   maxBookableHours,
@@ -31,8 +32,7 @@ export type CartItem = {
 
 const CLOCK_TICK_MS = 30_000;
 const MAX_CART_ITEMS = 8;
-const DURATIONS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4];
-const STEPS = ["เลือกเวลา", "เลือกสนาม", "ยืนยัน"] as const;
+const STEPS = ["เลือกสนาม", "เลือกเวลา", "ยืนยัน"] as const;
 
 const durationLabel = (h: number) => (h === 0.5 ? "30 นาที" : `${h} ชม.`);
 
@@ -69,10 +69,12 @@ export function BookingForm({
     if (initial.court && courts.some((c) => c.id === initial.court)) return initial.court;
     return courts[0]?.id ?? 1;
   });
+  const [courtChosen, setCourtChosen] = useState(() => Boolean(initial.court));
   const [hour, setHour] = useState<number | null>(initial.hour ?? null);
   const [hours, setHours] = useState(1);
   // Half-hour starts are still bookable, just not in the first grid a customer sees.
-  const [halfHourStarts, setHalfHourStarts] = useState(() => initial.hour !== undefined && initial.hour % 1 !== 0);
+  // Show the same precise half-hour cards as the booking reference flow.
+  const [halfHourStarts, setHalfHourStarts] = useState(true);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -144,18 +146,12 @@ export function BookingForm({
   const agreedValue = isCoach && agreedTotal.trim() !== "" ? Number(agreedTotal) : null;
   const payable = agreedValue ?? total;
 
-  // Courts that are completely free for the currently selected [hour, hour + hours] window
-  const freeCourtsForCurrentWindow =
-    hour !== null
-      ? courts.filter((c) => getAvailableHoursForCourt(c.id, date, hour) >= hours)
-      : [];
-
   // The time grid: hourly by default, every half hour when asked for.
   const slotStep = halfHourStarts ? 0.5 : 1;
   const slots = openingSlots(slotStep, openHour, closeHour);
-  const freeCourtsAt = (h: number) => courts.filter((c) => getAvailableHoursForCourt(c.id, date, h) >= slotStep);
+  const courtIsFreeAt = (h: number) => getAvailableHoursForCourt(activeCourtId, date, h) >= slotStep;
 
-  const currentStep = effectiveItems.length === 0 ? 1 : hour !== null ? 2 : 3;
+  const currentStep = effectiveItems.length > 0 ? 3 : !courtChosen ? 1 : 2;
 
   function changeDate(next: string) {
     setDate(next);
@@ -166,118 +162,76 @@ export function BookingForm({
 
   function pickTime(h: number) {
     setError(null);
-    // Keep the court the customer already had if it is free; otherwise the first free one.
-    const keep = getAvailableHoursForCourt(activeCourtId, date, h) >= slotStep;
-    const courtId = keep ? activeCourtId : (freeCourtsAt(h)[0]?.id ?? activeCourtId);
-    const avail = getAvailableHoursForCourt(courtId, date, h);
-    setActiveCourtId(courtId);
+    const avail = getAvailableHoursForCourt(activeCourtId, date, h);
+    if (avail < slotStep) {
+      setError(`${courtName(activeCourtId)} ไม่ว่างในเวลานี้`);
+      return;
+    }
     setHour(h);
     setHours(avail >= 1 ? 1 : 0.5);
   }
 
-  // Like a hotel calendar: the first tap is the start, the next tap later in the day is the
-  // end. A tap after that starts a new choice. One tap alone still books the default hour.
+  // The first tap sets the start. Every later tap extends or shortens the end, so a customer
+  // can keep tapping consecutive hours until the wanted continuous range is selected.
   const [awaitingEnd, setAwaitingEnd] = useState(false);
 
   function tapSlot(h: number) {
-    if (hour !== null && awaitingEnd && h > hour) {
-      const tooLong = h + slotStep - hour > BOOKING_RULES.maxHours;
-      if (!selectRange(hour, h)) {
-        setError("ช่วงนี้ไม่มีสนามว่างต่อเนื่องตลอด ลองเลือกเวลาจบที่เร็วขึ้น");
-        return;
-      }
-      setAwaitingEnd(false);
-      // selectRange caps the stretch at the longest booking allowed; say so.
-      if (tooLong) setError(`จองต่อเนื่องได้สูงสุด ${BOOKING_RULES.maxHours} ชม. เลือกให้ ${BOOKING_RULES.maxHours} ชม. แล้ว`);
+    setError(null);
+    if (hour === null) return pickTime(h);
+
+    const end = hour + hours;
+    // Tapping an adjacent half-hour card extends the selected range exactly
+    // through that card; no extra card is included implicitly.
+    if (h === end && courtIsFreeAt(h)) {
+      setHours(Number((hours + slotStep).toFixed(2)));
       return;
     }
-    if (hour !== null && awaitingEnd && h === hour) {
-      setAwaitingEnd(false);
+    if (h + slotStep === hour && courtIsFreeAt(h)) {
+      setHour(h);
+      setHours(Number((hours + slotStep).toFixed(2)));
       return;
     }
+
+    // Tapping a selected edge card removes only that exact card.
+    if (h === hour && hours > slotStep) {
+      setHour(Number((hour + slotStep).toFixed(2)));
+      setHours(Number((hours - slotStep).toFixed(2)));
+      return;
+    }
+    if (h === end - slotStep && hours > slotStep) {
+      setHours(Number((hours - slotStep).toFixed(2)));
+      return;
+    }
+    if (h === hour && hours === slotStep) {
+      setHour(null);
+      setHours(1);
+      return;
+    }
+
+    // A non-adjacent click starts a new exact selection.
     pickTime(h);
-    setAwaitingEnd(true);
   }
 
-  // Dragging across the grid picks one continuous stretch of time. On a phone the drag
-  // starts on the block already chosen, so a swipe anywhere else still scrolls the page;
-  // with a mouse it can start on any free slot.
-  const gridRef = useRef<HTMLDivElement>(null);
-  // anchor = the end of the stretch that stays put; null until the first move shows the direction.
-  const dragRef = useRef<{
-    anchor: number | null;
-    origin: number;
-    first: number;
-    lastSlot: number;
-    last: number;
-    moved: boolean;
-  } | null>(null);
-  const suppressClickRef = useRef(false);
-
-  /** Selects [a, b] (slot starts, either order) if one court is free for all of it. */
+  /** Selects the displayed range [a, b), keeping the clicked card as the end card. */
   function selectRange(a: number, b: number): boolean {
     const start = Math.min(a, b);
-    const length = Math.min(Math.max(a, b) + slotStep - start, BOOKING_RULES.maxHours);
-    const fits = (courtId: number) => getAvailableHoursForCourt(courtId, date, start) >= length;
-    const courtId = fits(activeCourtId) ? activeCourtId : courts.find((c) => fits(c.id))?.id;
-    if (courtId === undefined) return false;
+    const end = Math.max(a, b);
+    // A second tap on the next card extends the range through that card's
+    // start. A single tap remains the normal one-slot selection.
+    const length = Math.min(Math.max(end - start, slotStep), BOOKING_RULES.maxHours);
+    if (getAvailableHoursForCourt(activeCourtId, date, start) < length) return false;
     setError(null);
-    setActiveCourtId(courtId);
     setHour(start);
     setHours(length);
     return true;
   }
 
-  function startDrag(e: React.PointerEvent, h: number) {
-    const inSelection = hour !== null && h >= hour && h < hour + hours;
-    if (e.pointerType !== "mouse" && !inSelection) return;
-    if (!inSelection && !selectRange(h, h)) return;
-    const first = inSelection ? (hour as number) : h;
-    const lastSlot = inSelection ? (hour as number) + hours - slotStep : h;
-    dragRef.current = { anchor: inSelection ? null : h, origin: h, first, lastSlot, last: h, moved: false };
-    try {
-      gridRef.current?.setPointerCapture(e.pointerId);
-    } catch {
-      // The pointer is already gone (a very quick tap): nothing to follow.
-    }
-  }
-
-  function moveDrag(e: React.PointerEvent) {
-    const drag = dragRef.current;
-    if (!drag) return;
-    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-slot]");
-    const h = el ? Number(el.dataset.slot) : NaN;
-    if (Number.isNaN(h) || h === drag.last) return;
-    drag.last = h;
-    // Grabbing the last slot moves the end; pulling the first slot back moves the start;
-    // anything else moves the end, so "tap a time, then drag on" always lengthens.
-    if (drag.anchor === null) {
-      const grabbedEnd = drag.origin === drag.lastSlot && drag.lastSlot !== drag.first;
-      drag.anchor = !grabbedEnd && h < drag.origin && drag.origin === drag.first ? drag.lastSlot : drag.first;
-    }
-    // A stretch with no court free all the way is skipped: the last good one stays chosen.
-    if (selectRange(drag.anchor, h)) drag.moved = true;
-  }
-
-  function endDrag() {
-    if (dragRef.current?.moved) {
-      suppressClickRef.current = true;
-      setAwaitingEnd(false);
-    }
-    dragRef.current = null;
-  }
-
   function selectCourt(courtId: number) {
     setActiveCourtId(courtId);
+    setCourtChosen(true);
+    setHour(null);
+    setAwaitingEnd(false);
     setError(null);
-    if (hour !== null) {
-      const avail = getAvailableHoursForCourt(courtId, date, hour);
-      if (avail === 0) {
-        setHour(null);
-      } else if (hours > avail) {
-        setHours(avail);
-      }
-    }
   }
 
   function addCurrentToCart() {
@@ -290,20 +244,6 @@ export function BookingForm({
       return;
     }
     setCartItems([...cartItems, { key: `${date}-${activeCourtId}-${hour}`, courtId: activeCourtId, date, hour, hours }]);
-    setHour(null);
-    setError(null);
-  }
-
-  function addAllFreeCourtsForCurrentWindow() {
-    if (hour === null || freeCourtsForCurrentWindow.length === 0) return;
-    const toAdd: CartItem[] = freeCourtsForCurrentWindow.map((c) => ({
-      key: `${date}-${c.id}-${hour}`,
-      courtId: c.id,
-      date,
-      hour,
-      hours,
-    }));
-    setCartItems([...cartItems, ...toAdd].slice(0, MAX_CART_ITEMS));
     setHour(null);
     setError(null);
   }
@@ -352,7 +292,7 @@ export function BookingForm({
   const totalHours = effectiveItems.reduce((sum, item) => sum + item.hours, 0);
 
   return (
-    <div className="stack booking-cart-page time-first-booking">
+    <div className="stack booking-cart-page court-first-booking">
       <ol className="booking-steps" aria-label="ขั้นตอนการจอง">
         {STEPS.map((label, i) => {
           const n = i + 1;
@@ -374,10 +314,58 @@ export function BookingForm({
         <span aria-hidden="true">›</span>
       </Link>
 
-      {/* Step 1: a time, with how many courts are free at it */}
-      <section className="card stack booking-picker-card" aria-labelledby="pick-time-title">
+      {/* Step 1: choose the court before looking at its available times. */}
+      <section className="card stack booking-picker-card" aria-labelledby="pick-court-title">
         <div className="booking-section-title">
-          <span id="pick-time-title">เลือกเวลา</span>
+          <span id="pick-court-title">เลือกสนามก่อน</span>
+          {courtChosen && <span className="badge confirmed">{courtName(activeCourtId)}</span>}
+        </div>
+        <div className="court-pick-grid" role="radiogroup" aria-label="เลือกสนาม">
+          {courts.map((c) => {
+            const isSelected = courtChosen && c.id === activeCourtId;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                className={`court-pick ${isSelected ? "selected" : "free"}`}
+                onClick={() => selectCourt(c.id)}
+              >
+                <strong>{c.name}</strong>
+                <span>{c.price_per_hour}฿/ชม.</span>
+              </button>
+            );
+          })}
+        </div>
+        {courtChosen && (
+          <div className="booking-selected-court-timeline" aria-label={`ตารางคิวของ ${courtName(activeCourtId)}`}>
+            <div className="booking-selected-court-timeline-head">
+              <strong>{courtName(activeCourtId)}</strong>
+              <Link href={`/schedule?date=${date}&court=${activeCourtId}`}>ดูรายละเอียด</Link>
+            </div>
+            <div className="timeline-track-wrap">
+              <div className="timeline-track" role="img" aria-label={`คิวสนาม ${courtName(activeCourtId)} ตั้งแต่ ${formatHour(openHour)} ถึง ${formatHour(closeHour)}`}>
+                {openingSlots(0.5, openHour, closeHour).map((slotH) => (
+                  <span key={slotH} className={`timeline-slot ${cellState(activeCourtId, date, slotH, occupancy, now)}`} aria-hidden="true" />
+                ))}
+              </div>
+              <div className="timeline-ticks" aria-hidden="true">
+                {[openHour, 12, 15, 18, 21].filter((h) => h >= openHour && h <= closeHour).map((h) => (
+                  <span key={h} className="timeline-tick" style={{ left: `${((h - openHour) / (closeHour - openHour)) * 100}%` }}>{String(h).padStart(2, "0")}</span>
+                ))}
+              </div>
+            </div>
+            <p className="booking-timeline-hint">แถบสีแสดงคิวสนาม แตะ “ดูรายละเอียด” หากต้องการดูเวลาแบบเต็ม</p>
+          </div>
+        )}
+        {!courtChosen && <p className="booking-drag-hint">เลือกสนามที่ต้องการ แล้วระบบจะแสดงเวลาว่างของสนามนั้น</p>}
+      </section>
+
+      {/* Step 2: tap a start and end time on the selected court. */}
+      {courtChosen && <section className="card stack booking-picker-card" aria-labelledby="pick-time-title">
+        <div className="booking-section-title">
+          <span id="pick-time-title">เลือกเวลาของ {courtName(activeCourtId)}</span>
           {hour !== null ? (
             <span className="booking-duration-badge" aria-live="polite">
               ⏱ {formatDuration(hours)} · {formatHour(hour)}–{formatHour(hour + hours)}
@@ -410,14 +398,7 @@ export function BookingForm({
 
         {loadError && <p className="error">{loadError}</p>}
 
-        <div
-          ref={gridRef}
-          className={`hour-slot-grid ${halfHourStarts ? "half-hours" : ""}`}
-          aria-busy={!loaded}
-          onPointerMove={moveDrag}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
-        >
+        <div className={`hour-slot-grid ${halfHourStarts ? "half-hours" : ""}`} aria-busy={!loaded}>
           {slots.map((h) => {
             // Until the day's bookings arrive, say so instead of showing every court as free.
             if (!loaded) {
@@ -430,11 +411,10 @@ export function BookingForm({
                 </div>
               );
             }
-            const free = freeCourtsAt(h);
-            const freeIds = new Set(free.map((c) => c.id));
+            const isFree = courtIsFreeAt(h);
             const isSelected = h === hour;
             const inRange = hour !== null && h > hour && h < hour + hours;
-            const disabled = free.length === 0 && !isSelected && !inRange;
+            const disabled = !isFree && !isSelected && !inRange;
             return (
               <button
                 key={h}
@@ -443,26 +423,15 @@ export function BookingForm({
                 disabled={disabled}
                 aria-pressed={isSelected || inRange}
                 aria-label={`${formatHour(h)} ถึง ${formatHour(h + slotStep)} ${
-                  free.length > 0 ? `ว่าง ${free.length} สนาม` : "เต็ม"
+                  isFree ? `${courtName(activeCourtId)} ว่าง` : "ไม่ว่าง"
                 }`}
-                data-slot={h}
-                onPointerDown={(e) => startDrag(e, h)}
-                onClick={() => {
-                  // The click that ends a drag must not shrink the stretch back to one slot.
-                  if (suppressClickRef.current) {
-                    suppressClickRef.current = false;
-                    return;
-                  }
-                  tapSlot(h);
-                }}
+                onClick={() => tapSlot(h)}
               >
                 <span className="hour-slot-time">
                   {formatHour(h)} – {formatHour(h + slotStep)}
                 </span>
                 <span className="hour-slot-dots" aria-hidden="true">
-                  {courts.map((c) => (
-                    <span key={c.id} className={`court-dot ${freeIds.has(c.id) ? "free" : "taken"}`} />
-                  ))}
+                  <span className={`court-dot ${isFree ? "free" : "taken"}`} />
                 </span>
                 <span className="hour-slot-note">
                   {isSelected
@@ -471,9 +440,9 @@ export function BookingForm({
                       : "เริ่ม"
                     : hour !== null && hours > slotStep && h === hour + hours - slotStep
                     ? "จบ"
-                    : free.length > 0
-                    ? `ว่าง ${free.length} สนาม`
-                    : "เต็ม"}
+                    : isFree
+                    ? "ว่าง"
+                    : "ไม่ว่าง"}
                 </span>
               </button>
             );
@@ -483,10 +452,8 @@ export function BookingForm({
         {loaded && (
           <p className="booking-drag-hint">
             {hour === null
-              ? "แตะเวลาเริ่ม แล้วแตะอีกช่องเป็นเวลาจบ (หรือลากก็ได้)"
-              : awaitingEnd
-              ? "แตะช่องเวลาจบ หรือกดจองได้เลยถ้าเล่นช่วงเดียว"
-              : "แตะช่องอื่นเพื่อเลือกใหม่ หรือลากช่องสีเขียวเพื่อปรับเวลา"}
+              ? "คลิกช่องเวลาที่ต้องการได้เลย ระบบจะเลือกช่วงนั้นตรง ๆ"
+              : "หากต้องการเพิ่มช่วงเวลาอื่น ให้กดเพิ่มรายการ แล้วเลือกช่องถัดไป"}
           </p>
         )}
 
@@ -504,73 +471,14 @@ export function BookingForm({
             <span>แสดงเวลาเริ่มทุก 30 นาที (เช่น 13:30)</span>
           </label>
         </details>
-      </section>
-
-      {/* Step 2: which court, and for how long */}
-      {hour !== null && (
-        <section className="card stack booking-picker-card" aria-labelledby="pick-court-title">
-          <div className="booking-section-title">
-            <span id="pick-court-title">เลือกสนาม</span>
-            <span className="badge confirmed" style={{ fontSize: 12.5, fontWeight: 600 }}>
-              {formatHour(hour)} – {formatHour(hour + hours)} น.
-            </span>
-          </div>
-
-          <div className="court-pick-grid" role="radiogroup" aria-label="เลือกสนาม">
-            {courts.map((c) => {
-              const avail = getAvailableHoursForCourt(c.id, date, hour);
-              const isSelected = c.id === activeCourtId;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={isSelected}
-                  className={`court-pick ${isSelected ? "selected" : avail > 0 ? "free" : "taken"}`}
-                  disabled={avail === 0}
-                  onClick={() => selectCourt(c.id)}
-                >
-                  <strong>{c.name}</strong>
-                  <span>{avail > 0 ? `${c.price_per_hour}฿/ชม.` : "ไม่ว่างช่วงนี้"}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="field">
-            <span className="booking-section-sub">เล่นนานเท่าไร</span>
-            <div className="duration-scroller">
-              {DURATIONS.map((h) => {
-                const isSelected = h === hours;
-                const isAvailable = h <= maxHours;
-                return (
-                  <button
-                    key={h}
-                    type="button"
-                    className={`chip duration-chip ${isSelected ? "selected" : isAvailable ? "free" : "unavailable"}`}
-                    disabled={!isAvailable}
-                    onClick={() => setHours(h)}
-                  >
-                    <span className="duration-title">{durationLabel(h)}</span>
-                    <span className="duration-sub">เลิก {formatHour(hour + h)}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
+        {hour !== null && (
           <div className="booking-add-actions">
             <button type="button" className="booking-add-more-btn" onClick={addCurrentToCart}>
-              ＋ เพิ่มลงรายการ แล้วเลือกสนาม/เวลาอื่นต่อ
+              ＋ เพิ่มลงรายการ แล้วเลือกช่วงเวลาอื่นต่อ
             </button>
-            {freeCourtsForCurrentWindow.length > 1 && (
-              <button type="button" className="booking-add-all-courts-btn" onClick={addAllFreeCourtsForCurrentWindow}>
-                ⚡ จองทุกสนามที่ว่างช่วงนี้ ({freeCourtsForCurrentWindow.length} สนาม)
-              </button>
-            )}
           </div>
-        </section>
-      )}
+        )}
+      </section>}
 
       {/* Step 3: what will be booked */}
       {(effectiveItems.length > 0 || isCoach) && (

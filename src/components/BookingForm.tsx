@@ -71,10 +71,7 @@ export function BookingForm({
   });
   const [courtChosen, setCourtChosen] = useState(() => Boolean(initial.court));
   const [hour, setHour] = useState<number | null>(initial.hour ?? null);
-  const [hours, setHours] = useState(1);
-  // Half-hour starts are still bookable, just not in the first grid a customer sees.
-  // Show the same precise half-hour cards as the booking reference flow.
-  const [halfHourStarts, setHalfHourStarts] = useState(true);
+  const [hours, setHours] = useState(0.5);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -146,8 +143,8 @@ export function BookingForm({
   const agreedValue = isCoach && agreedTotal.trim() !== "" ? Number(agreedTotal) : null;
   const payable = agreedValue ?? total;
 
-  // The time grid: hourly by default, every half hour when asked for.
-  const slotStep = halfHourStarts ? 0.5 : 1;
+  // The time grid: every half hour by default.
+  const slotStep = 0.5;
   const slots = openingSlots(slotStep, openHour, closeHour);
   const courtIsFreeAt = (h: number) => getAvailableHoursForCourt(activeCourtId, date, h) >= slotStep;
 
@@ -204,7 +201,7 @@ export function BookingForm({
     }
     if (h === hour && hours === slotStep) {
       setHour(null);
-      setHours(1);
+      setHours(0.5);
       return;
     }
 
@@ -398,7 +395,7 @@ export function BookingForm({
 
         {loadError && <p className="error">{loadError}</p>}
 
-        <div className={`hour-slot-grid ${halfHourStarts ? "half-hours" : ""}`} aria-busy={!loaded}>
+        <div className="hour-slot-grid half-hours" aria-busy={!loaded}>
           {slots.map((h) => {
             // Until the day's bookings arrive, say so instead of showing every court as free.
             if (!loaded) {
@@ -457,20 +454,7 @@ export function BookingForm({
           </p>
         )}
 
-        <details className="booking-more" open={halfHourStarts || undefined}>
-          <summary>ตัวเลือกเพิ่มเติม</summary>
-          <label className="booking-more-option">
-            <input
-              type="checkbox"
-              checked={halfHourStarts}
-              onChange={(e) => {
-                setHalfHourStarts(e.target.checked);
-                setHour(null);
-              }}
-            />
-            <span>แสดงเวลาเริ่มทุก 30 นาที (เช่น 13:30)</span>
-          </label>
-        </details>
+
         {hour !== null && (
           <div className="booking-add-actions">
             <button type="button" className="booking-add-more-btn" onClick={addCurrentToCart}>

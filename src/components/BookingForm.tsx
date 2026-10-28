@@ -168,7 +168,7 @@ export function BookingForm({
       return;
     }
     setHour(h);
-    setHours(avail >= 1 ? 1 : 0.5);
+    setHours(0.5);
   }
 
   // The first tap sets the start. Every later tap extends or shortens the end, so a customer

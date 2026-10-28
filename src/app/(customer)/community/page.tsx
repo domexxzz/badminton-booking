@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 type PlayerCard = { player_key: string };
 
 export default async function CommunityPage() {
-  const { supabase, user, displayName } = await getSessionUser();
+  const { supabase, user, isAdmin, displayName } = await getSessionUser();
   // The feed is readable by signed-in players only (RLS, 0032), so an anonymous visitor
   // would see an empty page. Send them to sign in instead of showing nothing.
   if (!user) redirect("/login?next=/community");
@@ -18,7 +18,8 @@ export default async function CommunityPage() {
   const [{ data: posts, error }, { data: settings }, { data: likeRows }, { data: cardRows }] = await Promise.all([
     supabase
       .from("community_feed")
-      .select("post_id, author_key, author_name, avatar_url, body, image_path, party_title, likes, comments, created_at, edited_at")
+      .select("post_id, author_key, author_name, avatar_url, body, image_path, party_title, likes, comments, created_at, edited_at, is_admin_post, expires_at")
+      .or("expires_at.is.null,expires_at.gt.now()")
       .order("created_at", { ascending: false })
       .limit(50)
       .returns<FeedPost[]>(),
@@ -56,11 +57,26 @@ export default async function CommunityPage() {
           <div className="party-list-icon">💬</div>
           <div>
             <h1>คุยกับเพื่อนร่วมก๊วน</h1>
-            <span>เล่าเรื่องคืนที่ผ่านมา ถามหาคู่ซ้อม หรือแชร์รูปสนุกๆ</span>
+            <span>เล่าเรื่องคืนที่ผ่านมา ถามหาคู่ซ้อม หรือแชร์รูปและคลิปวิดีโอสนุกๆ</span>
           </div>
         </header>
 
-        <PostComposer open={postingOpen} displayName={displayName ?? ""} />
+        <div className="card community-expiry-banner">
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, fontSize: 13.5 }}>
+            <span>⏳</span>
+            <span>กติกาการแสดงโพสต์</span>
+          </div>
+          <p style={{ margin: "4px 0 0", fontSize: 13, lineHeight: 1.6, color: "var(--muted)" }}>
+            โพสต์ของลูกค้าจะมีอายุ <strong>7 วัน</strong> (ระบบจะลบอัตโนมัติเมื่อครบกำหนด เพื่อรักษาบรรยากาศก๊วนให้สดใหม่อยู่เสมอ) · โพสต์ของแอดมินจะแสดงผล<strong>ถาวร</strong>
+          </p>
+        </div>
+
+        <PostComposer
+          open={postingOpen}
+          displayName={displayName ?? ""}
+          userId={user.id}
+          isAdmin={isAdmin}
+        />
 
         {feed.length === 0 ? (
           <div className="card community-empty">
@@ -76,6 +92,7 @@ export default async function CommunityPage() {
               myKey={myKey}
               liked={likedIds.has(post.post_id)}
               postingOpen={postingOpen}
+              isAdmin={isAdmin}
             />
           ))
         )}
@@ -84,9 +101,11 @@ export default async function CommunityPage() {
           <h2>กติกาง่ายๆ</h2>
           <ul>
             <li>คุยกันดีๆ ที่นี่เป็นที่ของคนที่มาตีแบดด้วยกัน</li>
+            <li>แชร์รูปภาพหรือคลิปวิดีโอสนุกๆ จากคอร์ทได้ (รูปสูงสุด 10MB, วิดีโอสูงสุด 50MB)</li>
+            <li>โพสต์ของลูกค้ามีอายุ 7 วัน (เพื่อความสดใหม่) ส่วนโพสต์ของแอดมินจะแสดงถาวร</li>
             <li>ไม่ขายของ ไม่สแปม ไม่โพสต์เรื่องส่วนตัวของคนอื่น</li>
             <li>เจออะไรไม่เหมาะสม กดรายงานได้เลย ทางร้านจะเข้ามาดู</li>
-            <li>โพสต์ของตัวเองลบเองได้ตลอดเวลา</li>
+            <li>โพสต์ของตัวเองสามารถลบหรือแก้ไขได้ตลอดเวลา (แอดมินสามารถช่วยจัดการดูแลได้)</li>
           </ul>
           <Link href="/guide#community" className="btn btn-block btn-ghost">อ่านวิธีใช้งานทั้งหมด</Link>
         </div>

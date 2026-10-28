@@ -837,6 +837,32 @@ input[type="file"] { font-size: 14px; }
 .court-card strong { font-size: 15px; }
 .court-card .price { font-size: 13px; color: var(--muted); }
 
+.court-rules { padding: 0; overflow: hidden; }
+.court-rules-header { display: flex; gap: 12px; padding: 20px 18px; background: linear-gradient(135deg, var(--primary-soft), var(--surface)); }
+.court-rules-main-icon { flex: 0 0 40px; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: var(--surface); font-size: 22px; box-shadow: var(--shadow); }
+.court-rules-header h2 { margin: 0 0 4px; font-size: 20px; line-height: 1.25; }
+.court-rules-header p { margin: 0 0 8px; color: var(--primary-strong); font-size: 13px; line-height: 1.5; }
+.court-rules-header > div > span { display: block; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.court-rules-sections { padding: 4px 18px 0; }
+.court-rule-section { padding: 16px 0; border-bottom: 1px solid var(--border); }
+.court-rule-section h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 16px; line-height: 1.35; }
+.court-rule-section ol { margin: 0; padding-left: 23px; display: grid; gap: 8px; }
+.court-rule-section li, .court-rule-section p { color: var(--text); font-size: 14px; line-height: 1.65; }
+.court-rule-section li::marker { color: var(--primary-strong); font-weight: 700; }
+.court-rule-contact { margin: 0 18px; }
+.court-rule-contact p { margin: 0 0 10px; }
+.court-rule-contact a { display: inline-flex; padding: 9px 14px; border-radius: 999px; background: var(--primary-soft); color: var(--primary-strong); font-weight: 700; }
+.court-rules-footer { display: grid; gap: 4px; padding: 17px 18px 19px; text-align: center; background: var(--primary-soft); }
+.court-rules-footer strong { color: var(--primary-strong); font-size: 15px; }
+.court-rules-footer span { color: var(--muted); font-size: 13px; }
+.booking-selected-court-timeline { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
+.booking-selected-court-timeline-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
+.booking-selected-court-timeline-head strong { font-size: 15px; }
+.booking-selected-court-timeline-head a { color: var(--primary-strong); font-size: 13px; font-weight: 700; }
+.booking-selected-court-timeline .timeline-track { min-height: 16px; }
+.booking-selected-court-timeline .timeline-slot { cursor: default; }
+.booking-timeline-hint { margin: 15px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+
 /* ---------- Schedule & booking ---------- */
 .date-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
 .date-scroll::-webkit-scrollbar { display: none; }

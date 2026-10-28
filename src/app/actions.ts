@@ -82,25 +82,17 @@ export async function createBooking(input: {
     uniqueCourts.size === normalizedItems.length &&
     normalizedItems.every((it) => it.startsAt === firstStart && it.hours === firstHours);
 
-  if (allSameSlot) {
+  if (coach && allSameSlot) {
     const ids = normalizedItems.map((it) => it.courtId);
-    const { data, error } = coach
-      ? await supabase
-          .rpc("create_coach_booking", {
-            p_court_ids: ids,
-            p_starts_at: firstStart,
-            p_hours: firstHours,
-            p_pay_later: coach.payLater,
-            p_total: coach.total,
-          })
-          .single<{ id: string }>()
-      : await supabase
-          .rpc("create_multi_booking", {
-            p_court_ids: ids,
-            p_starts_at: firstStart,
-            p_hours: firstHours,
-          })
-          .single<{ id: string }>();
+    const { data, error } = await supabase
+      .rpc("create_coach_booking", {
+        p_court_ids: ids,
+        p_starts_at: firstStart,
+        p_hours: firstHours,
+        p_pay_later: coach.payLater,
+        p_total: coach.total,
+      })
+      .single<{ id: string }>();
 
     if (error || !data) return { ok: false, error: friendlyError(error) };
     revalidatePath("/me");

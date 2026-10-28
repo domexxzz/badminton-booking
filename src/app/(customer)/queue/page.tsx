@@ -48,6 +48,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
       <Link href="/queue?view=join" className={view === "join" ? "active" : ""}><span>♟</span><strong>เข้าห้อง</strong><small>เลือกทีมและสล็อต</small></Link>
       {/* The ladder lives off this page, not in the bottom bar, which is full at five tabs. */}
       <Link href="/leaderboard"><span>🏆</span><strong>อันดับ</strong><small>แต้มสะสมทั้งร้าน</small></Link>
+      <Link href="/guilds"><span>🛡️</span><strong>กิลด์ก๊วน</strong><small>รวมกลุ่มสะสมเลเวล</small></Link>
       <Link href="/community"><span>💬</span><strong>คอมมูนิตี้</strong><small>เล่าเรื่องคืนก๊วน</small></Link>
       <Link href="/guide"><span>📖</span><strong>วิธีใช้งาน</strong><small>คู่มือทุกฟังก์ชั่น</small></Link>
     </nav>

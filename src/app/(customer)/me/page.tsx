@@ -136,6 +136,9 @@ export default async function MyBookingsPage() {
         <Link href="/community" className="btn btn-block btn-ghost" style={{ textAlign: "center" }}>
           💬 คอมมูนิตี้
         </Link>
+        <Link href="/guilds" className="btn btn-block btn-ghost" style={{ textAlign: "center" }}>
+          🛡️ กิลด์ก๊วนตีแบด
+        </Link>
         <Link href="/guide" className="btn btn-block btn-ghost" style={{ textAlign: "center" }}>
           📖 วิธีใช้งานระบบ
         </Link>

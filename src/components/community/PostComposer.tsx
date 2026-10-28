@@ -140,7 +140,7 @@ export function PostComposer({
     <div className="card stack community-composer">
       <div className="community-composer-head">
         <div>
-          <strong>เล่าให้ฟังหน่อย</strong>
+          <strong>แชร์เรื่องราวของคุณ</strong>
           <small>{displayName ? `โพสต์ในชื่อ ${displayName}` : "โพสต์ในชื่อของคุณ"}</small>
         </div>
         {isAdmin ? (

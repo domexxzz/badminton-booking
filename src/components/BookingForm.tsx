@@ -70,9 +70,7 @@ export function BookingForm({
     return courts[0]?.id ?? 1;
   });
   const [hour, setHour] = useState<number | null>(initial.hour ?? null);
-  const [hours, setHours] = useState(1);
-  // Half-hour starts are still bookable, just not in the first grid a customer sees.
-  const [halfHourStarts, setHalfHourStarts] = useState(() => initial.hour !== undefined && initial.hour % 1 !== 0);
+  const [hours, setHours] = useState(0.5);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -150,8 +148,8 @@ export function BookingForm({
       ? courts.filter((c) => getAvailableHoursForCourt(c.id, date, hour) >= hours)
       : [];
 
-  // The time grid: hourly by default, every half hour when asked for.
-  const slotStep = halfHourStarts ? 0.5 : 1;
+  // The time grid: every half hour by default.
+  const slotStep = 0.5;
   const slots = openingSlots(slotStep, openHour, closeHour);
   const freeCourtsAt = (h: number) => courts.filter((c) => getAvailableHoursForCourt(c.id, date, h) >= slotStep);
 
@@ -169,10 +167,9 @@ export function BookingForm({
     // Keep the court the customer already had if it is free; otherwise the first free one.
     const keep = getAvailableHoursForCourt(activeCourtId, date, h) >= slotStep;
     const courtId = keep ? activeCourtId : (freeCourtsAt(h)[0]?.id ?? activeCourtId);
-    const avail = getAvailableHoursForCourt(courtId, date, h);
     setActiveCourtId(courtId);
     setHour(h);
-    setHours(avail >= 1 ? 1 : 0.5);
+    setHours(0.5);
   }
 
   // Like a hotel calendar: the first tap is the start, the next tap later in the day is the
@@ -412,7 +409,7 @@ export function BookingForm({
 
         <div
           ref={gridRef}
-          className={`hour-slot-grid ${halfHourStarts ? "half-hours" : ""}`}
+          className="hour-slot-grid half-hours"
           aria-busy={!loaded}
           onPointerMove={moveDrag}
           onPointerUp={endDrag}
@@ -489,21 +486,6 @@ export function BookingForm({
               : "แตะช่องอื่นเพื่อเลือกใหม่ หรือลากช่องสีเขียวเพื่อปรับเวลา"}
           </p>
         )}
-
-        <details className="booking-more" open={halfHourStarts || undefined}>
-          <summary>ตัวเลือกเพิ่มเติม</summary>
-          <label className="booking-more-option">
-            <input
-              type="checkbox"
-              checked={halfHourStarts}
-              onChange={(e) => {
-                setHalfHourStarts(e.target.checked);
-                setHour(null);
-              }}
-            />
-            <span>แสดงเวลาเริ่มทุก 30 นาที (เช่น 13:30)</span>
-          </label>
-        </details>
       </section>
 
       {/* Step 2: which court, and for how long */}

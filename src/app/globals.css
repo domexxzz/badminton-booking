@@ -3148,7 +3148,7 @@ details summary { cursor: pointer; }
 }
 .hour-slot:active:not(:disabled) { transform: scale(.97); }
 .hour-slot.free:hover { border-color: var(--primary); }
-.hour-slot-time { font-size: 14px; font-weight: 800; white-space: nowrap; }
+.hour-slot-time { font-size: 13px; font-weight: 800; white-space: nowrap; }
 .hour-slot-dots { display: flex; gap: 4px; }
 .hour-slot-note { font-size: 11px; color: var(--muted); }
 .hour-slot.selected, .hour-slot.in-range { border-color: var(--primary); background: var(--primary); color: #fff; }
@@ -3159,10 +3159,10 @@ details summary { cursor: pointer; }
 .hour-slot.full .hour-slot-time { text-decoration: line-through; }
 .hour-slot-grid.half-hours .hour-slot-time { font-size: 13px; }
 
-.booking-more { font-size: 13px; color: var(--muted); }
-.booking-more summary { width: fit-content; cursor: pointer; padding: 4px 0; font-weight: 600; }
-.booking-more-option { display: flex; align-items: center; gap: 8px; margin-top: 6px; color: var(--text); cursor: pointer; }
-.booking-more-option input { width: 18px; height: 18px; accent-color: var(--primary); }
+
+
+
+
 
 .court-pick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .court-pick {

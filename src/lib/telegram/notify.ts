@@ -26,9 +26,11 @@ import {
   formatTelegramCancelRequest,
   formatTelegramNewBooking,
   formatTelegramRescheduleRequest,
+  formatTelegramSlipCheckDown,
   formatTelegramSlipReport,
   type TelegramBookingSummary,
 } from "./messages";
+import { shouldAlertSlipFailure, slipFailureKey, type SlipAlertState } from "./slip-health";
 
 async function loadBookingSummary(bookingId: string): Promise<TelegramBookingSummary | null> {
   const supabase = getServiceClient();
@@ -122,6 +124,53 @@ export async function notifyTelegramNewBooking(bookingId: string): Promise<void>
   }
 }
 
+// The last failure the shop was told about, so one expired package does not send one
+// message per slip. In memory on purpose: Render runs a single instance, and losing
+// this on deploy only means the next failure is reported once more than needed.
+let lastSlipAlert: SlipAlertState = null;
+
+/** Exported for tests only. */
+export function resetSlipAlertState(): void {
+  lastSlipAlert = null;
+}
+
+/**
+ * Tells the shop when the slip checker itself stopped working, as its own alert.
+ * A slip that needs review is routine and already reported; this is the shop
+ * losing automatic confirmation until somebody renews or fixes something.
+ * Never throws.
+ */
+async function alertIfSlipCheckerDown(
+  verifyStatus: string | null,
+  reasons: readonly string[],
+  bookingId: string,
+): Promise<void> {
+  try {
+    const now = Date.now();
+    if (!shouldAlertSlipFailure({ verifyStatus, reasons, last: lastSlipAlert, now })) return;
+    lastSlipAlert = { key: slipFailureKey(reasons), at: now };
+
+    // How big the problem already is, so the shop can tell one hiccup from an outage.
+    let failedLast24h: number | undefined;
+    const supabase = getServiceClient();
+    if (supabase) {
+      const since = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+      const { count } = await supabase
+        .from("payments")
+        .select("id", { count: "exact", head: true })
+        .eq("verify_status", "error")
+        .gte("created_at", since);
+      failedLast24h = count ?? undefined;
+    }
+
+    await sendTelegramMessage(formatTelegramSlipCheckDown({ reasons, failedLast24h, bookingId }), {
+      parseMode: "HTML",
+    });
+  } catch (error) {
+    console.error("Telegram slip-checker alert failed:", error);
+  }
+}
+
 /** Pushes an EasySlip verification report (with slip photo) to Telegram group. Never throws. */
 export async function notifyTelegramAfterSlip(
   bookingId: string,
@@ -164,6 +213,8 @@ export async function notifyTelegramAfterSlip(
       senderName,
       senderBank,
     };
+
+    await alertIfSlipCheckerDown(reportParams.verifyStatus, reportParams.reasons, bookingId);
 
     const text = formatTelegramSlipReport(reportParams);
     const config = getTelegramConfig();

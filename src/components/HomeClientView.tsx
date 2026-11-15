@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { BrandPromo } from "@/components/BrandPromo";
+import { ChivarGoBadge } from "@/components/ChivarGoBadge";
 import { CourtRules } from "@/components/CourtRules";
 import {
   CalendarGridIcon,
@@ -292,6 +293,8 @@ export function HomeClientView({
       </section>
 
       <CourtRules />
+
+      <ChivarGoBadge />
     </div>
   );
 }

@@ -1042,6 +1042,65 @@ check("the winner gained exactly what the loser lost",
     `select admin_mark_booking_unpaid('${online.id}')`, "BOOKING_NOT_FOUND");
 }
 
+// ก๊วนเม้ามอย: Mon/Wed/Fri locked for good (0037)
+{
+  const one = async (sql) => (await db.query(sql)).rows[0];
+  const LOCKED = "admin_note = '[จองประจำ] ล็อกอัตโนมัติ'";
+  const BKK = "at time zone 'Asia/Bangkok'";
+  const lock = async () => (await one("select lock_mao_moi_courts() as n")).n;
+  // Earlier checks leave bookings behind; start from an empty fortnight.
+  await db.exec("update bookings set status = 'cancelled' where starts_at > now() and status <> 'cancelled'");
+
+  // Somebody already has court 2 on the last Wednesday of the window.
+  const { day: taken } = await one(`select d::date::text as day
+    from generate_series((now() ${BKK})::date + 1, (now() ${BKK})::date + 14, interval '1 day') d
+    where extract(isodow from d) = 3 order by d desc limit 1`);
+  const other = await one(`insert into bookings (court_id, user_id, starts_at, ends_at, amount, status, channel, customer_name)
+    values (2, '${ADMIN}', timestamp '${taken} 18:00' ${BKK}, timestamp '${taken} 20:00' ${BKK}, 260, 'confirmed', 'phone', 'ก๊วนอื่น')
+    returning id`);
+
+  const added = await lock();
+  const { rows } = await db.query(`select court_id, to_char(starts_at ${BKK}, 'HH24:MI') as s, to_char(ends_at ${BKK}, 'HH24:MI') as e,
+    extract(isodow from starts_at ${BKK})::int as dow, (starts_at ${BKK})::date::text as day, customer_name, status,
+    channel, pay_later, paid_at, group_id from bookings where ${LOCKED}`);
+  const wanted = (r) => (r.court_id === 1 ? "20:00-23:00" : "19:00-23:00");
+  check("the ก๊วน's courts are locked at the hours it asked for",
+    rows.length > 0 && added === rows.length && rows.every((r) => `${r.s}-${r.e}` === wanted(r)), `${rows.length} rows`);
+  check("on Mondays, Wednesdays and Fridays only",
+    JSON.stringify([...new Set(rows.map((r) => r.dow))].sort()) === "[1,3,5]");
+  check("confirmed, owed and under the ก๊วน's name",
+    rows.every((r) => r.status === "confirmed" && r.pay_later && !r.paid_at && r.customer_name === "ก๊วนเม้ามอย" && r.channel === "line"));
+  check("at the court's own price", (await one(`select bool_and(b.amount = round(c.price_per_hour * extract(epoch from b.ends_at - b.starts_at) / 3600)) as ok
+    from bookings b join courts c on c.id = b.court_id where b.${LOCKED}`)).ok);
+  check("a night is one bill",
+    new Set(rows.map((r) => r.group_id)).size === new Set(rows.map((r) => r.day)).size);
+  check("somebody else's booking is left alone and the other courts still lock",
+    JSON.stringify(rows.filter((r) => r.day === taken).map((r) => r.court_id).sort()) === "[1,3,4]"
+      && (await one(`select status from bookings where id = '${other.id}'`)).status === "confirmed");
+  check("the public board shows them taken",
+    (await one(`select count(*)::int as n from court_occupancy o join bookings b on b.id = o.booking_id
+      where b.${LOCKED} and o.state = 'booked'`)).n === rows.length);
+  check("running it again adds nothing", (await lock()) === 0);
+
+  await db.exec(`update bookings set status = 'cancelled' where id = '${other.id}'`);
+  check("a court that frees up is locked the next time", (await lock()) === 1);
+
+  await as(ADMIN);
+  const night = await one(`select id, group_id from bookings where ${LOCKED} and (starts_at ${BKK})::date <> '${taken}' limit 1`);
+  await db.query(`select cancel_booking('${night.id}')`);
+  check("cancelling a night frees every court that night",
+    (await one(`select count(*)::int as n from bookings where group_id = '${night.group_id}' and status <> 'cancelled'`)).n === 0);
+  check("and a cancelled night stays free", (await lock()) === 0);
+
+  const paid = await one(`select id, group_id from bookings where ${LOCKED} and status = 'confirmed' limit 1`);
+  await db.query(`select mark_booking_paid('${paid.id}')`);
+  check("one press settles the night's bill",
+    (await one(`select count(*)::int as n from bookings where group_id = '${paid.group_id}' and paid_at is null`)).n === 0);
+  check("customers cannot run the lock themselves",
+    (await one(`select has_function_privilege('authenticated', 'lock_mao_moi_courts()', 'execute')
+      or has_function_privilege('anon', 'lock_mao_moi_courts()', 'execute') as ok`)).ok === false);
+}
+
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED");
 process.exit(failures ? 1 : 0);
 

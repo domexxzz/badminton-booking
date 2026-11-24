@@ -1016,6 +1016,45 @@ check("the win and the loss are both on the scoreboard",
 check("the winner gained exactly what the loser lost",
   (await db.query(`select sum(rating_delta)::int total from party_player_stats where party_id='${singles.party_id}'`)).rows[0]?.total === 0);
 
+// ---- Admin bookings for several courts on one bill (0038) ----
+{
+  const one = async (sql) => (await db.query(sql)).rows[0];
+  const { rows: [{ t: cartAt }] } = await db.query(
+    `select ((now() at time zone 'Asia/Bangkok')::date + 5 + time '09:00') at time zone 'Asia/Bangkok' as t`);
+  const at = (h) => new Date(Date.parse(cartAt) + h * 3600e3).toISOString();
+  const cart = (items, channel = "phone", name = "'  ก๊วนทดสอบ  '") =>
+    `select * from admin_create_cart_booking('${JSON.stringify(items)}'::jsonb, '${channel}', ${name}, '0812345678', '[จองประจำ]')`;
+  const item = (court_id, h, hours) => ({ court_id, starts_at: at(h), hours });
+  const total = async () => (await one("select count(*)::int as n from bookings")).n;
+
+  await as(U1);
+  await expectError("a customer cannot enter an admin bill", cart([item(1, 0, 1), item(2, 0, 1)]), "FORBIDDEN");
+
+  await as(ADMIN);
+  const lead = await one(cart([item(1, 1, 3), item(2, 0, 4)]));
+  const { rows: bill } = await db.query(`select * from bookings where group_id = '${lead.group_id}' order by court_id`);
+  check("an admin books several courts and times as one bill",
+    bill.length === 2 && lead.court_id === 1 && bill.every((b) => b.status === "confirmed" && b.user_id === ADMIN));
+  check("each court keeps its own time",
+    bill[0].starts_at.toISOString() === at(1) && bill[0].ends_at.toISOString() === at(4)
+      && bill[1].starts_at.toISOString() === at(0) && bill[1].ends_at.toISOString() === at(4));
+  check("the customer's details are on every court of the bill",
+    bill.every((b) => b.channel === "phone" && b.customer_name === "ก๊วนทดสอบ"
+      && b.customer_phone === "0812345678" && b.admin_note === "[จองประจำ]"));
+  check("each court is charged its own price", (await one(`select bool_and(b.amount = round(c.price_per_hour * extract(epoch from b.ends_at - b.starts_at) / 3600)) as ok
+    from bookings b join courts c on c.id = b.court_id where b.group_id = '${lead.group_id}'`)).ok);
+  await db.query(`select admin_mark_booking_unpaid('${lead.id}')`);
+  check("marking the bill owed covers every court",
+    (await one(`select count(*)::int as n from bookings where group_id = '${lead.group_id}' and pay_later and paid_at is null`)).n === 2);
+
+  const before = await total();
+  await expectError("a taken court fails the whole bill", cart([item(3, 0, 1), item(2, 1, 1)]), "SLOT_TAKEN");
+  check("and nothing from that bill is kept", (await total()) === before);
+  await expectError("a bill still needs a name", cart([item(3, 0, 1), item(4, 0, 1)], "phone", "'  '"), "INVALID_CUSTOMER");
+  await expectError("a bill cannot pose as an online booking", cart([item(3, 0, 1), item(4, 0, 1)], "online"), "INVALID_CUSTOMER");
+  await expectError("a bill stays inside opening hours", cart([item(3, 0, 1), item(4, 13, 2)]), "OUTSIDE_OPENING_HOURS");
+}
+
 // ---- Admin bookings that are owed (0034) ----
 {
   const one = async (sql) => (await db.query(sql)).rows[0];

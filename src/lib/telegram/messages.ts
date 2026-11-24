@@ -1,6 +1,7 @@
 import { CHANNEL_LABEL, formatBaht, formatDate, formatSlot } from "@/lib/format";
 import type { BookingSummary } from "@/lib/line/messages";
 import { sanitizeName } from "@/lib/line/messages";
+import { slipFailureAdvice } from "./slip-health";
 
 export function escapeHtml(text: string): string {
   return text
@@ -282,3 +283,43 @@ export function formatTelegramCancelledBooking(summary: TelegramBookingSummary, 
   return text;
 }
 
+
+export type TelegramSlipCheckDownParams = {
+  /** verify_reasons as recorded on the payment; the first one is the provider's message. */
+  reasons: readonly string[];
+  /** How many slips the same failure has already hit, when it is known. */
+  failedLast24h?: number;
+  bookingId?: string;
+};
+
+/**
+ * The alert for "the slip checker itself is not working". Deliberately not shaped like
+ * the per-slip report: a slip needing review is routine, this is the shop losing
+ * automatic confirmation until somebody acts.
+ */
+export function formatTelegramSlipCheckDown(params: TelegramSlipCheckDownParams): string {
+  const { reasons, failedLast24h, bookingId } = params;
+  const reason = (reasons[0] ?? "ไม่ทราบสาเหตุ").trim();
+  const advice = slipFailureAdvice(reasons);
+
+  let text =
+    `🚨 <b>ระบบตรวจสลิปอัตโนมัติใช้งานไม่ได้</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `❌ <b>สาเหตุ:</b> ${escapeHtml(reason)}\n`;
+
+  if (failedLast24h != null && failedLast24h > 0) {
+    text += `📉 <b>สลิปที่ตรวจไม่ได้ใน 24 ชม.:</b> ${failedLast24h} ใบ\n`;
+  }
+
+  text += `⚠️ ระหว่างนี้การจองจะไม่ถูกยืนยันอัตโนมัติ แอดมินต้องกด<b>ยืนยันเอง</b>ทุกใบ\n`;
+
+  if (advice) {
+    text += `🛠️ <b>ต้องทำ:</b> ${escapeHtml(advice)}\n`;
+  }
+
+  if (bookingId) {
+    text += `🔗 ${siteUrl()}/admin/review\n`;
+  }
+
+  return text;
+}

@@ -1,5 +1,6 @@
 import { ShopContactCard } from "@/components/ShopContactCard";
 import { BrandPromo } from "@/components/BrandPromo";
+import { ChivarGoBadge } from "@/components/ChivarGoBadge";
 import { CourtArt } from "@/components/CourtArt";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -216,6 +217,7 @@ export default async function MyBookingsPage() {
       </section>
       <BrandPromo />
       <ShopContactCard />
+      <ChivarGoBadge />
     </>
   );
 }
